@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Clock3, Dumbbell } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
@@ -37,6 +37,11 @@ export function WorkoutPage() {
     () => createCanonicalExerciseIdMap(exercises, templates, sessions),
     [exercises, sessions, templates]
   )
+  const workoutStatus = progress.total > 0 && progress.completed === progress.total
+    ? 'Completado'
+    : progress.completed > 0
+      ? 'En curso'
+      : 'Pendiente'
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
@@ -69,38 +74,44 @@ export function WorkoutPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-      <section className="overflow-hidden rounded-3xl bg-hero p-5 text-on-hero shadow-card md:flex md:items-center md:justify-between md:p-6">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-hero-accent">Sesión en curso</p>
-          <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{template.name}</h2>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-hero-muted">
-            <span className="flex items-center gap-1.5"><Dumbbell className="size-4 text-hero-accent" aria-hidden="true" />{template.exercises.length} ejercicios</span>
-            <span className="flex items-center gap-1.5"><Clock3 className="size-4 text-hero-accent" aria-hidden="true" />Entrenamiento activo</span>
+    <div className="space-y-4 pb-24 sm:space-y-5">
+      <section className="overflow-hidden rounded-3xl bg-hero p-4 text-on-hero shadow-card md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-hero-accent">Entrenar</p>
+            <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{template.name}</h2>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-hero-muted">
+              <span className="flex items-center gap-1.5">
+                <Dumbbell className="size-4 text-hero-accent" aria-hidden="true" />
+                {template.exercises.length} ejercicios
+              </span>
+              <span>{progress.completed}/{progress.total} series</span>
+              <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
+            </div>
           </div>
-        </div>
-        <div className="mt-5 min-w-56 md:mt-0">
-          <div className="mb-2 flex justify-between text-xs font-bold">
-            <span>Progreso</span>
-            <span className="text-hero-muted">{progress.completed} / {progress.total} series</span>
-          </div>
-          <div
-            className="h-2.5 overflow-hidden rounded-full bg-on-hero/15"
-            role="progressbar"
-            aria-label="Progreso de series realizadas"
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-            aria-valuenow={progress.completed}
-          >
+          <div className="min-w-36 flex-1 sm:max-w-64">
+            <div className="mb-2 flex justify-between text-xs font-bold">
+              <span>Progreso</span>
+              <span className="text-hero-muted">{progress.completed} / {progress.total}</span>
+            </div>
             <div
-              className="h-full rounded-full bg-hero-accent transition-all duration-300"
-              style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
-            />
+              className="h-2.5 overflow-hidden rounded-full bg-on-hero/15"
+              role="progressbar"
+              aria-label="Progreso de series realizadas"
+              aria-valuemin={0}
+              aria-valuemax={progress.total}
+              aria-valuenow={progress.completed}
+            >
+              <div
+                className="h-full rounded-full bg-hero-accent transition-all duration-300"
+                style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
+              />
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         {template.exercises.map((item) => {
           const log = logs.find((entry) => entry.exerciseId === item.exerciseId)
           const equivalentIds = new Set(getEquivalentExerciseIds(exercises, item.exerciseId))
@@ -132,15 +143,21 @@ export function WorkoutPage() {
             <span>{saveError}</span>
           </p>
         )}
-        <button
-          type="button"
-          onClick={() => void finishWorkout()}
-          disabled={saving || progress.completed === 0}
-          className="btn-primary w-full !min-h-12 !bg-success-solid !text-base !text-on-brand hover:!bg-success-solid-hover"
-        >
-          <CheckCircle2 className="size-5" aria-hidden="true" />
-          {saving ? 'Guardando…' : 'Finalizar y guardar entrenamiento'}
-        </button>
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+          <div className="rounded-xl bg-muted px-3 py-2 text-center">
+            <p className="text-base font-extrabold text-ink">{progress.completed}/{progress.total}</p>
+            <p className="text-[11px] font-bold text-secondary">series</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void finishWorkout()}
+            disabled={saving || progress.completed === 0}
+            className="btn-primary w-full !min-h-12 !bg-success-solid !text-base !text-on-brand hover:!bg-success-solid-hover"
+          >
+            <CheckCircle2 className="size-5" aria-hidden="true" />
+            {saving ? 'Guardando…' : 'Finalizar y guardar'}
+          </button>
+        </div>
       </div>
     </div>
   )
