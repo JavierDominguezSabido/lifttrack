@@ -2,7 +2,6 @@ import { ArrowRight, CalendarCheck, Clock3, Dumbbell, Flame, Trophy } from 'luci
 import { Link } from 'react-router-dom'
 import { ProgressRing } from '../components/ui/ProgressRing'
 import { TemplateExerciseRow } from '../components/workout/TemplateExerciseRow'
-import { templates } from '../data/mockData'
 import { useWorkouts } from '../context/WorkoutContext'
 import {
   formatCompactNumber,
@@ -13,7 +12,7 @@ import {
 } from '../utils/workout'
 
 export function DashboardPage() {
-  const { sessions } = useWorkouts()
+  const { sessions, templates, getExerciseById } = useWorkouts()
   const todayTemplate = getTodayTemplate(templates)
   const recentSessions = [...sessions]
     .filter((session) => session.completedAt && !isInitialSession(session.id))
@@ -98,7 +97,7 @@ export function DashboardPage() {
           </div>
           <div className="divide-y divide-line">
             {todayTemplate.exercises.slice(0, 4).map((item) => (
-              <TemplateExerciseRow key={item.id} item={item} />
+              <TemplateExerciseRow key={item.id} item={item} exercise={getExerciseById(item.exerciseId)} />
             ))}
           </div>
         </div>

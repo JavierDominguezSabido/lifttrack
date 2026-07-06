@@ -3,9 +3,8 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useWorkouts } from '../context/WorkoutContext'
-import { templates } from '../data/mockData'
 import type { DraftExerciseLog } from '../types'
-import { formatDate, getExercise, isInitialSession } from '../utils/workout'
+import { formatDate, isInitialSession } from '../utils/workout'
 import {
   createDraftFromSession,
   updateWorkoutSession,
@@ -15,7 +14,7 @@ import {
 export function EditSessionPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { sessions, saveSession } = useWorkouts()
+  const { sessions, saveSession, templates, getExerciseById } = useWorkouts()
   const session = sessions.find((item) => item.id === sessionId)
   const template =
     templates.find((item) => item.id === session?.templateId) ??
@@ -45,7 +44,7 @@ export function EditSessionPage() {
     const validationError = validateWorkoutDraft(logs)[0]
     if (validationError) {
       const exerciseName =
-        getExercise(validationError.exerciseId)?.name ?? validationError.exerciseId
+        getExerciseById(validationError.exerciseId)?.name ?? validationError.exerciseId
       setError(`${exerciseName}, serie ${validationError.setNumber}: ${validationError.message}`)
       return
     }
@@ -90,7 +89,14 @@ export function EditSessionPage() {
         {logs.map((log) => {
           const templateExercise = template.exercises.find(
             (item) => item.exerciseId === log.exerciseId
-          )
+          ) ?? {
+            id: `historical-${log.id}`,
+            templateId: template.id,
+            exerciseId: log.exerciseId,
+            order: log.order,
+            targetSets: Math.max(1, log.sets.length),
+            targetReps: String(log.sets[0]?.reps ?? 8)
+          }
           return templateExercise ? (
             <ExerciseLogger
               key={log.id}
@@ -98,6 +104,7 @@ export function EditSessionPage() {
               log={log}
               previousPerformance={null}
               onChange={updateLog}
+              exercise={getExerciseById(log.exerciseId)}
             />
           ) : null
         })}

@@ -1,10 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { templates } from '../../data/mockData'
 import type { Database } from '../../types/database'
 import type { WorkoutSession } from '../../types'
-import { getExercise } from '../../utils/workout'
 import { getLastExercisePerformanceFromSessions } from '../../utils/workoutHistory'
 import type { WorkoutRepository } from '../workoutRepository'
+import { getStoredExercises, getStoredTemplates } from '../routineStorage'
 import { supabase } from './supabaseClient'
 
 type DbClient = SupabaseClient<Database>
@@ -30,8 +29,13 @@ function throwIfError(error: { message: string } | null) {
 async function persistSession(session: WorkoutSession) {
   const client = requireClient()
   const userId = await requireUserId(client)
-  const domainTemplate = templates.find((item) => item.id === session.templateId)
+  const domainTemplate = getStoredTemplates().find((item) => item.id === session.templateId)
   let templateId: string | null = null
+
+  const { error: profileError } = await client
+    .from('profiles')
+    .upsert({ id: userId }, { onConflict: 'id' })
+  throwIfError(profileError)
 
   if (session.templateId) {
     const { data, error } = await client
@@ -51,7 +55,7 @@ async function persistSession(session: WorkoutSession) {
 
   const exerciseIds = new Map<string, string>()
   for (const log of session.exerciseLogs) {
-    const exercise = getExercise(log.exerciseId)
+    const exercise = getStoredExercises().find((item) => item.id === log.exerciseId)
     const { data, error } = await client
       .from('exercises')
       .upsert({

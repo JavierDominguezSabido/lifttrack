@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import {
   formatRestSeconds,
-  getExercise,
   getProgressionSuggestion
 } from '../../utils/workout'
 import {
@@ -21,6 +20,7 @@ import {
 import type {
   DraftExerciseLog,
   DraftSetLog,
+  Exercise,
   LastExercisePerformance,
   WorkoutTemplateExercise
 } from '../../types'
@@ -30,15 +30,16 @@ interface ExerciseLoggerProps {
   log: DraftExerciseLog
   previousPerformance: LastExercisePerformance | null
   onChange: (log: DraftExerciseLog) => void
+  exercise?: Exercise
 }
 
 export function ExerciseLogger({
   templateExercise,
   log,
   previousPerformance,
-  onChange
+  onChange,
+  exercise
 }: ExerciseLoggerProps) {
-  const exercise = getExercise(templateExercise.exerciseId)
   if (!exercise) return null
 
   const workingWeight = getWorkingWeight(log)
@@ -137,6 +138,12 @@ export function ExerciseLogger({
         {exercise.notes && (
           <p className="mt-3 rounded-xl border border-warning/40 bg-warning-soft px-3 py-2.5 text-sm font-medium text-warning-text">
             <span className="font-bold">Técnica:</span> {exercise.notes}
+          </p>
+        )}
+
+        {templateExercise.notes && (
+          <p className="mt-3 rounded-xl border border-brand/30 bg-brand-soft px-3 py-2.5 text-sm font-medium text-ink">
+            <span className="font-bold">Rutina:</span> {templateExercise.notes}
           </p>
         )}
       </header>

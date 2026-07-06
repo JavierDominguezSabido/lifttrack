@@ -1,7 +1,6 @@
-import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Dumbbell, LayoutDashboard } from 'lucide-react'
+import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, Dumbbell, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
-import { templates } from '../../data/mockData'
 import { getCurrentWeekSessions } from '../../utils/workout'
 import { ThemeToggle } from '../ui/ThemeToggle'
 
@@ -9,19 +8,21 @@ const navigation = [
   { label: 'Inicio', path: '/', icon: LayoutDashboard },
   { label: 'Rutina', path: '/rutina', icon: CalendarDays },
   { label: 'Entrenar', path: '/entrenamiento', icon: Dumbbell },
-  { label: 'Historial', path: '/historial', icon: ChartNoAxesColumnIncreasing }
+  { label: 'Historial', path: '/historial', icon: ChartNoAxesColumnIncreasing },
+  { label: 'Ajustes', path: '/configuracion', icon: Settings }
 ]
 
 const pageTitles: Record<string, string> = {
   '/': 'Resumen',
   '/rutina': 'Rutina semanal',
   '/entrenamiento': 'Entrenamiento',
-  '/historial': 'Historial'
+  '/historial': 'Historial',
+  '/configuracion': 'Configuración'
 }
 
 export function AppLayout() {
   const location = useLocation()
-  const { sessions } = useWorkouts()
+  const { sessions, templates, dataMode, sessionsError, sessionsLoading } = useWorkouts()
   const weeklySessionCount = getCurrentWeekSessions(sessions).length
   const weeklyProgress = Math.min(100, (weeklySessionCount / templates.length) * 100)
   const currentDate = new Intl.DateTimeFormat('es-ES', {
@@ -86,6 +87,21 @@ export function AppLayout() {
             <h1 className="text-xl font-extrabold tracking-tight lg:text-2xl">{title}</h1>
           </div>
           <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-extrabold ${
+                dataMode === 'cloud'
+                  ? 'bg-success-soft text-success-text'
+                  : 'bg-muted text-secondary'
+              }`}
+              title={dataMode === 'cloud' ? 'Modo sincronizado con Supabase' : 'Modo local'}
+            >
+              {dataMode === 'cloud'
+                ? <Cloud className="size-4" aria-hidden="true" />
+                : <HardDrive className="size-4" aria-hidden="true" />}
+              <span className="hidden sm:inline">
+                {dataMode === 'cloud' ? 'Sincronizado' : 'Local'}
+              </span>
+            </span>
             <ThemeToggle />
             <div aria-label="LiftTrack" className="grid size-10 place-items-center rounded-2xl bg-hero text-sm font-extrabold text-hero-accent shadow-sm">
               LT
@@ -94,11 +110,22 @@ export function AppLayout() {
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
-          <Outlet />
+          {sessionsLoading ? (
+            <p role="status" className="mb-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-secondary">
+              Cargando entrenamientos…
+            </p>
+          ) : (
+            <>
+              {sessionsError && (
+                <p role="alert" className="status-error mb-4">{sessionsError}</p>
+              )}
+              <Outlet />
+            </>
+          )}
         </main>
       </div>
 
-      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[72px] grid-cols-4 border-t border-line bg-surface/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-nav backdrop-blur-xl lg:hidden">
+      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[72px] grid-cols-5 border-t border-line bg-surface/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-nav backdrop-blur-xl lg:hidden">
         {navigation.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}

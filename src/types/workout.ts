@@ -10,15 +10,16 @@ export type MuscleGroup =
 export interface Exercise {
   id: string
   name: string
-  muscleGroup: MuscleGroup
+  muscleGroup?: MuscleGroup
   equipment?: string
-  dayOfWeek: number
-  targetSets: number
-  targetReps: string
-  restSeconds: number
-  lastReps: number[]
+  dayOfWeek?: number
+  targetSets?: number
+  targetReps?: string
+  restSeconds?: number
+  lastReps?: number[]
   lastWeightKg?: number
   notes?: string
+  active: boolean
 }
 
 export interface WorkoutTemplate {
@@ -37,6 +38,7 @@ export interface WorkoutTemplateExercise {
   targetSets: number
   targetReps: string
   restSeconds?: number
+  notes?: string
 }
 
 export interface WorkoutSession {

@@ -12,13 +12,11 @@ import {
 import { useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
-import { exercises } from '../data/mockData'
 import type { SetLog } from '../types'
 import {
   dayNames,
   formatCompactNumber,
   formatDate,
-  getExercise,
   getSessionVolume,
   isInitialSession
 } from '../utils/workout'
@@ -26,7 +24,14 @@ import {
 export function HistoryPage() {
   const { exerciseId } = useParams()
   const location = useLocation()
-  const { sessions, deleteSession, clearLocalSessions } = useWorkouts()
+  const {
+    sessions,
+    deleteSession,
+    clearLocalSessions,
+    exercises,
+    getExerciseById,
+    dataMode
+  } = useWorkouts()
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const exercise = exercises.find((item) => item.id === exerciseId) ?? exercises[0]
@@ -119,7 +124,7 @@ export function HistoryPage() {
               Entrenamientos guardados
             </h2>
           </div>
-          {localSessions.length > 0 && (
+          {localSessions.length > 0 && dataMode === 'local' && (
             <button
               type="button"
               onClick={() => void clearTestData()}
@@ -180,7 +185,7 @@ export function HistoryPage() {
 
                 <div className="divide-y divide-line px-4 sm:px-5">
                   {session.exerciseLogs.map((log) => {
-                    const loggedExercise = getExercise(log.exerciseId)
+                    const loggedExercise = getExerciseById(log.exerciseId)
                     const completedSets = log.sets.filter((set) => set.completed)
                     const weight = log.workingWeightKg ?? completedSets[0]?.weightKg ?? 0
                     return (

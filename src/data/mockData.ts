@@ -57,7 +57,8 @@ const routine: RoutineExerciseSeed[] = [
 
 export const exercises: Exercise[] = routine.map((exercise) => ({
   ...exercise,
-  targetReps: String(exercise.targetReps)
+  targetReps: String(exercise.targetReps),
+  active: true
 }))
 
 const templateNames: Record<number, { id: string; name: string; notes: string }> = {

@@ -1,11 +1,23 @@
 import { createContext, useContext } from 'react'
-import type { WorkoutSession } from '../types'
+import type { Exercise, WorkoutSession, WorkoutTemplate } from '../types'
 
 export interface WorkoutContextValue {
   sessions: WorkoutSession[]
+  exercises: Exercise[]
+  templates: WorkoutTemplate[]
+  hasCustomRoutine: boolean
+  sessionsLoading: boolean
+  sessionsError: string | null
+  dataMode: 'local' | 'cloud'
   saveSession: (session: WorkoutSession) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   clearLocalSessions: () => Promise<void>
+  createExercise: (exercise: Omit<Exercise, 'id'>) => Exercise
+  updateExercise: (exercise: Exercise) => void
+  archiveExercise: (exerciseId: string) => boolean
+  saveTemplates: (templates: WorkoutTemplate[]) => void
+  getExerciseById: (exerciseId: string) => Exercise | undefined
+  reloadSessions: (silent?: boolean) => Promise<void>
 }
 
 export const WorkoutContext = createContext<WorkoutContextValue | null>(null)

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
 import { App } from './App'
 import { WorkoutProvider } from './context/WorkoutProvider'
+import { AuthProvider } from './context/AuthProvider'
 import './index.css'
 
 registerSW({ immediate: true })
@@ -11,9 +12,11 @@ registerSW({ immediate: true })
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <WorkoutProvider>
-        <App />
-      </WorkoutProvider>
+      <AuthProvider>
+        <WorkoutProvider>
+          <App />
+        </WorkoutProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>
 )

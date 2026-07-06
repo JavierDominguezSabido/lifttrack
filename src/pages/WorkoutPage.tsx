@@ -3,9 +3,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useWorkouts } from '../context/WorkoutContext'
-import { templates } from '../data/mockData'
 import type { DraftExerciseLog } from '../types'
-import { getExercise, getTodayTemplate } from '../utils/workout'
+import { getTodayTemplate } from '../utils/workout'
 import {
   createExerciseLogs,
   createWorkoutSession,
@@ -16,7 +15,7 @@ import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
 export function WorkoutPage() {
   const { templateId } = useParams()
   const navigate = useNavigate()
-  const { sessions, saveSession } = useWorkouts()
+  const { sessions, saveSession, templates, getExerciseById } = useWorkouts()
   const template = templates.find((item) => item.id === templateId) ?? getTodayTemplate(templates)
   const [logs, setLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions))
   const [startedAt] = useState(() => new Date().toISOString())
@@ -40,7 +39,7 @@ export function WorkoutPage() {
     const validationError = validateWorkoutDraft(logs)[0]
     if (validationError) {
       const exerciseName =
-        getExercise(validationError.exerciseId)?.name ?? validationError.exerciseId
+        getExerciseById(validationError.exerciseId)?.name ?? validationError.exerciseId
       setSaveError(
         `${exerciseName}, serie ${validationError.setNumber}: ${validationError.message}`
       )
@@ -104,6 +103,7 @@ export function WorkoutPage() {
               log={log}
               previousPerformance={previousPerformance}
               onChange={updateLog}
+              exercise={getExerciseById(item.exerciseId)}
             />
           ) : null
         })}

@@ -4,6 +4,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { EditSessionPage } from './pages/EditSessionPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { RoutinePage } from './pages/RoutinePage'
+import { SettingsPage } from './pages/SettingsPage'
 import { WorkoutPage } from './pages/WorkoutPage'
 
 export function App() {
@@ -12,6 +13,7 @@ export function App() {
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="/rutina" element={<RoutinePage />} />
+        <Route path="/configuracion" element={<SettingsPage />} />
         <Route path="/entrenamiento" element={<WorkoutPage />} />
         <Route path="/entrenamiento/:templateId" element={<WorkoutPage />} />
         <Route path="/historial" element={<HistoryPage />} />

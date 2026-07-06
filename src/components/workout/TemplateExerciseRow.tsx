@@ -1,9 +1,14 @@
 import { Clock3 } from 'lucide-react'
-import { formatRestSeconds, getExercise } from '../../utils/workout'
-import type { WorkoutTemplateExercise } from '../../types'
+import { formatRestSeconds } from '../../utils/workout'
+import type { Exercise, WorkoutTemplateExercise } from '../../types'
 
-export function TemplateExerciseRow({ item }: { item: WorkoutTemplateExercise }) {
-  const exercise = getExercise(item.exerciseId)
+export function TemplateExerciseRow({
+  item,
+  exercise
+}: {
+  item: WorkoutTemplateExercise
+  exercise?: Exercise
+}) {
   if (!exercise) return null
 
   return (
