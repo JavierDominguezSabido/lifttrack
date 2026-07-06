@@ -1,0 +1,136 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-canvas: 246 247 249;
+  --color-surface: 255 255 255;
+  --color-raised: 255 255 255;
+  --color-muted: 245 245 244;
+  --color-line: 226 224 221;
+  --color-control: 148 143 137;
+  --color-ink: 23 32 51;
+  --color-secondary: 87 83 78;
+  --color-subtle: 120 113 108;
+  --color-brand: 194 65 12;
+  --color-brand-hover: 154 52 18;
+  --color-brand-solid: 194 65 12;
+  --color-brand-solid-hover: 154 52 18;
+  --color-brand-soft: 255 237 213;
+  --color-on-brand: 255 255 255;
+  --color-hero: 23 32 51;
+  --color-on-hero: 255 255 255;
+  --color-hero-muted: 214 211 209;
+  --color-hero-accent: 251 146 60;
+  --color-success: 5 150 105;
+  --color-success-solid: 4 120 87;
+  --color-success-solid-hover: 6 95 70;
+  --color-success-soft: 209 250 229;
+  --color-success-text: 6 95 70;
+  --color-danger: 220 38 38;
+  --color-danger-soft: 254 226 226;
+  --color-danger-text: 153 27 27;
+  --color-warning: 217 119 6;
+  --color-warning-soft: 254 243 199;
+  --color-warning-text: 120 53 15;
+  --progress-value: rgb(var(--color-brand));
+  --progress-track: rgb(var(--color-brand-soft));
+  color-scheme: light;
+}
+
+:root.dark {
+  --color-canvas: 10 15 26;
+  --color-surface: 17 24 39;
+  --color-raised: 24 33 50;
+  --color-muted: 30 41 59;
+  --color-line: 55 65 81;
+  --color-control: 100 116 139;
+  --color-ink: 241 245 249;
+  --color-secondary: 203 213 225;
+  --color-subtle: 148 163 184;
+  --color-brand: 249 115 22;
+  --color-brand-hover: 251 146 60;
+  --color-brand-solid: 194 65 12;
+  --color-brand-solid-hover: 154 52 18;
+  --color-brand-soft: 67 36 16;
+  --color-on-brand: 255 255 255;
+  --color-hero: 15 23 42;
+  --color-on-hero: 248 250 252;
+  --color-hero-muted: 203 213 225;
+  --color-hero-accent: 251 146 60;
+  --color-success: 16 185 129;
+  --color-success-solid: 4 120 87;
+  --color-success-solid-hover: 6 95 70;
+  --color-success-soft: 6 60 50;
+  --color-success-text: 167 243 208;
+  --color-danger: 248 113 113;
+  --color-danger-soft: 69 10 10;
+  --color-danger-text: 254 202 202;
+  --color-warning: 251 191 36;
+  --color-warning-soft: 69 40 10;
+  --color-warning-text: 253 230 138;
+  --progress-value: rgb(var(--color-brand));
+  --progress-track: rgb(var(--color-muted));
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  html {
+    @apply scroll-smooth bg-canvas;
+  }
+
+  body {
+    @apply m-0 min-w-[320px] bg-canvas font-sans text-ink antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button,
+  a {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  }
+
+  input {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl border border-line bg-surface shadow-card;
+  }
+
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.14em] text-subtle;
+  }
+
+  .btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-solid px-4 py-3 text-sm font-bold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-control bg-raised px-4 py-3 text-sm font-bold text-ink shadow-sm transition hover:bg-muted active:scale-[0.98];
+  }
+
+  .input {
+    @apply min-h-12 w-full rounded-xl border border-control bg-raised px-3 py-2.5 text-center text-base font-bold text-ink outline-none transition placeholder:text-subtle focus:border-brand focus:ring-4 focus:ring-brand-soft;
+  }
+
+  .status-success {
+    @apply flex items-start gap-2 rounded-2xl border border-success/40 bg-success-soft px-4 py-3 text-sm font-semibold text-success-text;
+  }
+
+  .status-error {
+    @apply flex items-start gap-2 rounded-2xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-text;
+  }
+}
