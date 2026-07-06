@@ -15,6 +15,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import { AccountSettings } from '../components/settings/AccountSettings'
+import { DataSettings } from '../components/settings/DataSettings'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
 import { dayNames, formatRestSeconds, shortDayNames } from '../utils/workout'
 
@@ -139,6 +140,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-5 md:space-y-6">
       <AccountSettings />
+      <DataSettings />
 
       <section className="card p-5 md:p-6">
         <p className="eyebrow">Ajustes</p>

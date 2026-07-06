@@ -17,6 +17,7 @@ export interface WorkoutContextValue {
   archiveExercise: (exerciseId: string) => boolean
   saveTemplates: (templates: WorkoutTemplate[]) => void
   getExerciseById: (exerciseId: string) => Exercise | undefined
+  mergeExercises: (exercises: Exercise[]) => void
   reloadSessions: (silent?: boolean) => Promise<void>
 }
 

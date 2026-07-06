@@ -118,6 +118,16 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       },
       getExerciseById: (exerciseId) =>
         exercises.find((exercise) => exercise.id === exerciseId),
+      mergeExercises: (importedExercises) => {
+        const currentIds = new Set(exercises.map((exercise) => exercise.id))
+        const additions = importedExercises
+          .filter((exercise) => !currentIds.has(exercise.id))
+          .map((exercise) => ({ ...exercise, active: exercise.active !== false }))
+        if (additions.length === 0) return
+        const next = [...exercises, ...additions]
+        storeExercises(next)
+        setExercises(next)
+      },
       reloadSessions
     }),
     [
