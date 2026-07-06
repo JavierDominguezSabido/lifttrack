@@ -7,8 +7,10 @@ import { isInitialSession } from './workout'
  */
 export function getLastExercisePerformanceFromSessions(
   sessions: WorkoutSession[],
-  exerciseId: string
+  exerciseId: string,
+  equivalentExerciseIds: string[] = [exerciseId]
 ): LastExercisePerformance | null {
+  const equivalentIds = new Set(equivalentExerciseIds)
   const sortedSessions = [...sessions]
     .filter((session) => session.completedAt)
     .sort((a, b) => {
@@ -18,7 +20,7 @@ export function getLastExercisePerformanceFromSessions(
     })
 
   for (const session of sortedSessions) {
-    const exerciseLog = session.exerciseLogs.find((log) => log.exerciseId === exerciseId)
+    const exerciseLog = session.exerciseLogs.find((log) => equivalentIds.has(log.exerciseId))
     if (!exerciseLog) continue
 
     const completedSets = exerciseLog.sets.filter((set) => set.completed && !set.isWarmup)

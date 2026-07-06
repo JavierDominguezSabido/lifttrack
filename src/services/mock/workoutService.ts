@@ -93,6 +93,24 @@ export const localWorkoutRepository: WorkoutRepository = {
       throw new Error('No se pudieron limpiar los datos locales.')
     }
   },
+  async mergeExerciseIds(canonicalId, duplicateIds) {
+    const storage = getLocalStorage()
+    if (!storage) throw new Error('localStorage no estÃ¡ disponible en este navegador o contexto.')
+
+    const duplicates = new Set(duplicateIds)
+    let updatedLogs = 0
+    const next = getLocalSessions().map((session) => ({
+      ...session,
+      exerciseLogs: session.exerciseLogs.map((log) => {
+        if (!duplicates.has(log.exerciseId)) return log
+        updatedLogs += 1
+        return { ...log, exerciseId: canonicalId }
+      })
+    }))
+
+    writeLocalSessions(storage, next)
+    return updatedLogs
+  },
   async getLastPerformanceByExercise(exerciseId) {
     return getLastExercisePerformanceFromSessions(getStoredSessions(), exerciseId)
   }

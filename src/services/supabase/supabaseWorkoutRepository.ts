@@ -244,6 +244,49 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
     throwIfError(error)
   },
 
+  async mergeExerciseIds(canonicalId, duplicateIds) {
+    const client = requireClient()
+    const userId = await requireUserId(client)
+    const storedExercises = getStoredExercises()
+    const canonicalExercise = storedExercises.find((item) => item.id === canonicalId)
+
+    const { data: canonicalRow, error: canonicalError } = await client
+      .from('exercises')
+      .upsert({
+        user_id: userId,
+        stable_key: canonicalId,
+        name: canonicalExercise?.name ?? canonicalId,
+        muscle_group: canonicalExercise?.muscleGroup ?? 'Sin grupo',
+        equipment: canonicalExercise?.equipment ?? null,
+        notes: canonicalExercise?.notes ?? null
+      }, { onConflict: 'user_id,stable_key' })
+      .select('id')
+      .single()
+    throwIfError(canonicalError)
+    if (!canonicalRow) throw new Error(`No se pudo preparar el ejercicio ${canonicalId}.`)
+
+    const { data: duplicateRows, error: duplicateError } = await client
+      .from('exercises')
+      .select('id')
+      .eq('user_id', userId)
+      .in('stable_key', duplicateIds)
+    throwIfError(duplicateError)
+
+    const duplicateDbIds = (duplicateRows ?? [])
+      .map((row) => row.id)
+      .filter((id) => id !== canonicalRow.id)
+
+    if (duplicateDbIds.length === 0) return 0
+
+    const { count, error } = await client
+      .from('exercise_logs')
+      .update({ exercise_id: canonicalRow.id }, { count: 'exact' })
+      .eq('user_id', userId)
+      .in('exercise_id', duplicateDbIds)
+    throwIfError(error)
+    return count ?? 0
+  },
+
   async getLastPerformanceByExercise(exerciseId) {
     const sessions = await this.getWorkoutSessions()
     return getLastExercisePerformanceFromSessions(sessions, exerciseId)

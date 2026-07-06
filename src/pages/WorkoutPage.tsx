@@ -4,6 +4,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { DraftExerciseLog } from '../types'
+import {
+  createCanonicalExerciseIdMap,
+  getEquivalentExerciseIds
+} from '../utils/exerciseIdentity'
 import { getTodayTemplate } from '../utils/workout'
 import {
   createExerciseLogs,
@@ -15,9 +19,9 @@ import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
 export function WorkoutPage() {
   const { templateId } = useParams()
   const navigate = useNavigate()
-  const { sessions, saveSession, templates, getExerciseById } = useWorkouts()
+  const { sessions, saveSession, templates, exercises, getExerciseById } = useWorkouts()
   const template = templates.find((item) => item.id === templateId) ?? getTodayTemplate(templates)
-  const [logs, setLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions))
+  const [logs, setLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions, exercises))
   const [startedAt] = useState(() => new Date().toISOString())
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -29,6 +33,10 @@ export function WorkoutPage() {
       total: sets.length
     }
   }, [logs])
+  const canonicalExerciseIds = useMemo(
+    () => createCanonicalExerciseIdMap(exercises, templates, sessions),
+    [exercises, sessions, templates]
+  )
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
@@ -95,7 +103,15 @@ export function WorkoutPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         {template.exercises.map((item) => {
           const log = logs.find((entry) => entry.exerciseId === item.exerciseId)
-          const previousPerformance = getLastExercisePerformanceFromSessions(sessions, item.exerciseId)
+          const equivalentIds = new Set(getEquivalentExerciseIds(exercises, item.exerciseId))
+          for (const [from, to] of canonicalExerciseIds) {
+            if (to === item.exerciseId) equivalentIds.add(from)
+          }
+          const previousPerformance = getLastExercisePerformanceFromSessions(
+            sessions,
+            item.exerciseId,
+            [...equivalentIds]
+          )
           return log ? (
             <ExerciseLogger
               key={item.id}

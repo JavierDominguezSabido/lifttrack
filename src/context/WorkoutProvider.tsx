@@ -128,6 +128,11 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
         storeExercises(next)
         setExercises(next)
       },
+      mergeDuplicateExercises: async (canonicalId, duplicateIds) => {
+        const updatedLogs = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds)
+        await reloadSessions(true)
+        return updatedLogs
+      },
       reloadSessions
     }),
     [

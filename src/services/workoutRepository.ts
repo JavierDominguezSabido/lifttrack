@@ -10,6 +10,7 @@ export interface WorkoutRepository {
   updateWorkoutSession(session: WorkoutSession): Promise<WorkoutSession>
   deleteWorkoutSession(sessionId: string): Promise<void>
   clearWorkoutSessions(): Promise<void>
+  mergeExerciseIds(canonicalId: string, duplicateIds: string[]): Promise<number>
   getLastPerformanceByExercise(
     exerciseId: string
   ): Promise<LastExercisePerformance | null>

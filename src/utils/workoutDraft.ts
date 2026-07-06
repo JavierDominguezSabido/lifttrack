@@ -1,10 +1,12 @@
 import type {
   DraftExerciseLog,
   DraftSetLog,
+  Exercise,
   SetLog,
   WorkoutSession,
   WorkoutTemplate
 } from '../types'
+import { getEquivalentExerciseIds } from './exerciseIdentity'
 import { getLastExercisePerformanceFromSessions } from './workoutHistory'
 
 export interface WorkoutDraftValidationError {
@@ -55,12 +57,14 @@ export function setAllSetsCompleted(
 
 export function createExerciseLogs(
   template: WorkoutTemplate,
-  sessions: WorkoutSession[]
+  sessions: WorkoutSession[],
+  exercises: Exercise[] = []
 ): DraftExerciseLog[] {
   return template.exercises.map((item) => {
     const logId = `draft-${item.id}`
+    const equivalentIds = getEquivalentExerciseIds(exercises, item.exerciseId)
     const previousWeight =
-      getLastExercisePerformanceFromSessions(sessions, item.exerciseId)?.weightKg ?? 0
+      getLastExercisePerformanceFromSessions(sessions, item.exerciseId, equivalentIds)?.weightKg ?? 0
 
     return {
       id: logId,

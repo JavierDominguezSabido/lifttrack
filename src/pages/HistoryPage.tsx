@@ -9,10 +9,14 @@ import {
   Trash2,
   Trophy
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { SetLog } from '../types'
+import {
+  createCanonicalExerciseIdMap,
+  getEquivalentExerciseIds
+} from '../utils/exerciseIdentity'
 import {
   dayNames,
   formatCompactNumber,
@@ -29,17 +33,46 @@ export function HistoryPage() {
     deleteSession,
     clearLocalSessions,
     exercises,
+    templates,
     getExerciseById,
     dataMode
   } = useWorkouts()
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const exercise = exercises.find((item) => item.id === exerciseId) ?? exercises[0]
   const localSessions = sessions
     .filter((session) => !isInitialSession(session.id))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+  const canonicalExerciseIds = useMemo(
+    () => createCanonicalExerciseIdMap(exercises, templates, localSessions),
+    [exercises, localSessions, templates]
+  )
+  const selectedExerciseId = exerciseId
+    ? canonicalExerciseIds.get(exerciseId) ?? exerciseId
+    : undefined
+  const progressExercises = useMemo(() => {
+    const shownIds = new Set<string>()
+    const loggedIds = new Set(localSessions.flatMap((session) =>
+      session.exerciseLogs.map((log) => canonicalExerciseIds.get(log.exerciseId) ?? log.exerciseId)
+    ))
+
+    return exercises.filter((item) => {
+      const canonicalId = canonicalExerciseIds.get(item.id) ?? item.id
+      if (canonicalId !== item.id || shownIds.has(canonicalId)) return false
+      shownIds.add(canonicalId)
+      return item.active !== false || loggedIds.has(canonicalId)
+    })
+  }, [canonicalExerciseIds, exercises, localSessions])
+  const exercise =
+    progressExercises.find((item) => item.id === selectedExerciseId) ??
+    progressExercises[0] ??
+    exercises[0]
+  const equivalentExerciseIds = exercise
+    ? new Set(getEquivalentExerciseIds(exercises, exercise.id))
+    : new Set<string>()
   const entries = localSessions.flatMap((session) => {
-    const log = session.exerciseLogs.find((item) => item.exerciseId === exercise.id)
+    const log = session.exerciseLogs.find((item) =>
+      equivalentExerciseIds.has(canonicalExerciseIds.get(item.exerciseId) ?? item.exerciseId)
+    )
     if (!log) return []
     return [{
       session,
@@ -248,7 +281,7 @@ export function HistoryPage() {
           </h2>
         </div>
         <div aria-label="Seleccionar ejercicio" className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0">
-          {exercises.map((item) => (
+          {progressExercises.map((item) => (
             <Link
               key={item.id}
               to={`/historial/${item.id}`}

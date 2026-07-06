@@ -10,7 +10,7 @@ import {
   Upload,
   X
 } from 'lucide-react'
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { createBackup } from '../../services/dataExport/backup'
 import { sessionsToCsv } from '../../services/dataExport/csv'
@@ -19,9 +19,60 @@ import { parseWorkoutCsv } from '../../services/dataImport/csv'
 import { parseWorkoutBackup } from '../../services/dataImport/json'
 import { createImportPreview } from '../../services/dataImport/preview'
 import type { ImportPreview } from '../../services/dataImport/types'
+import {
+  findExerciseDuplicateGroups,
+  normalizeExerciseName
+} from '../../utils/exerciseIdentity'
 import { isInitialSession } from '../../utils/workout'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+function canonicalizeImportedPayload(
+  payload: ReturnType<typeof parseWorkoutCsv>,
+  existingExercises: ReturnType<typeof useWorkouts>['exercises'],
+  templates: ReturnType<typeof useWorkouts>['templates']
+) {
+  const templateExerciseIds = new Set(
+    templates.flatMap((template) => template.exercises.map((item) => item.exerciseId))
+  )
+  const existingByName = new Map<string, string>()
+  for (const exercise of [...existingExercises].sort((a, b) => {
+    const templateDifference = Number(templateExerciseIds.has(b.id)) - Number(templateExerciseIds.has(a.id))
+    return templateDifference || a.id.localeCompare(b.id)
+  })) {
+    const normalized = normalizeExerciseName(exercise.name)
+    if (normalized && !existingByName.has(normalized)) existingByName.set(normalized, exercise.id)
+  }
+
+  const idMap = new Map<string, string>()
+  for (const exercise of payload.exercises) {
+    const canonicalId = existingByName.get(normalizeExerciseName(exercise.name))
+    if (canonicalId && canonicalId !== exercise.id) idMap.set(exercise.id, canonicalId)
+  }
+
+  if (idMap.size === 0) return payload
+
+  const sessions = payload.sessions.map((session) => ({
+    ...session,
+    exerciseLogs: session.exerciseLogs.map((log) => {
+      const canonicalId = idMap.get(log.exerciseId)
+      return canonicalId ? { ...log, exerciseId: canonicalId } : log
+    })
+  }))
+  const exercises = payload.exercises.filter((exercise) => !idMap.has(exercise.id))
+  for (const canonicalId of new Set(idMap.values())) {
+    const existing = existingExercises.find((exercise) => exercise.id === canonicalId)
+    if (existing && !exercises.some((exercise) => exercise.id === canonicalId)) {
+      exercises.push(existing)
+    }
+  }
+
+  return {
+    ...payload,
+    sessions,
+    exercises
+  }
+}
 
 export function DataSettings() {
   const {
@@ -30,15 +81,22 @@ export function DataSettings() {
     templates,
     dataMode,
     saveSession,
-    mergeExercises
+    mergeExercises,
+    mergeDuplicateExercises
   } = useWorkouts()
   const csvInput = useRef<HTMLInputElement>(null)
   const jsonInput = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [importing, setImporting] = useState(false)
+  const [reviewDuplicates, setReviewDuplicates] = useState(false)
+  const [mergingDuplicates, setMergingDuplicates] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const exportableSessions = sessions.filter((session) => !isInitialSession(session.id))
+  const duplicateGroups = useMemo(
+    () => findExerciseDuplicateGroups(exercises, templates, exportableSessions),
+    [exercises, exportableSessions, templates]
+  )
 
   function filename(extension: 'csv' | 'json') {
     return `lifttrack-${new Date().toISOString().slice(0, 10)}.${extension}`
@@ -83,7 +141,10 @@ export function DataSettings() {
       const payload = type === 'csv'
         ? parseWorkoutCsv(text, file.name)
         : parseWorkoutBackup(text, file.name)
-      setPreview(createImportPreview(payload, exportableSessions))
+      setPreview(createImportPreview(
+        canonicalizeImportedPayload(payload, exercises, templates),
+        exportableSessions
+      ))
     } catch (readError) {
       console.error('[import] No se pudo leer el archivo:', readError)
       setError('No se pudo leer el archivo seleccionado.')
@@ -110,6 +171,40 @@ export function DataSettings() {
       setError('La importación no se completó. Puedes reintentar; las sesiones ya guardadas se detectarán por su ID.')
     } finally {
       setImporting(false)
+    }
+  }
+
+  async function mergeDetectedDuplicates() {
+    if (duplicateGroups.length === 0) return
+
+    const duplicateCount = duplicateGroups.reduce(
+      (total, group) => total + group.duplicateIds.length,
+      0
+    )
+    const logCount = duplicateGroups.reduce(
+      (total, group) => total + group.affectedLogCount,
+      0
+    )
+
+    if (!window.confirm(
+      `Se van a fusionar ${duplicateCount} ejercicios duplicados y actualizar ${logCount} registros. No se borrarÃ¡n sesiones ni series. Â¿Continuar?`
+    )) return
+
+    setMergingDuplicates(true)
+    setError(null)
+    setMessage(null)
+    try {
+      let updatedLogs = 0
+      for (const group of duplicateGroups) {
+        updatedLogs += await mergeDuplicateExercises(group.canonicalId, group.duplicateIds)
+      }
+      setMessage(`${updatedLogs} registros actualizados. Los duplicados se han fusionado en el historial activo.`)
+      setReviewDuplicates(false)
+    } catch (mergeError) {
+      console.error('[data] No se pudieron fusionar ejercicios duplicados:', mergeError)
+      setError('No se pudieron fusionar los duplicados. No se han borrado entrenamientos ni series.')
+    } finally {
+      setMergingDuplicates(false)
     }
   }
 
@@ -213,6 +308,64 @@ export function DataSettings() {
             onCancel={() => setPreview(null)}
           />
         )}
+
+        <div className="border-t border-line pt-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-5 text-brand" aria-hidden="true" />
+            <h3 className="font-extrabold text-ink">Revisar ejercicios duplicados</h3>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-secondary">
+            Detecta ejercicios con nombres equivalentes aunque tengan IDs distintos, por ejemplo variantes con guiones o palabras como “en”.
+          </p>
+          <button
+            type="button"
+            onClick={() => setReviewDuplicates((current) => !current)}
+            className="btn-secondary mt-3"
+          >
+            Revisar ejercicios duplicados
+          </button>
+          {reviewDuplicates && (
+            <div className="mt-4 rounded-2xl border border-line bg-muted/60 p-4">
+              {duplicateGroups.length > 0 ? (
+                <>
+                  <div className="space-y-3">
+                    {duplicateGroups.map((group) => (
+                      <div key={group.normalizedName} className="rounded-xl bg-surface p-3 shadow-sm">
+                        <p className="text-xs font-bold uppercase tracking-wider text-brand">
+                          CanÃ³nico
+                        </p>
+                        <p className="mt-1 font-extrabold text-ink">
+                          {group.canonicalName}
+                          <span className="ml-2 break-all text-xs font-semibold text-secondary">
+                            {group.canonicalId}
+                          </span>
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-secondary">
+                          Duplicados: {group.duplicateNames.join(', ')}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-subtle">
+                          {group.affectedSessionCount} sesiones afectadas Â· {group.affectedLogCount} registros a actualizar
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void mergeDetectedDuplicates()}
+                    disabled={mergingDuplicates}
+                    className="btn-primary mt-4 w-full"
+                  >
+                    {mergingDuplicates ? 'Fusionandoâ€¦' : 'Fusionar duplicados'}
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm font-semibold text-secondary">
+                  No se han encontrado duplicados con sesiones asociadas.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="border-t border-line pt-5">
           <h3 className="font-extrabold text-ink">Estado de sincronización</h3>
