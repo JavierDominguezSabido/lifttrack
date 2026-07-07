@@ -10,7 +10,8 @@ import {
   Filter,
   Search,
   Trash2,
-  Trophy
+  Trophy,
+  X
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
@@ -86,6 +87,7 @@ export function HistoryPage() {
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>('all')
   const [search, setSearch] = useState('')
   const [progressSearch, setProgressSearch] = useState('')
+  const [progressSelectorOpen, setProgressSelectorOpen] = useState(false)
   const [visibleProgressCount, setVisibleProgressCount] = useState(8)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_SESSIONS)
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
@@ -248,55 +250,22 @@ export function HistoryPage() {
         </div>
 
         {selectedExercise && selectedSummary ? (
-          <div className="grid gap-5 p-5 md:p-6 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
-            <aside className="space-y-3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
-                  Ejercicio
-                </span>
-                <span className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-                  <input
-                    className="input min-h-12 !text-left !font-semibold pl-9"
-                    value={progressSearch}
-                    placeholder="Buscar ejercicio..."
-                    onChange={(event) => setProgressSearch(event.target.value)}
-                  />
-                </span>
-              </label>
-
-              <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
-                {filteredExerciseProgressSummaries.map((summary) => {
-                  const selected = summary.exercise.id === selectedExercise.id
-                  return (
-                    <button
-                      key={summary.exercise.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedProgressId(summary.exercise.id)
-                        setVisibleProgressCount(8)
-                      }}
-                      className={`w-full rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
-                        selected
-                          ? 'border-brand bg-brand-soft text-ink ring-2 ring-brand-soft'
-                          : 'border-line bg-surface hover:border-brand/50 hover:bg-muted/60'
-                      }`}
-                      aria-pressed={selected}
-                    >
-                      <span className="block font-extrabold leading-tight text-ink">{summary.exercise.name}</span>
-                      <span className="mt-1 block text-xs font-semibold text-secondary">
-                        {summary.bestWeight} kg · {summary.sessionCount} sesiones · última: {summary.latestReps || 'sin reps'}
-                      </span>
-                    </button>
-                  )
-                })}
-                {filteredExerciseProgressSummaries.length === 0 && (
-                  <p className="rounded-2xl border border-dashed border-line p-4 text-center text-sm font-semibold text-secondary">
-                    No hay ejercicios que coincidan con la búsqueda.
-                  </p>
-                )}
-              </div>
-            </aside>
+          <div className="space-y-5 p-5 md:p-6">
+            <div>
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
+                Ejercicio seleccionado
+              </span>
+              <button
+                type="button"
+                onClick={() => setProgressSelectorOpen(true)}
+                className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-control bg-raised px-3 py-2.5 text-left text-base font-extrabold text-ink outline-none transition hover:bg-muted focus-visible:ring-4 focus-visible:ring-brand-soft sm:max-w-xl"
+                aria-haspopup="dialog"
+                aria-expanded={progressSelectorOpen}
+              >
+                <span className="min-w-0 truncate">{selectedExercise.name}</span>
+                <ChevronDown className="size-4 shrink-0 text-secondary" aria-hidden="true" />
+              </button>
+            </div>
 
             <div className="min-w-0 space-y-5">
               <div className="rounded-2xl border border-line bg-surface p-4">
@@ -375,6 +344,21 @@ export function HistoryPage() {
                 )}
               </div>
             </div>
+
+            {progressSelectorOpen && (
+              <ExerciseProgressSelector
+                summaries={filteredExerciseProgressSummaries}
+                search={progressSearch}
+                selectedExerciseId={selectedExercise.id}
+                onSearchChange={setProgressSearch}
+                onClose={() => setProgressSelectorOpen(false)}
+                onSelect={(summary) => {
+                  setSelectedProgressId(summary.exercise.id)
+                  setVisibleProgressCount(8)
+                  setProgressSelectorOpen(false)
+                }}
+              />
+            )}
           </div>
         ) : (
           <EmptyHistoryState
@@ -390,11 +374,11 @@ export function HistoryPage() {
           <Filter className="size-5 text-brand" aria-hidden="true" />
           <h2 id="history-filters-title" className="font-extrabold text-ink">Filtros</h2>
         </div>
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Ejercicio</span>
             <select
-              className="input min-h-12"
+              className="input min-h-12 !text-left !font-semibold"
               value={filterExerciseId}
               onChange={(event) => {
                 setFilterExerciseId(event.target.value)
@@ -410,7 +394,7 @@ export function HistoryPage() {
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Día</span>
             <select
-              className="input min-h-12"
+              className="input min-h-12 !text-left !font-semibold"
               value={filterDay}
               onChange={(event) => {
                 setFilterDay(event.target.value)
@@ -426,7 +410,7 @@ export function HistoryPage() {
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Periodo</span>
             <select
-              className="input min-h-12"
+              className="input min-h-12 !text-left !font-semibold"
               value={rangeFilter}
               onChange={(event) => {
                 setRangeFilter(event.target.value as RangeFilter)
@@ -443,7 +427,7 @@ export function HistoryPage() {
             <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
               <input
-                className="input min-h-12 pl-9"
+                className="input min-h-12 !text-left !font-semibold pl-9"
                 value={search}
                 placeholder="Nombre de ejercicio"
                 onChange={(event) => {
@@ -552,7 +536,7 @@ function SessionCard({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
           <button
             type="button"
             onClick={onToggle}
@@ -572,10 +556,10 @@ function SessionCard({
           <button
             type="button"
             onClick={onDelete}
-            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-raised px-2 py-2.5 text-xs font-bold text-secondary transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98] sm:text-sm"
+            className="grid min-h-11 w-11 place-items-center rounded-xl border border-line bg-raised text-secondary transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98]"
+            aria-label="Borrar sesión"
           >
             <Trash2 className="size-4" aria-hidden="true" />
-            Borrar
           </button>
         </div>
       </header>
@@ -638,6 +622,85 @@ function SessionCard({
         </div>
       )}
     </article>
+  )
+}
+
+function ExerciseProgressSelector({
+  summaries,
+  search,
+  selectedExerciseId,
+  onSearchChange,
+  onSelect,
+  onClose
+}: {
+  summaries: ExerciseProgressSummary[]
+  search: string
+  selectedExerciseId: string
+  onSearchChange: (value: string) => void
+  onSelect: (summary: ExerciseProgressSummary) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-ink/40 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Seleccionar ejercicio">
+      <div className="max-h-[86vh] w-full overflow-hidden rounded-3xl border border-line bg-surface shadow-card sm:max-w-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-line bg-muted/40 p-4 sm:p-5">
+          <div>
+            <p className="eyebrow">Ejercicio</p>
+            <h3 className="mt-1 text-xl font-extrabold text-ink">Seleccionar ejercicio</h3>
+          </div>
+          <button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-raised" aria-label="Cerrar selector">
+            <X className="size-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="space-y-3 p-4 sm:p-5">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
+              Buscar
+            </span>
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+              <input
+                autoFocus
+                className="input min-h-12 !text-left !font-semibold pl-9"
+                value={search}
+                placeholder="Buscar ejercicio..."
+                onChange={(event) => onSearchChange(event.target.value)}
+              />
+            </span>
+          </label>
+
+          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+            {summaries.map((summary) => {
+              const selected = summary.exercise.id === selectedExerciseId
+              return (
+                <button
+                  key={summary.exercise.id}
+                  type="button"
+                  onClick={() => onSelect(summary)}
+                  className={`w-full rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
+                    selected
+                      ? 'border-brand bg-brand-soft text-ink ring-2 ring-brand-soft'
+                      : 'border-line bg-raised hover:border-brand/50 hover:bg-muted/60'
+                  }`}
+                  aria-pressed={selected}
+                >
+                  <span className="block font-extrabold leading-tight text-ink">{summary.exercise.name}</span>
+                  <span className="mt-1 block text-xs font-semibold text-secondary">
+                    {summary.bestWeight} kg · {summary.sessionCount} sesiones · última: {summary.latestReps || 'sin reps'}
+                  </span>
+                </button>
+              )
+            })}
+            {summaries.length === 0 && (
+              <p className="rounded-2xl border border-dashed border-line p-4 text-center text-sm font-semibold text-secondary">
+                No hay ejercicios que coincidan con la búsqueda.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
