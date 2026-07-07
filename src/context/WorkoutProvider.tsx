@@ -43,8 +43,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       setSessions([])
       setSessionsError(
         dataMode === 'cloud'
-          ? 'No se pudo cargar el historial de Supabase.'
-          : 'No se pudo cargar el historial local.'
+          ? 'No se pudo cargar el historial sincronizado. Revisa la conexión e inténtalo de nuevo.'
+          : 'No se pudo cargar el historial guardado en este dispositivo.'
       )
     } finally {
       if (!silent) setSessionsLoading(false)

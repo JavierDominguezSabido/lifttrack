@@ -195,6 +195,10 @@ export function DataSettings() {
 
   async function confirmImport() {
     if (!preview || preview.errors.length > 0 || preview.sessionsToImport.length === 0) return
+    if (!window.confirm(
+      `Se van a importar ${preview.sessionsToImport.length} sesiones nuevas desde CSV. No se sobrescribirán sesiones existentes. ¿Continuar?`
+    )) return
+
     setImporting(true)
     setError(null)
     setMessage(null)
@@ -265,7 +269,7 @@ export function DataSettings() {
             {dataMode === 'cloud'
               ? <Cloud className="size-4" aria-hidden="true" />
               : <HardDrive className="size-4" aria-hidden="true" />}
-            {dataMode === 'cloud' ? 'Supabase' : 'localStorage'}
+            {dataMode === 'cloud' ? 'Nube' : 'Este dispositivo'}
           </span>
         </div>
         <p className="mt-2 text-sm leading-6 text-secondary">
@@ -360,7 +364,7 @@ export function DataSettings() {
           <h3 className="font-extrabold text-ink">Estado de sincronización</h3>
           <p className="mt-1 text-sm leading-6 text-secondary">
             {dataMode === 'cloud'
-              ? `${exportableSessions.length} entrenamientos cargados desde Supabase.`
+              ? `${exportableSessions.length} entrenamientos sincronizados.`
               : `${exportableSessions.length} entrenamientos guardados en este dispositivo.`}
           </p>
         </div>

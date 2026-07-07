@@ -47,7 +47,7 @@ export function AppLayout() {
           </span>
           <div>
             <p className="text-lg font-extrabold tracking-tight">LiftTrack</p>
-            <p className="text-xs font-medium text-subtle">Training log</p>
+            <p className="text-xs font-medium text-subtle">Registro de entrenos</p>
           </div>
         </div>
 
@@ -96,7 +96,7 @@ export function AppLayout() {
                   ? 'bg-success-soft text-success-text'
                   : 'bg-muted text-secondary'
               }`}
-              title={dataMode === 'cloud' ? 'Modo sincronizado con Supabase' : 'Modo local'}
+              title={dataMode === 'cloud' ? 'Modo sincronizado en la nube' : 'Modo local'}
             >
               {dataMode === 'cloud'
                 ? <Cloud className="size-4" aria-hidden="true" />

@@ -113,7 +113,7 @@ export function AccountSettings() {
 
         {!configured ? (
           <p className="rounded-2xl border border-warning/40 bg-warning-soft p-4 text-sm font-semibold text-warning-text">
-            Faltan las variables de entorno de Supabase. LiftTrack continúa en modo local.
+            La sincronización en la nube no está configurada. LiftTrack continúa guardando datos en este dispositivo.
           </p>
         ) : loading ? (
           <p className="text-sm font-medium text-secondary">Comprobando sesión…</p>
@@ -123,7 +123,7 @@ export function AccountSettings() {
               <p className="text-xs font-bold uppercase tracking-wider text-secondary">Sesión iniciada</p>
               <p className="mt-1 break-all font-extrabold text-ink">{user.email}</p>
               <p className="mt-2 text-sm leading-6 text-secondary">
-                Los entrenamientos nuevos, las ediciones y los borrados se guardan en Supabase.
+                Los entrenamientos nuevos, las ediciones y los borrados se guardan en la nube.
                 La rutina editable continúa guardándose localmente en esta fase.
               </p>
             </div>

@@ -149,7 +149,7 @@ export function HistoryPage() {
   }
 
   async function clearTestData() {
-    if (!window.confirm('¿Borrar todos los entrenamientos guardados localmente? La rutina base se conservará.')) {
+    if (!window.confirm('Vas a borrar todos los entrenamientos guardados en este dispositivo. La rutina base se conservará. Esta acción no se puede deshacer. ¿Continuar?')) {
       return
     }
 
@@ -188,7 +188,7 @@ export function HistoryPage() {
             onClick={() => void clearTestData()}
             className="min-h-11 rounded-xl px-2 text-right text-xs font-bold text-secondary underline decoration-line underline-offset-4 hover:text-danger"
           >
-            Borrar datos locales de prueba
+            Borrar datos de este dispositivo
           </button>
         )}
       </header>
@@ -313,7 +313,13 @@ export function HistoryPage() {
             )}
           </div>
         ) : (
-          <EmptyHistoryState />
+          <EmptyHistoryState
+            title={realSessions.length > 0 ? 'No hay resultados con estos filtros' : undefined}
+            message={realSessions.length > 0
+              ? 'Cambia el periodo, el día, el ejercicio o la búsqueda para ver más sesiones.'
+              : undefined}
+            showAction={realSessions.length === 0}
+          />
         )}
       </section>
 
@@ -597,19 +603,29 @@ function HistoryStat({
   )
 }
 
-function EmptyHistoryState() {
+function EmptyHistoryState({
+  title = 'No hay sesiones para mostrar',
+  message = 'Ajusta los filtros o guarda una sesión para ver aquí tus ejercicios, pesos y repeticiones.',
+  showAction = true
+}: {
+  title?: string
+  message?: string
+  showAction?: boolean
+}) {
   return (
     <div className="card border-dashed px-5 py-12 text-center">
       <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-muted text-subtle">
         <Dumbbell className="size-7" aria-hidden="true" />
       </span>
-      <h3 className="mt-4 text-lg font-extrabold text-ink">No hay sesiones para mostrar</h3>
+      <h3 className="mt-4 text-lg font-extrabold text-ink">{title}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-secondary">
-        Ajusta los filtros o guarda una sesión para ver aquí tus ejercicios, pesos y repeticiones.
+        {message}
       </p>
-      <Link to="/entrenamiento" className="btn-primary mt-5">
-        Empezar entrenamiento
-      </Link>
+      {showAction && (
+        <Link to="/entrenamiento" className="btn-primary mt-5">
+          Empezar entrenamiento
+        </Link>
+      )}
     </div>
   )
 }

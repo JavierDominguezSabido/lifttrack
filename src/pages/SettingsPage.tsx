@@ -135,6 +135,11 @@ export function SettingsPage() {
 
   function handleArchive(exerciseId: string) {
     setError(null)
+    const exercise = exercises.find((item) => item.id === exerciseId)
+    if (!window.confirm(
+      `Vas a archivar ${exercise?.name ?? 'este ejercicio'}. Se conservará su historial, pero dejará de aparecer como ejercicio activo. ¿Continuar?`
+    )) return
+
     if (!archiveExercise(exerciseId)) {
       setError('Quita el ejercicio de todos los días y guarda la rutina antes de archivarlo.')
       return
@@ -362,7 +367,7 @@ export function SettingsPage() {
                       setEditingExercise(exercise)
                       setShowExerciseForm(true)
                     }}
-                    className="btn-secondary !min-h-10 !py-2"
+                    className="btn-secondary !min-h-11 !py-2"
                   >
                     <Edit3 className="size-4" /> Editar
                   </button>
@@ -370,7 +375,7 @@ export function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => handleArchive(exercise.id)}
-                      className="btn-secondary !min-h-10 !py-2"
+                      className="btn-secondary !min-h-11 !py-2"
                     >
                       <Archive className="size-4" /> Archivar
                     </button>
@@ -381,7 +386,7 @@ export function SettingsPage() {
                         updateExercise({ ...exercise, active: true })
                         setMessage('Ejercicio activado.')
                       }}
-                      className="btn-secondary !min-h-10 !py-2"
+                      className="btn-secondary !min-h-11 !py-2"
                     >
                       <Plus className="size-4" /> Activar
                     </button>
@@ -427,10 +432,10 @@ function RoutineExerciseEditor({
           <p className="font-extrabold text-ink">{exercise?.name ?? 'Ejercicio no disponible'}</p>
           <p className="text-xs text-secondary">{exercise?.muscleGroup || 'Sin grupo muscular'}</p>
         </div>
-        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-10 place-items-center rounded-xl border border-line disabled:opacity-30" aria-label="Subir">
+        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-11 place-items-center rounded-xl border border-line disabled:opacity-30" aria-label="Subir">
           <ArrowUp className="size-4" />
         </button>
-        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-10 place-items-center rounded-xl border border-line disabled:opacity-30" aria-label="Bajar">
+        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-11 place-items-center rounded-xl border border-line disabled:opacity-30" aria-label="Bajar">
           <ArrowDown className="size-4" />
         </button>
       </div>
@@ -486,7 +491,7 @@ function RoutineExerciseEditor({
           placeholder="Nota específica opcional"
         />
       </label>
-      <button type="button" onClick={onRemove} className="mt-2 inline-flex min-h-10 items-center gap-2 px-2 text-sm font-bold text-danger-text">
+      <button type="button" onClick={onRemove} className="mt-2 inline-flex min-h-11 items-center gap-2 px-2 text-sm font-bold text-danger-text">
         <Trash2 className="size-4" /> Quitar del día
       </button>
     </div>
@@ -524,7 +529,7 @@ function ExerciseForm({
     <form onSubmit={submit} className="card space-y-3 p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-extrabold">{exercise ? 'Editar ejercicio' : 'Nuevo ejercicio'}</h3>
-        <button type="button" onClick={onCancel} className="grid size-10 place-items-center rounded-xl" aria-label="Cerrar">
+        <button type="button" onClick={onCancel} className="grid size-11 place-items-center rounded-xl" aria-label="Cerrar">
           <X className="size-5" />
         </button>
       </div>
