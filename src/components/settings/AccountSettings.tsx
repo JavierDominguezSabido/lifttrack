@@ -88,65 +88,41 @@ export function AccountSettings() {
 
   return (
     <section className="card overflow-hidden" aria-labelledby="account-settings-title">
-      <header className="border-b border-line bg-muted/40 p-5 md:p-6">
-        <p className="eyebrow">Cuenta</p>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="account-settings-title" className="text-2xl font-extrabold tracking-tight text-ink">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-5 md:p-6">
+        <div>
+          <p className="eyebrow">Cuenta</p>
+          <h2 id="account-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
             Cuenta y sincronización
           </h2>
-          <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ${
-            dataMode === 'cloud'
-              ? 'bg-success-soft text-success-text'
-              : 'bg-muted text-secondary'
-          }`}>
-            {dataMode === 'cloud'
-              ? <Cloud className="size-4" aria-hidden="true" />
-              : <HardDrive className="size-4" aria-hidden="true" />}
-            {dataMode === 'cloud' ? 'Modo sincronizado' : 'Modo local'}
-          </span>
+          {user?.email && <p className="mt-1 break-all text-sm font-semibold text-secondary">{user.email}</p>}
         </div>
-      </header>
+        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ${
+          dataMode === 'cloud'
+            ? 'bg-success-soft text-success-text'
+            : 'bg-muted text-secondary'
+        }`}>
+          {dataMode === 'cloud'
+            ? <Cloud className="size-4" aria-hidden="true" />
+            : <HardDrive className="size-4" aria-hidden="true" />}
+          {dataMode === 'cloud' ? 'Sincronizado' : 'Local'}
+        </span>
+      </div>
 
-      <div className="space-y-4 p-5 md:p-6">
+      <div className="space-y-4 border-t border-line p-5 md:p-6">
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p role="alert" className="status-error">{error}</p>}
 
         {!configured ? (
           <p className="rounded-2xl border border-warning/40 bg-warning-soft p-4 text-sm font-semibold text-warning-text">
-            La sincronización en la nube no está configurada. LiftTrack continúa guardando datos en este dispositivo.
+            La sincronización en la nube no está configurada. LiftTrack guarda los datos en este dispositivo.
           </p>
         ) : loading ? (
-          <p className="text-sm font-medium text-secondary">Comprobando sesión…</p>
+          <p className="text-sm font-medium text-secondary">Comprobando sesión...</p>
         ) : user ? (
-          <>
-            <div className="rounded-2xl bg-muted p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-secondary">Sesión iniciada</p>
-              <p className="mt-1 break-all font-extrabold text-ink">{user.email}</p>
-              <p className="mt-2 text-sm leading-6 text-secondary">
-                Los entrenamientos nuevos, las ediciones y los borrados se guardan en la nube.
-                La rutina editable continúa guardándose localmente en esta fase.
-              </p>
-            </div>
-
-            {localCount > 0 && (
-              <div className="rounded-2xl border border-brand/30 bg-brand-soft p-4">
-                <p className="font-extrabold text-ink">Datos locales disponibles</p>
-                <p className="mt-1 text-sm leading-6 text-secondary">
-                  Hay {localCount} entrenamiento{localCount === 1 ? '' : 's'} local{localCount === 1 ? '' : 'es'}.
-                  Puedes subirlos manualmente. No se borrarán del dispositivo.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void uploadLocalData()}
-                  disabled={migrating}
-                  className="btn-primary mt-3 w-full sm:w-auto"
-                >
-                  <CloudUpload className="size-4" aria-hidden="true" />
-                  {migrating ? 'Subiendo…' : 'Subir datos locales a la nube'}
-                </button>
-              </div>
-            )}
-
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <p className="text-sm font-semibold text-secondary">
+              Los entrenamientos nuevos, ediciones y borrados se guardan en la nube.
+            </p>
             <button
               type="button"
               onClick={() => void logOut()}
@@ -156,7 +132,25 @@ export function AccountSettings() {
               <LogOut className="size-4" aria-hidden="true" />
               Cerrar sesión
             </button>
-          </>
+
+            {localCount > 0 && (
+              <div className="rounded-2xl border border-brand/30 bg-brand-soft p-4 sm:col-span-2">
+                <p className="font-extrabold text-ink">Datos locales disponibles</p>
+                <p className="mt-1 text-sm leading-6 text-secondary">
+                  Hay {localCount} entrenamiento{localCount === 1 ? '' : 's'} local{localCount === 1 ? '' : 'es'}.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void uploadLocalData()}
+                  disabled={migrating}
+                  className="btn-primary mt-3 w-full sm:w-auto"
+                >
+                  <CloudUpload className="size-4" aria-hidden="true" />
+                  {migrating ? 'Subiendo...' : 'Subir datos locales'}
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5">
@@ -180,7 +174,7 @@ export function AccountSettings() {
               </button>
             </div>
 
-            <form onSubmit={submit} className="space-y-3">
+            <form onSubmit={submit} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
               <label className="block text-sm font-bold text-secondary">
                 Email
                 <input
@@ -204,12 +198,12 @@ export function AccountSettings() {
                   placeholder="Mínimo 6 caracteres"
                 />
               </label>
-              <button type="submit" disabled={submitting} className="btn-primary w-full">
+              <button type="submit" disabled={submitting} className="btn-primary w-full lg:w-auto">
                 {mode === 'signin'
                   ? <LogIn className="size-4" aria-hidden="true" />
                   : <UserPlus className="size-4" aria-hidden="true" />}
                 {submitting
-                  ? 'Procesando…'
+                  ? 'Procesando...'
                   : mode === 'signin' ? 'Iniciar sesión' : 'Crear cuenta'}
               </button>
             </form>

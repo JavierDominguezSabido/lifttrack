@@ -1,24 +1,25 @@
 import {
   Archive,
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   CalendarDays,
-  Dumbbell,
   Edit3,
   Library,
   Plus,
   Save,
+  Search,
   Trash2,
   X
 } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { useWorkouts } from '../context/WorkoutContext'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
+import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
-import { dayNames, formatRestSeconds, shortDayNames } from '../utils/workout'
+import { dayNames, formatRestSeconds } from '../utils/workout'
 
 const muscleGroups: MuscleGroup[] = [
   'Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Core'
@@ -53,20 +54,36 @@ export function SettingsPage() {
     saveTemplates,
     getExerciseById
   } = useWorkouts()
-  const [tab, setTab] = useState<'routine' | 'library'>('routine')
+  const [settingsView, setSettingsView] = useState<'overview' | 'routine' | 'library'>('overview')
   const [drafts, setDrafts] = useState(() => cloneTemplates(templates))
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
   const [showExerciseForm, setShowExerciseForm] = useState(false)
   const [daySelections, setDaySelections] = useState<Record<string, string>>({})
+  const [exerciseSearch, setExerciseSearch] = useState('')
+  const [exerciseStatus, setExerciseStatus] = useState<'active' | 'all' | 'archived'>('active')
 
   useEffect(() => setDrafts(cloneTemplates(templates)), [templates])
 
   const orderedDrafts = [...drafts].sort(
     (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
   )
-  const trainingDays = new Set(drafts.filter((item) => item.exercises.length).map((item) => item.dayOfWeek))
+  const filteredExercises = useMemo(() => {
+    const normalizedSearch = exerciseSearch.trim().toLowerCase()
+    return exercises
+      .filter((exercise) => {
+        if (exerciseStatus === 'active' && !exercise.active) return false
+        if (exerciseStatus === 'archived' && exercise.active) return false
+        if (!normalizedSearch) return true
+        return [
+          exercise.name,
+          exercise.muscleGroup ?? '',
+          exercise.notes ?? ''
+        ].some((value) => value.toLowerCase().includes(normalizedSearch))
+      })
+      .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
+  }, [exerciseSearch, exerciseStatus, exercises])
 
   function updateTemplate(templateId: string, update: (template: WorkoutTemplate) => WorkoutTemplate) {
     setDrafts((current) => current.map((item) => item.id === templateId ? update(item) : item))
@@ -133,6 +150,12 @@ export function SettingsPage() {
     setMessage('Rutina semanal guardada.')
   }
 
+  function openOverview() {
+    setSettingsView('overview')
+    setEditingExercise(null)
+    setShowExerciseForm(false)
+  }
+
   function handleArchive(exerciseId: string) {
     setError(null)
     const exercise = exercises.find((item) => item.id === exerciseId)
@@ -147,259 +170,331 @@ export function SettingsPage() {
     setMessage('Ejercicio archivado. Su historial se conserva.')
   }
 
-  return (
-    <div className="space-y-5 md:space-y-6">
-      <AccountSettings />
+  if (settingsView === 'routine') {
+    return (
+      <div className="space-y-5 md:space-y-6">
+        <SettingsSubpageHeader
+          eyebrow="Rutina"
+          title="Editar rutina"
+          description={hasCustomRoutine
+            ? 'Estás usando tu rutina personalizada.'
+            : 'Estás usando la rutina base. Guarda cualquier cambio para personalizarla.'}
+          onBack={openOverview}
+        />
 
-      <section className="card overflow-hidden" aria-labelledby="appearance-settings-title">
-        <header className="border-b border-line bg-muted/40 p-5 md:p-6">
-          <p className="eyebrow">Apariencia</p>
-          <h2 id="appearance-settings-title" className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
-            Apariencia
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-secondary">
-            Ajusta el tema visual de LiftTrack en este dispositivo.
-          </p>
-        </header>
-        <div className="flex flex-wrap items-center justify-between gap-3 p-5 md:p-6">
-          <p className="text-sm font-semibold text-secondary">Tema de la aplicación</p>
-          <ThemeToggle />
-        </div>
-      </section>
+        {message && <p role="status" className="status-success">{message}</p>}
+        {error && <p role="alert" className="status-error">{error}</p>}
 
-      <section className="card p-5 md:p-6">
-        <p className="eyebrow">Rutina</p>
-        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
-          Rutina y ejercicios
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-          Administra la biblioteca y personaliza los ejercicios de cada día. Los cambios no
-          eliminan entrenamientos anteriores.
-        </p>
-      </section>
+        <section aria-label="Editar entrenamientos por día" className="space-y-4">
+          {orderedDrafts.map((template) => (
+            <article key={template.id} className="card overflow-hidden">
+              <header className="border-b border-line bg-muted/40 p-4 sm:p-5">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand">
+                  {dayNames[template.dayOfWeek]}
+                </p>
+                <h2 className="mt-1 text-xl font-extrabold text-ink">{template.name}</h2>
+                {template.notes && <p className="mt-1 text-sm text-secondary">{template.notes}</p>}
+              </header>
 
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5">
-        <button
-          type="button"
-          onClick={() => setTab('routine')}
-          className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${
-            tab === 'routine' ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
-          }`}
-        >
-          <CalendarDays className="size-4" /> Editar rutina
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('library')}
-          className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${
-            tab === 'library' ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
-          }`}
-        >
-          <Library className="size-4" /> Ejercicios
-        </button>
-      </div>
-
-      {message && <p role="status" className="status-success">{message}</p>}
-      {error && <p role="alert" className="status-error">{error}</p>}
-
-      {tab === 'routine' ? (
-        <>
-          <div>
-            <p className="max-w-xl text-sm leading-6 text-secondary">
-              {hasCustomRoutine
-                ? 'Estás usando tu rutina personalizada.'
-                : 'Estás usando la rutina base. Guarda cualquier cambio para personalizarla.'}
-            </p>
-          </div>
-
-          <section aria-labelledby="week-overview-title" className="card p-4 md:p-5">
-            <h2 id="week-overview-title" className="mb-4 text-sm font-extrabold text-ink">Vista semanal</h2>
-            <div className="grid grid-cols-7 gap-2">
-              {shortDayNames.slice(1).concat(shortDayNames[0]).map((day, index) => {
-                const dayIndex = (index + 1) % 7
-                const active = trainingDays.has(dayIndex)
-                return (
-                  <div key={`${day}-${index}`} className="text-center">
-                    <p className="mb-2 text-xs font-bold text-secondary">{day}</p>
-                    <div className={`mx-auto grid size-10 place-items-center rounded-xl text-sm font-bold ${
-                      active ? 'bg-hero text-brand shadow-sm' : 'bg-muted text-subtle'
-                    }`}>
-                      {active ? <Dumbbell className="size-4" /> : '—'}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-
-          <section aria-label="Editar entrenamientos por día" className="space-y-4">
-            {orderedDrafts.map((template) => (
-              <article key={template.id} className="card overflow-hidden">
-                <header className="border-b border-line bg-muted/40 p-4 sm:p-5">
-                  <p className="text-xs font-bold uppercase tracking-wider text-brand">
-                    {dayNames[template.dayOfWeek]}
+              <div className="space-y-3 p-3 sm:p-4">
+                {template.exercises.map((item, index) => (
+                  <RoutineExerciseEditor
+                    key={item.id}
+                    item={item}
+                    exercise={getExerciseById(item.exerciseId)}
+                    first={index === 0}
+                    last={index === template.exercises.length - 1}
+                    onMove={(direction) => moveItem(template.id, index, direction)}
+                    onRemove={() => removeItem(template.id, item.id)}
+                    onChange={(changes) => updateItem(template.id, item.id, changes)}
+                    onError={setError}
+                  />
+                ))}
+                {template.exercises.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-secondary">
+                    No hay ejercicios en este día.
                   </p>
-                  <h2 className="mt-1 text-xl font-extrabold text-ink">{template.name}</h2>
-                  {template.notes && <p className="mt-1 text-sm text-secondary">{template.notes}</p>}
-                </header>
+                )}
 
-                <div className="space-y-3 p-3 sm:p-4">
-                  {template.exercises.map((item, index) => (
-                    <RoutineExerciseEditor
-                      key={item.id}
-                      item={item}
-                      exercise={getExerciseById(item.exerciseId)}
-                      first={index === 0}
-                      last={index === template.exercises.length - 1}
-                      onMove={(direction) => moveItem(template.id, index, direction)}
-                      onRemove={() => removeItem(template.id, item.id)}
-                      onChange={(changes) => updateItem(template.id, item.id, changes)}
-                      onError={setError}
-                    />
-                  ))}
-                  {template.exercises.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-secondary">
-                      No hay ejercicios en este día.
-                    </p>
-                  )}
-
-                  <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto]">
-                    <select
-                      aria-label={`Ejercicio para ${template.name}`}
-                      value={daySelections[template.id] ?? ''}
-                      className="input !text-left !font-semibold"
-                      onChange={(event) => setDaySelections((current) => ({
-                        ...current,
-                        [template.id]: event.target.value
-                      }))}
-                    >
-                      <option value="" disabled>Añadir ejercicio desde la biblioteca</option>
-                      {exercises.filter((exercise) => exercise.active).map((exercise) => (
-                        <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      disabled={!daySelections[template.id]}
-                      onClick={() => {
-                        addToDay(template.id, daySelections[template.id])
-                        setDaySelections((current) => ({ ...current, [template.id]: '' }))
-                      }}
-                    >
-                      <Plus className="size-4" /> Añadir al día
-                    </button>
-                  </div>
-                  <button type="button" onClick={() => setTab('library')} className="text-sm font-bold text-brand">
-                    ¿No está en la lista? Crear ejercicio nuevo
+                <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto]">
+                  <select
+                    aria-label={`Ejercicio para ${template.name}`}
+                    value={daySelections[template.id] ?? ''}
+                    className="input !text-left !font-semibold"
+                    onChange={(event) => setDaySelections((current) => ({
+                      ...current,
+                      [template.id]: event.target.value
+                    }))}
+                  >
+                    <option value="" disabled>Añadir ejercicio desde la biblioteca</option>
+                    {exercises.filter((exercise) => exercise.active).map((exercise) => (
+                      <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={!daySelections[template.id]}
+                    onClick={() => {
+                      addToDay(template.id, daySelections[template.id])
+                      setDaySelections((current) => ({ ...current, [template.id]: '' }))
+                    }}
+                  >
+                    <Plus className="size-4" /> Añadir al día
                   </button>
                 </div>
+                <button type="button" onClick={() => setSettingsView('library')} className="text-sm font-bold text-brand">
+                  ¿No está en la lista? Crear ejercicio nuevo
+                </button>
+              </div>
 
-                <div className="border-t border-line p-3 sm:p-4">
-                  <Link to={`/entrenamiento/${template.id}`} className="text-sm font-bold text-brand">
-                    Entrenar {template.name.toLowerCase()}
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </section>
+              <div className="border-t border-line p-3 sm:p-4">
+                <Link to={`/entrenamiento/${template.id}`} className="text-sm font-bold text-brand">
+                  Entrenar {template.name.toLowerCase()}
+                </Link>
+              </div>
+            </article>
+          ))}
+        </section>
 
-          <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur-xl lg:bottom-4">
-            <button type="button" onClick={persistRoutine} className="btn-primary w-full">
-              <Save className="size-4" /> Guardar cambios
-            </button>
-          </div>
-        </>
-      ) : (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="eyebrow">Biblioteca</p>
-              <h2 className="mt-1 text-xl font-extrabold">Ejercicios disponibles</h2>
-            </div>
+        <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 grid gap-2 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4">
+          <button type="button" onClick={openOverview} className="btn-secondary w-full">
+            Volver a configuración
+          </button>
+          <button type="button" onClick={persistRoutine} className="btn-primary w-full">
+            <Save className="size-4" /> Guardar cambios
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (settingsView === 'library') {
+    return (
+      <div className="space-y-5 md:space-y-6">
+        <SettingsSubpageHeader
+          eyebrow="Biblioteca"
+          title="Gestionar ejercicios"
+          description="Busca, crea, edita o archiva ejercicios de la biblioteca."
+          onBack={openOverview}
+        />
+
+        {message && <p role="status" className="status-success">{message}</p>}
+        {error && <p role="alert" className="status-error">{error}</p>}
+
+        <section className="card space-y-4 p-4 sm:p-5">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
+                Buscar
+              </span>
+              <span className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+                <input
+                  value={exerciseSearch}
+                  onChange={(event) => setExerciseSearch(event.target.value)}
+                  className="input !text-left !font-semibold pl-9"
+                  placeholder="Buscar ejercicio..."
+                />
+              </span>
+            </label>
             <button
               type="button"
               onClick={() => {
                 setEditingExercise(null)
                 setShowExerciseForm(true)
               }}
-              className="btn-primary"
+              className="btn-primary self-end"
             >
               <Plus className="size-4" /> Añadir ejercicio
             </button>
           </div>
 
-          {showExerciseForm && (
-            <ExerciseForm
-              exercise={editingExercise}
-              onCancel={() => setShowExerciseForm(false)}
-              onSave={(values) => {
-                if (editingExercise) updateExercise({ ...editingExercise, ...values })
-                else createExercise({ ...values, active: true })
-                setShowExerciseForm(false)
-                setMessage(editingExercise ? 'Ejercicio actualizado.' : 'Ejercicio creado.')
-              }}
-            />
-          )}
-
-          <div className="grid gap-3 md:grid-cols-2">
-            {exercises.map((exercise) => (
-              <article key={exercise.id} className={`card p-4 ${exercise.active ? '' : 'opacity-60'}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-extrabold text-ink">{exercise.name}</h3>
-                    <p className="mt-1 text-xs font-semibold text-secondary">
-                      {exercise.muscleGroup || 'Sin grupo muscular'}
-                      {!exercise.active && ' · Archivado'}
-                    </p>
-                    {exercise.notes && <p className="mt-2 text-sm text-secondary">{exercise.notes}</p>}
-                  </div>
-                  <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${
-                    exercise.active ? 'bg-success-soft text-success-text' : 'bg-muted text-secondary'
-                  }`}>
-                    {exercise.active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingExercise(exercise)
-                      setShowExerciseForm(true)
-                    }}
-                    className="btn-secondary !min-h-11 !py-2"
-                  >
-                    <Edit3 className="size-4" /> Editar
-                  </button>
-                  {exercise.active ? (
-                    <button
-                      type="button"
-                      onClick={() => handleArchive(exercise.id)}
-                      className="btn-secondary !min-h-11 !py-2"
-                    >
-                      <Archive className="size-4" /> Archivar
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateExercise({ ...exercise, active: true })
-                        setMessage('Ejercicio activado.')
-                      }}
-                      className="btn-secondary !min-h-11 !py-2"
-                    >
-                      <Plus className="size-4" /> Activar
-                    </button>
-                  )}
-                </div>
-              </article>
+          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1.5">
+            {([
+              ['active', 'Activos'],
+              ['all', 'Todos'],
+              ['archived', 'Archivados']
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setExerciseStatus(value)}
+                className={`min-h-11 rounded-xl text-sm font-bold transition ${
+                  exerciseStatus === value ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
+                }`}
+              >
+                {label}
+              </button>
             ))}
           </div>
         </section>
-      )}
+
+        {showExerciseForm && (
+          <ExerciseForm
+            exercise={editingExercise}
+            onCancel={() => setShowExerciseForm(false)}
+            onSave={(values) => {
+              if (editingExercise) updateExercise({ ...editingExercise, ...values })
+              else createExercise({ ...values, active: true })
+              setShowExerciseForm(false)
+              setMessage(editingExercise ? 'Ejercicio actualizado.' : 'Ejercicio creado.')
+            }}
+          />
+        )}
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {filteredExercises.map((exercise) => (
+            <article key={exercise.id} className={`card p-4 ${exercise.active ? '' : 'opacity-70'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-ink">{exercise.name}</h3>
+                  <p className="mt-1 text-xs font-semibold text-secondary">
+                    {exercise.muscleGroup || 'Sin grupo muscular'}
+                    {!exercise.active && ' · Archivado'}
+                  </p>
+                  {exercise.notes && <p className="mt-2 text-sm text-secondary">{exercise.notes}</p>}
+                </div>
+                <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${
+                  exercise.active ? 'bg-success-soft text-success-text' : 'bg-muted text-secondary'
+                }`}>
+                  {exercise.active ? 'Activo' : 'Inactivo'}
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingExercise(exercise)
+                    setShowExerciseForm(true)
+                  }}
+                  className="btn-secondary !min-h-11 !py-2"
+                >
+                  <Edit3 className="size-4" /> Editar
+                </button>
+                {exercise.active ? (
+                  <button
+                    type="button"
+                    onClick={() => handleArchive(exercise.id)}
+                    className="btn-secondary !min-h-11 !py-2"
+                  >
+                    <Archive className="size-4" /> Archivar
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateExercise({ ...exercise, active: true })
+                      setMessage('Ejercicio activado.')
+                    }}
+                    className="btn-secondary !min-h-11 !py-2"
+                  >
+                    <Plus className="size-4" /> Activar
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+        {filteredExercises.length === 0 && (
+          <p className="rounded-2xl border border-dashed border-line p-5 text-center text-sm font-semibold text-secondary">
+            No hay ejercicios que coincidan con la búsqueda.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5 md:space-y-6">
+      <AccountSettings />
+
+      <section className="card overflow-hidden" aria-labelledby="appearance-settings-title">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-5 md:p-6">
+          <div>
+            <p className="eyebrow">Apariencia</p>
+            <h2 id="appearance-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
+              Apariencia
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-secondary">
+              Tema actual de la aplicación.
+            </p>
+          </div>
+          <ThemeToggle />
+        </div>
+      </section>
+
+      <section className="card overflow-hidden" aria-labelledby="routine-settings-title">
+        <header className="border-b border-line bg-muted/40 p-5 md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="eyebrow">Rutina</p>
+              <h2 id="routine-settings-title" className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
+                Rutina y ejercicios
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
+                Personaliza tus días de entrenamiento y tu biblioteca de ejercicios.
+              </p>
+            </div>
+            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-extrabold text-secondary">
+              {hasCustomRoutine ? 'Rutina personalizada' : 'Rutina base'}
+            </span>
+          </div>
+        </header>
+
+        <div className="space-y-4 p-5 md:p-6">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {orderedDrafts.map((template) => (
+              <div key={template.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-raised px-4 py-3">
+                <span className="font-bold text-ink">{dayNames[template.dayOfWeek]}</span>
+                <span className="text-sm font-semibold text-secondary">
+                  {template.exercises.length > 0
+                    ? `${template.exercises.length} ejercicios`
+                    : 'Sin ejercicios'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={() => setSettingsView('routine')} className="btn-primary w-full">
+              <CalendarDays className="size-4" /> Editar rutina
+            </button>
+            <button type="button" onClick={() => setSettingsView('library')} className="btn-secondary w-full">
+              <Library className="size-4" /> Gestionar ejercicios
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {message && <p role="status" className="status-success">{message}</p>}
+      {error && <p role="alert" className="status-error">{error}</p>}
 
       <DataSettings />
     </div>
+  )
+}
+
+function SettingsSubpageHeader({
+  eyebrow,
+  title,
+  description,
+  onBack
+}: {
+  eyebrow: string
+  title: string
+  description: string
+  onBack: () => void
+}) {
+  return (
+    <section className="card p-5 md:p-6">
+      <button type="button" onClick={onBack} className="btn-secondary mb-4">
+        <ArrowLeft className="size-4" /> Volver a configuración
+      </button>
+      <p className="eyebrow">{eyebrow}</p>
+      <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{title}</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{description}</p>
+    </section>
   )
 }
 
