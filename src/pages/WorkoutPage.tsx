@@ -1,6 +1,6 @@
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { DraftExerciseLog } from '../types'
@@ -112,6 +112,18 @@ export function WorkoutPage() {
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
+        {template.exercises.length === 0 && (
+          <div className="card border-dashed p-6 text-center xl:col-span-2">
+            <Dumbbell className="mx-auto size-8 text-subtle" aria-hidden="true" />
+            <h3 className="mt-3 text-lg font-extrabold text-ink">Día sin ejercicios</h3>
+            <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-secondary">
+              Añade ejercicios a {template.name.toLowerCase()} desde la configuración de rutina.
+            </p>
+            <Link to="/configuracion" className="btn-secondary mt-4">
+              Configurar rutina
+            </Link>
+          </div>
+        )}
         {template.exercises.map((item) => {
           const log = logs.find((entry) => entry.exerciseId === item.exerciseId)
           const equivalentIds = new Set(getEquivalentExerciseIds(exercises, item.exerciseId))

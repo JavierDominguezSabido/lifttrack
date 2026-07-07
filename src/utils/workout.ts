@@ -58,7 +58,11 @@ export function getCompletedRoutineDaysForWeek(
   templates: WorkoutTemplate[],
   date = new Date()
 ) {
-  const routineDays = new Set(templates.map((template) => template.dayOfWeek))
+  const routineDays = new Set(
+    templates
+      .filter((template) => template.exercises.length > 0)
+      .map((template) => template.dayOfWeek)
+  )
   return new Set(
     getCurrentWeekSessions(sessions, date)
       .filter((session) => routineDays.has(session.dayOfWeek))
@@ -91,7 +95,9 @@ export function getNextPendingTemplate(
   completedDays: Set<number>,
   date = new Date()
 ) {
-  const sortedTemplates = [...templates].sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+  const sortedTemplates = [...templates]
+    .filter((template) => template.exercises.length > 0)
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
   const today = date.getDay()
 
   return sortedTemplates.find((template) =>
@@ -101,7 +107,10 @@ export function getNextPendingTemplate(
 
 export function getTodayTemplate(templates: WorkoutTemplate[], date = new Date()) {
   const today = date.getDay()
-  return templates.find((template) => template.dayOfWeek >= today) ?? templates[0]
+  const sortedTemplates = [...templates]
+    .filter((template) => template.exercises.length > 0)
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+  return sortedTemplates.find((template) => template.dayOfWeek >= today) ?? sortedTemplates[0] ?? templates[0]
 }
 
 export function formatRestSeconds(seconds?: number) {

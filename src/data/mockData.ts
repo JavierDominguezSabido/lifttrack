@@ -62,11 +62,13 @@ export const exercises: Exercise[] = routine.map((exercise) => ({
 }))
 
 const templateNames: Record<number, { id: string; name: string; notes: string }> = {
+  0: { id: 'domingo', name: 'Domingo', notes: 'Día opcional' },
   1: { id: 'lunes', name: 'Lunes', notes: 'Pecho, tríceps y gemelos' },
   2: { id: 'martes', name: 'Martes', notes: 'Espalda, bíceps y hombro' },
   3: { id: 'miercoles', name: 'Miércoles', notes: 'Pierna y abdominales' },
   4: { id: 'jueves', name: 'Jueves', notes: 'Hombro y trapecio' },
-  5: { id: 'viernes', name: 'Viernes', notes: 'Pecho, espalda y brazos' }
+  5: { id: 'viernes', name: 'Viernes', notes: 'Pecho, espalda y brazos' },
+  6: { id: 'sabado', name: 'Sábado', notes: 'Día opcional' }
 }
 
 export const templates: WorkoutTemplate[] = Object.entries(templateNames).map(([day, meta]) => {
@@ -117,7 +119,7 @@ function createInitialLog(exercise: RoutineExerciseSeed, sessionId: string, orde
   }
 }
 
-export const initialSessions: WorkoutSession[] = templates.map((template) => {
+export const initialSessions: WorkoutSession[] = templates.filter((template) => template.exercises.length > 0).map((template) => {
   const sessionId = `initial-${template.id}`
   const completedAt = sessionDates[template.dayOfWeek]
   const exerciseLogs = routine

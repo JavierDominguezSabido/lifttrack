@@ -4,8 +4,13 @@ import { TemplateExerciseRow } from '../components/workout/TemplateExerciseRow'
 import { useWorkouts } from '../context/WorkoutContext'
 import { dayNames, shortDayNames } from '../utils/workout'
 
+const weekOrder = [1, 2, 3, 4, 5, 6, 0]
+
 export function RoutinePage() {
   const { templates, getExerciseById } = useWorkouts()
+  const orderedTemplates = [...templates].sort(
+    (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
+  )
   const trainingDays = new Set(
     templates.filter((template) => template.exercises.length > 0).map((template) => template.dayOfWeek)
   )
@@ -44,7 +49,7 @@ export function RoutinePage() {
       </section>
 
       <section aria-label="Rutina semanal" className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {templates.map((template) => (
+        {orderedTemplates.map((template) => (
           <article key={template.id} className="card flex flex-col overflow-hidden">
             <header className="border-b border-line bg-muted/40 p-5">
               <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand">
@@ -90,13 +95,19 @@ export function RoutinePage() {
             </div>
 
             <footer className="p-4 pt-2">
-              <Link
-                to={`/entrenamiento/${template.id}`}
-                className="btn-primary w-full"
-              >
-                <Play className="size-4" aria-hidden="true" />
-                Entrenar {template.name.toLowerCase()}
-              </Link>
+              {template.exercises.length > 0 ? (
+                <Link
+                  to={`/entrenamiento/${template.id}`}
+                  className="btn-primary w-full"
+                >
+                  <Play className="size-4" aria-hidden="true" />
+                  Entrenar {template.name.toLowerCase()}
+                </Link>
+              ) : (
+                <Link to="/configuracion" className="btn-secondary w-full">
+                  Añadir ejercicios
+                </Link>
+              )}
             </footer>
           </article>
         ))}

@@ -2,9 +2,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
-  DatabaseBackup,
   Download,
-  FileJson,
   FileSpreadsheet,
   HardDrive,
   Upload,
@@ -12,13 +10,11 @@ import {
 } from 'lucide-react'
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useWorkouts } from '../../context/WorkoutContext'
-import { createBackup } from '../../services/dataExport/backup'
 import { sessionsToCsv } from '../../services/dataExport/csv'
 import { downloadTextFile } from '../../services/dataExport/download'
 import { parseWorkoutCsv } from '../../services/dataImport/csv'
-import { parseWorkoutBackup } from '../../services/dataImport/json'
 import { createImportPreview } from '../../services/dataImport/preview'
-import type { ImportPreview } from '../../services/dataImport/types'
+import type { ImportPayload, ImportPreview } from '../../services/dataImport/types'
 import {
   findExerciseDuplicateGroups,
   normalizeExerciseName
@@ -27,9 +23,7 @@ import { isInitialSession } from '../../utils/workout'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
-function mergeCanonicalizedSessionLogs(
-  payload: ReturnType<typeof parseWorkoutCsv>
-): ReturnType<typeof parseWorkoutCsv> {
+function mergeCanonicalizedSessionLogs(payload: ImportPayload): ImportPayload {
   const sessions = payload.sessions.map((session) => {
     const mergedLogs = new Map<string, typeof session.exerciseLogs[number]>()
 
@@ -77,18 +71,14 @@ function mergeCanonicalizedSessionLogs(
       0
     )
 
-    return {
-      ...session,
-      volumeKg,
-      exerciseLogs
-    }
+    return { ...session, volumeKg, exerciseLogs }
   })
 
   return { ...payload, sessions }
 }
 
 function canonicalizeImportedPayload(
-  payload: ReturnType<typeof parseWorkoutCsv>,
+  payload: ImportPayload,
   existingExercises: ReturnType<typeof useWorkouts>['exercises'],
   templates: ReturnType<typeof useWorkouts>['templates']
 ) {
@@ -138,11 +128,7 @@ function canonicalizeImportedPayload(
     }
   }
 
-  return mergeCanonicalizedSessionLogs({
-    ...payload,
-    sessions,
-    exercises
-  })
+  return mergeCanonicalizedSessionLogs({ ...payload, sessions, exercises })
 }
 
 export function DataSettings() {
@@ -156,9 +142,9 @@ export function DataSettings() {
     mergeDuplicateExercises
   } = useWorkouts()
   const csvInput = useRef<HTMLInputElement>(null)
-  const jsonInput = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [importing, setImporting] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [reviewDuplicates, setReviewDuplicates] = useState(false)
   const [mergingDuplicates, setMergingDuplicates] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -169,32 +155,18 @@ export function DataSettings() {
     [exercises, exportableSessions, templates]
   )
 
-  function filename(extension: 'csv' | 'json') {
-    return `lifttrack-${new Date().toISOString().slice(0, 10)}.${extension}`
+  function filename() {
+    return `lifttrack-${new Date().toISOString().slice(0, 10)}.csv`
   }
 
   function exportCsv() {
     const csv = sessionsToCsv(exportableSessions, exercises, templates)
-    downloadTextFile(filename('csv'), csv, 'text/csv;charset=utf-8')
+    downloadTextFile(filename(), csv, 'text/csv;charset=utf-8')
     setMessage(`${exportableSessions.length} entrenamientos exportados a CSV.`)
     setError(null)
   }
 
-  function exportJson() {
-    const backup = createBackup(exportableSessions, exercises, dataMode)
-    downloadTextFile(
-      filename('json'),
-      JSON.stringify(backup, null, 2),
-      'application/json;charset=utf-8'
-    )
-    setMessage(`${exportableSessions.length} entrenamientos incluidos en la copia JSON.`)
-    setError(null)
-  }
-
-  async function selectFile(
-    event: ChangeEvent<HTMLInputElement>,
-    type: 'csv' | 'json'
-  ) {
+  async function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
@@ -209,9 +181,7 @@ export function DataSettings() {
 
     try {
       const text = await file.text()
-      const payload = type === 'csv'
-        ? parseWorkoutCsv(text, file.name)
-        : parseWorkoutBackup(text, file.name)
+      const payload = parseWorkoutCsv(text, file.name)
       setPreview(createImportPreview(
         canonicalizeImportedPayload(payload, exercises, templates),
         exportableSessions
@@ -258,7 +228,7 @@ export function DataSettings() {
     )
 
     if (!window.confirm(
-      `Se van a fusionar ${duplicateCount} ejercicios duplicados y actualizar ${logCount} registros. No se borrarÃ¡n sesiones ni series. Â¿Continuar?`
+      `Se van a fusionar ${duplicateCount} ejercicios duplicados y actualizar ${logCount} registros. No se borrarán sesiones ni series. ¿Continuar?`
     )) return
 
     setMergingDuplicates(true)
@@ -285,7 +255,7 @@ export function DataSettings() {
         <p className="eyebrow">Datos</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h2 id="data-settings-title" className="text-2xl font-extrabold tracking-tight text-ink">
-            Importación y copias
+            Datos
           </h2>
           <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ${
             dataMode === 'cloud'
@@ -299,7 +269,7 @@ export function DataSettings() {
           </span>
         </div>
         <p className="mt-2 text-sm leading-6 text-secondary">
-          La exportación y la importación usan únicamente el almacenamiento activo.
+          Importa o exporta tus entrenamientos en CSV.
         </p>
       </header>
 
@@ -318,55 +288,24 @@ export function DataSettings() {
         )}
 
         <div>
-          <div className="flex items-center gap-2">
-            <Download className="size-5 text-brand" aria-hidden="true" />
-            <h3 className="font-extrabold text-ink">Exportar entrenamientos</h3>
-          </div>
-          <p className="mt-1 text-sm leading-6 text-secondary">
-            El CSV contiene una fila por serie. La copia JSON conserva la estructura completa.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={exportCsv} className="btn-secondary">
-              <FileSpreadsheet className="size-4" aria-hidden="true" />
-              Exportar CSV
-            </button>
-            <button type="button" onClick={exportJson} className="btn-secondary">
-              <DatabaseBackup className="size-4" aria-hidden="true" />
-              Exportar copia JSON
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t border-line pt-5">
-          <div className="flex items-center gap-2">
-            <Upload className="size-5 text-brand" aria-hidden="true" />
-            <h3 className="font-extrabold text-ink">Importar entrenamientos</h3>
-          </div>
-          <p className="mt-1 text-sm leading-6 text-secondary">
-            Selecciona un archivo para validarlo. No se guardará nada hasta que confirmes.
+          <p className="text-sm leading-6 text-secondary">
+            El CSV contiene una fila por serie y se puede revisar cómodamente en Excel.
           </p>
           <input
             ref={csvInput}
             type="file"
             accept=".csv,text/csv"
             className="sr-only"
-            onChange={(event) => void selectFile(event, 'csv')}
-          />
-          <input
-            ref={jsonInput}
-            type="file"
-            accept=".json,application/json"
-            className="sr-only"
-            onChange={(event) => void selectFile(event, 'json')}
+            onChange={(event) => void selectFile(event)}
           />
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => csvInput.current?.click()} className="btn-secondary">
-              <FileSpreadsheet className="size-4" aria-hidden="true" />
-              Importar CSV
+            <button type="button" onClick={exportCsv} className="btn-secondary">
+              <Download className="size-4" aria-hidden="true" />
+              Exportar CSV
             </button>
-            <button type="button" onClick={() => jsonInput.current?.click()} className="btn-secondary">
-              <FileJson className="size-4" aria-hidden="true" />
-              Importar copia JSON
+            <button type="button" onClick={() => csvInput.current?.click()} className="btn-secondary">
+              <Upload className="size-4" aria-hidden="true" />
+              Importar CSV
             </button>
           </div>
         </div>
@@ -380,59 +319,38 @@ export function DataSettings() {
           />
         )}
 
-        <div className="border-t border-line pt-5">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="size-5 text-brand" aria-hidden="true" />
-            <h3 className="font-extrabold text-ink">Revisar ejercicios duplicados</h3>
-          </div>
-          <p className="mt-1 text-sm leading-6 text-secondary">
-            Detecta ejercicios con nombres equivalentes aunque tengan IDs distintos, por ejemplo variantes con guiones o palabras como “en”.
-          </p>
+        <div className="border-t border-line pt-4">
           <button
             type="button"
-            onClick={() => setReviewDuplicates((current) => !current)}
-            className="btn-secondary mt-3"
+            onClick={() => setShowAdvanced((current) => !current)}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-secondary hover:text-ink"
+            aria-expanded={showAdvanced}
           >
-            Revisar ejercicios duplicados
+            <AlertTriangle className="size-4" aria-hidden="true" />
+            Herramientas avanzadas
           </button>
-          {reviewDuplicates && (
-            <div className="mt-4 rounded-2xl border border-line bg-muted/60 p-4">
-              {duplicateGroups.length > 0 ? (
-                <>
-                  <div className="space-y-3">
-                    {duplicateGroups.map((group) => (
-                      <div key={group.normalizedName} className="rounded-xl bg-surface p-3 shadow-sm">
-                        <p className="text-xs font-bold uppercase tracking-wider text-brand">
-                          CanÃ³nico
-                        </p>
-                        <p className="mt-1 font-extrabold text-ink">
-                          {group.canonicalName}
-                          <span className="ml-2 break-all text-xs font-semibold text-secondary">
-                            {group.canonicalId}
-                          </span>
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-secondary">
-                          Duplicados: {group.duplicateNames.join(', ')}
-                        </p>
-                        <p className="mt-1 text-xs font-medium text-subtle">
-                          {group.affectedSessionCount} sesiones afectadas Â· {group.affectedLogCount} registros a actualizar
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void mergeDetectedDuplicates()}
-                    disabled={mergingDuplicates}
-                    className="btn-primary mt-4 w-full"
-                  >
-                    {mergingDuplicates ? 'Fusionandoâ€¦' : 'Fusionar duplicados'}
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm font-semibold text-secondary">
-                  No se han encontrado duplicados con sesiones asociadas.
-                </p>
+          {showAdvanced && (
+            <div className="mt-3 rounded-2xl border border-line bg-muted/60 p-4">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="size-5 text-brand" aria-hidden="true" />
+                <h3 className="font-extrabold text-ink">Revisar duplicados</h3>
+              </div>
+              <p className="mt-1 text-sm leading-6 text-secondary">
+                Detecta ejercicios con nombres equivalentes aunque tengan IDs distintos.
+              </p>
+              <button
+                type="button"
+                onClick={() => setReviewDuplicates((current) => !current)}
+                className="btn-secondary mt-3"
+              >
+                Revisar ejercicios duplicados
+              </button>
+              {reviewDuplicates && (
+                <DuplicateReview
+                  duplicateGroups={duplicateGroups}
+                  mergingDuplicates={mergingDuplicates}
+                  onMerge={() => void mergeDetectedDuplicates()}
+                />
               )}
             </div>
           )}
@@ -445,12 +363,61 @@ export function DataSettings() {
               ? `${exportableSessions.length} entrenamientos cargados desde Supabase.`
               : `${exportableSessions.length} entrenamientos guardados en este dispositivo.`}
           </p>
-          <p className="mt-2 text-xs font-medium text-subtle">
-            Google Drive y Google Sheets no están conectados. La estructura admite futuros adaptadores sin cambiar este flujo.
-          </p>
         </div>
       </div>
     </section>
+  )
+}
+
+function DuplicateReview({
+  duplicateGroups,
+  mergingDuplicates,
+  onMerge
+}: {
+  duplicateGroups: ReturnType<typeof findExerciseDuplicateGroups>
+  mergingDuplicates: boolean
+  onMerge: () => void
+}) {
+  return (
+    <div className="mt-4 rounded-2xl border border-line bg-surface p-4">
+      {duplicateGroups.length > 0 ? (
+        <>
+          <div className="space-y-3">
+            {duplicateGroups.map((group) => (
+              <div key={group.normalizedName} className="rounded-xl bg-muted p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand">
+                  Canónico
+                </p>
+                <p className="mt-1 font-extrabold text-ink">
+                  {group.canonicalName}
+                  <span className="ml-2 break-all text-xs font-semibold text-secondary">
+                    {group.canonicalId}
+                  </span>
+                </p>
+                <p className="mt-2 text-sm font-semibold text-secondary">
+                  Duplicados: {group.duplicateNames.join(', ')}
+                </p>
+                <p className="mt-1 text-xs font-medium text-subtle">
+                  {group.affectedSessionCount} sesiones afectadas · {group.affectedLogCount} registros a actualizar
+                </p>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={onMerge}
+            disabled={mergingDuplicates}
+            className="btn-primary mt-4 w-full"
+          >
+            {mergingDuplicates ? 'Fusionando...' : 'Fusionar duplicados'}
+          </button>
+        </>
+      ) : (
+        <p className="text-sm font-semibold text-secondary">
+          No se han encontrado duplicados con sesiones asociadas.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -514,7 +481,7 @@ function ImportPreviewCard({
           Cancelar
         </button>
         <button type="button" onClick={onConfirm} disabled={!canImport || importing} className="btn-primary">
-          {importing ? 'Importando…' : 'Confirmar importación'}
+          {importing ? 'Importando...' : 'Confirmar importación'}
         </button>
       </div>
     </div>

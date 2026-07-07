@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
+import { ThemeToggle } from '../components/ui/ThemeToggle'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
 import { dayNames, formatRestSeconds, shortDayNames } from '../utils/workout'
 
@@ -29,6 +30,7 @@ const cloneTemplates = (templates: WorkoutTemplate[]) =>
 const createId = () => typeof globalThis.crypto?.randomUUID === 'function'
   ? globalThis.crypto.randomUUID()
   : `template-exercise-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+const weekOrder = [1, 2, 3, 4, 5, 6, 0]
 
 function parseTarget(value: string) {
   const match = value.trim().match(/^([1-9]\d*)\s*[xX×]\s*([1-9]\d*)$/)
@@ -61,6 +63,9 @@ export function SettingsPage() {
 
   useEffect(() => setDrafts(cloneTemplates(templates)), [templates])
 
+  const orderedDrafts = [...drafts].sort(
+    (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
+  )
   const trainingDays = new Set(drafts.filter((item) => item.exercises.length).map((item) => item.dayOfWeek))
 
   function updateTemplate(templateId: string, update: (template: WorkoutTemplate) => WorkoutTemplate) {
@@ -140,10 +145,25 @@ export function SettingsPage() {
   return (
     <div className="space-y-5 md:space-y-6">
       <AccountSettings />
-      <DataSettings />
+
+      <section className="card overflow-hidden" aria-labelledby="appearance-settings-title">
+        <header className="border-b border-line bg-muted/40 p-5 md:p-6">
+          <p className="eyebrow">Apariencia</p>
+          <h2 id="appearance-settings-title" className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
+            Apariencia
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Ajusta el tema visual de LiftTrack en este dispositivo.
+          </p>
+        </header>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5 md:p-6">
+          <p className="text-sm font-semibold text-secondary">Tema de la aplicación</p>
+          <ThemeToggle />
+        </div>
+      </section>
 
       <section className="card p-5 md:p-6">
-        <p className="eyebrow">Ajustes</p>
+        <p className="eyebrow">Rutina</p>
         <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
           Rutina y ejercicios
         </h2>
@@ -208,7 +228,7 @@ export function SettingsPage() {
           </section>
 
           <section aria-label="Editar entrenamientos por día" className="space-y-4">
-            {drafts.map((template) => (
+            {orderedDrafts.map((template) => (
               <article key={template.id} className="card overflow-hidden">
                 <header className="border-b border-line bg-muted/40 p-4 sm:p-5">
                   <p className="text-xs font-bold uppercase tracking-wider text-brand">
@@ -372,6 +392,8 @@ export function SettingsPage() {
           </div>
         </section>
       )}
+
+      <DataSettings />
     </div>
   )
 }

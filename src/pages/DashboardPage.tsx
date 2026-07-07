@@ -15,9 +15,15 @@ import {
   isInitialSession
 } from '../utils/workout'
 
+const weekOrder = [1, 2, 3, 4, 5, 6, 0]
+
 export function DashboardPage() {
   const { sessions, templates, getExerciseById } = useWorkouts()
   const today = new Date()
+  const orderedTemplates = [...templates].sort(
+    (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
+  )
+  const activeTemplates = orderedTemplates.filter((template) => template.exercises.length > 0)
   const recentSessions = [...sessions]
     .filter((session) => session.completedAt && !isInitialSession(session.id))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
@@ -28,14 +34,15 @@ export function DashboardPage() {
   const todayCompleted = todayTemplate
     ? completedDays.has(todayTemplate.dayOfWeek)
     : false
-  const weekCompleted = templates.length > 0 &&
-    templates.every((template) => completedDays.has(template.dayOfWeek))
+  const weekCompleted = activeTemplates.length > 0 &&
+    activeTemplates.every((template) => completedDays.has(template.dayOfWeek))
   const heroTemplate = nextTemplate ?? todayTemplate ?? templates[0]
+  const heroIsToday = heroTemplate?.dayOfWeek === today.getDay()
   const weeklyVolume = weeklySessions.reduce((sum, session) => sum + getSessionVolume(session), 0)
   const weeklyStreak = calculateWeeklyStreak(sessions, today)
   const completedRoutineDays = completedDays.size
-  const weeklyProgressValue = templates.length
-    ? Math.min(100, (completedRoutineDays / templates.length) * 100)
+  const weeklyProgressValue = activeTemplates.length
+    ? Math.min(100, (completedRoutineDays / activeTemplates.length) * 100)
     : 0
   const heroState = weekCompleted
     ? 'week-complete'
@@ -74,7 +81,7 @@ export function DashboardPage() {
               {heroState === 'week-complete' ? (
                 <span className="flex items-center gap-2">
                   <CheckCircle2 className="size-4 text-hero-accent" />
-                  {completedRoutineDays} de {templates.length} días completados
+                  {completedRoutineDays} de {activeTemplates.length} días completados
                 </span>
               ) : (
                 <>
@@ -104,7 +111,7 @@ export function DashboardPage() {
               ? 'Ver historial'
               : heroState === 'today-complete'
                 ? 'Entrenar próximo'
-                : 'Entrenar hoy'}
+                : heroIsToday ? 'Entrenar hoy' : 'Entrenar próximo'}
             <ArrowRight className="size-4" />
           </Link>
         </div>
@@ -146,15 +153,16 @@ export function DashboardPage() {
             Ver rutina
           </Link>
         </div>
-        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-5 md:px-0">
-          {templates.map((template) => {
+        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-7 md:px-0">
+          {orderedTemplates.map((template) => {
             const completed = completedDays.has(template.dayOfWeek)
             const isNext = !weekCompleted && heroTemplate?.id === template.id
+            const hasExercises = template.exercises.length > 0
 
             return (
               <Link
                 key={template.id}
-                to={`/entrenamiento/${template.id}`}
+                to={hasExercises ? `/entrenamiento/${template.id}` : '/configuracion'}
                 className={`card min-w-36 snap-start p-4 transition hover:-translate-y-0.5 hover:border-brand ${
                   completed
                     ? '!border-success/50 bg-success-soft/40'
@@ -173,7 +181,7 @@ export function DashboardPage() {
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-ink">{template.exercises.length}</p>
                 <p className="text-xs font-medium text-secondary">
-                  {completed ? 'completado esta semana' : 'pendiente'}
+                  {!hasExercises ? 'sin ejercicios' : completed ? 'completado esta semana' : 'pendiente'}
                 </p>
               </Link>
             )
@@ -214,7 +222,7 @@ export function DashboardPage() {
           <div className="mt-6">
             <ProgressRing
               value={weeklyProgressValue}
-              label={`${completedRoutineDays} de ${templates.length} días`}
+              label={`${completedRoutineDays} de ${activeTemplates.length} días`}
               detail="Progreso de la rutina semanal."
             />
           </div>

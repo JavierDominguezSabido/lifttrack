@@ -31,7 +31,11 @@ export function getStoredExercises(): Exercise[] {
 
 export function getStoredTemplates(): WorkoutTemplate[] {
   const stored = read<WorkoutTemplate[]>(TEMPLATES_KEY)
-  return Array.isArray(stored) && stored.length > 0 ? stored : clone(baseTemplates)
+  if (!Array.isArray(stored) || stored.length === 0) return clone(baseTemplates)
+
+  const storedIds = new Set(stored.map((template) => template.id))
+  const missingBaseTemplates = baseTemplates.filter((template) => !storedIds.has(template.id))
+  return [...stored, ...clone(missingBaseTemplates)].sort((a, b) => a.dayOfWeek - b.dayOfWeek)
 }
 
 export function storeExercises(exercises: Exercise[]) {

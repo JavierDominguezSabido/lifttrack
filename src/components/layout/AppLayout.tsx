@@ -23,8 +23,11 @@ const pageTitles: Record<string, string> = {
 export function AppLayout() {
   const location = useLocation()
   const { sessions, templates, dataMode, sessionsError, sessionsLoading } = useWorkouts()
+  const activeTemplateCount = templates.filter((template) => template.exercises.length > 0).length
   const weeklySessionCount = getCurrentWeekSessions(sessions).length
-  const weeklyProgress = Math.min(100, (weeklySessionCount / templates.length) * 100)
+  const weeklyProgress = activeTemplateCount
+    ? Math.min(100, (weeklySessionCount / activeTemplateCount) * 100)
+    : 0
   const currentDate = new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
     day: 'numeric',
@@ -69,7 +72,7 @@ export function AppLayout() {
         <div className="mt-auto rounded-2xl bg-brand-soft p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-brand">Semana activa</p>
           <p className="mt-1 text-2xl font-extrabold text-ink">
-            {weeklySessionCount} / {templates.length}
+            {weeklySessionCount} / {activeTemplateCount}
           </p>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
             <div
