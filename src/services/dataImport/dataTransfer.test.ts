@@ -110,11 +110,12 @@ describe('transferencia de datos', () => {
   })
 
   it('valida una copia JSON generada por LiftTrack', () => {
-    const backup = createBackup([session], [exercise], 'local')
+    const backup = createBackup([session], [exercise], [template], 'local')
     const parsed = parseWorkoutBackup(JSON.stringify(backup), 'backup.json')
 
     expect(parsed.errors).toEqual([])
     expect(parsed.sessions[0]).toEqual(session)
     expect(parsed.exercises[0]).toEqual(exercise)
+    expect(parsed.templates?.[0]).toEqual(template)
   })
 })

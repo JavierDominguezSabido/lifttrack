@@ -2,17 +2,16 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
-  Download,
-  FileSpreadsheet,
+  DatabaseBackup,
+  FileJson,
   HardDrive,
-  Upload,
   X
 } from 'lucide-react'
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useWorkouts } from '../../context/WorkoutContext'
-import { sessionsToCsv } from '../../services/dataExport/csv'
+import { createBackup } from '../../services/dataExport/backup'
 import { downloadTextFile } from '../../services/dataExport/download'
-import { parseWorkoutCsv } from '../../services/dataImport/csv'
+import { parseWorkoutBackup } from '../../services/dataImport/json'
 import { createImportPreview } from '../../services/dataImport/preview'
 import type { ImportPayload, ImportPreview } from '../../services/dataImport/types'
 import {
@@ -138,10 +137,11 @@ export function DataSettings() {
     templates,
     dataMode,
     saveSession,
+    saveTemplates,
     mergeExercises,
     mergeDuplicateExercises
   } = useWorkouts()
-  const csvInput = useRef<HTMLInputElement>(null)
+  const jsonInput = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [importing, setImporting] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -156,13 +156,13 @@ export function DataSettings() {
   )
 
   function filename() {
-    return `lifttrack-${new Date().toISOString().slice(0, 10)}.csv`
+    return `lifttrack-${new Date().toISOString().slice(0, 10)}.json`
   }
 
-  function exportCsv() {
-    const csv = sessionsToCsv(exportableSessions, exercises, templates)
-    downloadTextFile(filename(), csv, 'text/csv;charset=utf-8')
-    setMessage(`${exportableSessions.length} entrenamientos exportados a CSV.`)
+  function exportJson() {
+    const backup = createBackup(exportableSessions, exercises, templates, dataMode)
+    downloadTextFile(filename(), JSON.stringify(backup, null, 2), 'application/json;charset=utf-8')
+    setMessage(`${exportableSessions.length} entrenamientos incluidos en la copia JSON.`)
     setError(null)
   }
 
@@ -181,7 +181,7 @@ export function DataSettings() {
 
     try {
       const text = await file.text()
-      const payload = parseWorkoutCsv(text, file.name)
+      const payload = parseWorkoutBackup(text, file.name)
       setPreview(createImportPreview(
         canonicalizeImportedPayload(payload, exercises, templates),
         exportableSessions
@@ -194,9 +194,11 @@ export function DataSettings() {
   }
 
   async function confirmImport() {
-    if (!preview || preview.errors.length > 0 || preview.sessionsToImport.length === 0) return
+    if (!preview || preview.errors.length > 0) return
+    const hasRoutine = Boolean(preview.templates?.length)
+    if (preview.sessionsToImport.length === 0 && !hasRoutine && preview.exercises.length === 0) return
     if (!window.confirm(
-      `Se van a importar ${preview.sessionsToImport.length} sesiones nuevas desde CSV. No se sobrescribirán sesiones existentes. ¿Continuar?`
+      `Se va a importar una copia JSON con ${preview.sessionsToImport.length} sesiones nuevas${hasRoutine ? ' y rutina personalizada' : ''}. No se sobrescribirán sesiones existentes. ¿Continuar?`
     )) return
 
     setImporting(true)
@@ -204,11 +206,12 @@ export function DataSettings() {
     setMessage(null)
     try {
       mergeExercises(preview.exercises)
+      if (preview.templates?.length) saveTemplates(preview.templates)
       for (const session of preview.sessionsToImport) {
         await saveSession(session)
       }
       setMessage(
-        `${preview.sessionsToImport.length} entrenamiento${preview.sessionsToImport.length === 1 ? '' : 's'} importado${preview.sessionsToImport.length === 1 ? '' : 's'} en modo ${dataMode === 'cloud' ? 'sincronizado' : 'local'}.`
+        `${preview.sessionsToImport.length} sesión${preview.sessionsToImport.length === 1 ? '' : 'es'} importada${preview.sessionsToImport.length === 1 ? '' : 's'} desde la copia JSON.`
       )
       setPreview(null)
     } catch (importError) {
@@ -273,7 +276,7 @@ export function DataSettings() {
           </span>
         </div>
         <p className="mt-2 text-sm leading-6 text-secondary">
-          Importa o exporta tus entrenamientos en CSV.
+          JSON guarda una copia completa de LiftTrack para restaurar entrenamientos, ejercicios, series, pesos y rutina.
         </p>
       </header>
 
@@ -293,23 +296,23 @@ export function DataSettings() {
 
         <div>
           <p className="text-sm leading-6 text-secondary">
-            El CSV contiene una fila por serie y se puede revisar cómodamente en Excel.
+            La copia incluye sesiones, biblioteca de ejercicios, objetivos, descansos, notas, IDs, fecha de exportación y versión del formato.
           </p>
           <input
-            ref={csvInput}
+            ref={jsonInput}
             type="file"
-            accept=".csv,text/csv"
+            accept=".json,application/json"
             className="sr-only"
             onChange={(event) => void selectFile(event)}
           />
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={exportCsv} className="btn-secondary">
-              <Download className="size-4" aria-hidden="true" />
-              Exportar CSV
+            <button type="button" onClick={exportJson} className="btn-secondary">
+              <DatabaseBackup className="size-4" aria-hidden="true" />
+              Exportar copia JSON
             </button>
-            <button type="button" onClick={() => csvInput.current?.click()} className="btn-secondary">
-              <Upload className="size-4" aria-hidden="true" />
-              Importar CSV
+            <button type="button" onClick={() => jsonInput.current?.click()} className="btn-secondary">
+              <FileJson className="size-4" aria-hidden="true" />
+              Importar copia JSON
             </button>
           </div>
         </div>
@@ -336,7 +339,7 @@ export function DataSettings() {
           {showAdvanced && (
             <div className="mt-3 rounded-2xl border border-line bg-muted/60 p-4">
               <div className="flex items-center gap-2">
-                <FileSpreadsheet className="size-5 text-brand" aria-hidden="true" />
+                <FileJson className="size-5 text-brand" aria-hidden="true" />
                 <h3 className="font-extrabold text-ink">Revisar duplicados</h3>
               </div>
               <p className="mt-1 text-sm leading-6 text-secondary">
@@ -436,7 +439,11 @@ function ImportPreviewCard({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  const canImport = preview.errors.length === 0 && preview.sessionsToImport.length > 0
+  const hasRestorableData =
+    preview.sessionsToImport.length > 0 ||
+    preview.exercises.length > 0 ||
+    Boolean(preview.templates?.length)
+  const canImport = preview.errors.length === 0 && hasRestorableData
 
   return (
     <div className="rounded-2xl border border-brand/30 bg-brand-soft/60 p-4">

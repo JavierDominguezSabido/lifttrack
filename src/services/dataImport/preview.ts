@@ -45,11 +45,12 @@ export function createImportPreview(
   return {
     ...payload,
     sessionCount: payload.sessions.length,
-    exerciseCount: new Set(
-      payload.sessions.flatMap((session) =>
+    exerciseCount: new Set([
+      ...payload.exercises.map((exercise) => exercise.id),
+      ...payload.sessions.flatMap((session) =>
         session.exerciseLogs.map((log) => log.exerciseId)
       )
-    ).size,
+    ]).size,
     setCount: payload.sessions.reduce(
       (total, session) =>
         total + session.exerciseLogs.reduce((sum, log) => sum + log.sets.length, 0),

@@ -1,4 +1,4 @@
-import type { Exercise, WorkoutSession } from '../../types'
+import type { Exercise, WorkoutSession, WorkoutTemplate } from '../../types'
 
 export interface LiftTrackBackup {
   format: 'lifttrack-backup'
@@ -6,24 +6,26 @@ export interface LiftTrackBackup {
   exportedAt: string
   dataMode: 'local' | 'cloud'
   exercises: Exercise[]
+  templates: WorkoutTemplate[]
   sessions: WorkoutSession[]
 }
 
 export function createBackup(
   sessions: WorkoutSession[],
   exercises: Exercise[],
-  dataMode: 'local' | 'cloud'
+  templatesOrDataMode: WorkoutTemplate[] | 'local' | 'cloud',
+  dataModeOrUndefined?: 'local' | 'cloud'
 ): LiftTrackBackup {
-  const usedExerciseIds = new Set(
-    sessions.flatMap((session) => session.exerciseLogs.map((log) => log.exerciseId))
-  )
+  const templates = Array.isArray(templatesOrDataMode) ? templatesOrDataMode : []
+  const dataMode = dataModeOrUndefined ?? (Array.isArray(templatesOrDataMode) ? 'local' : templatesOrDataMode)
 
   return {
     format: 'lifttrack-backup',
     version: 1,
     exportedAt: new Date().toISOString(),
     dataMode,
-    exercises: exercises.filter((exercise) => usedExerciseIds.has(exercise.id)),
+    exercises,
+    templates,
     sessions
   }
 }

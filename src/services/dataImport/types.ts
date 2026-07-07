@@ -1,10 +1,11 @@
-import type { Exercise, WorkoutSession } from '../../types'
+import type { Exercise, WorkoutSession, WorkoutTemplate } from '../../types'
 
 export interface ImportPayload {
   source: 'csv' | 'json'
   filename: string
   sessions: WorkoutSession[]
   exercises: Exercise[]
+  templates?: WorkoutTemplate[]
   errors: string[]
 }
 
