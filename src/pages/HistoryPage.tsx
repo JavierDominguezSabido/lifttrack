@@ -41,6 +41,14 @@ interface ProgressEntry {
   bestSet?: SetLog
 }
 
+function formatSetReps(sets: SetLog[]) {
+  return sets
+    .filter((set) => set.completed)
+    .sort((a, b) => a.setNumber - b.setNumber)
+    .map((set) => set.reps)
+    .join('-')
+}
+
 export function HistoryPage() {
   const { exerciseId } = useParams()
   const location = useLocation()
@@ -262,26 +270,36 @@ export function HistoryPage() {
             </div>
 
             {chartEntries.length > 0 ? (
-              <div className="rounded-2xl border border-line bg-surface p-4">
-                <div className="flex h-44 items-end gap-2 border-b border-line px-1 sm:gap-4 sm:px-2">
-                  {chartEntries.map((entry) => {
-                    const weight = entry.bestSet?.weightKg ?? 0
-                    return (
-                      <div key={entry.session.id} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
-                        <span className="text-[11px] font-bold text-secondary">{weight} kg</span>
-                        <div
-                          className="w-full max-w-14 rounded-t-lg bg-brand"
-                          style={{ height: `${Math.max(8, (weight / maxWeight) * 80)}%` }}
-                        />
-                      </div>
-                    )
-                  })}
+              <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
+                <div>
+                  <div className="flex h-44 items-end gap-2 border-b border-line px-1 sm:gap-4 sm:px-2">
+                    {chartEntries.map((entry) => {
+                      const weight = entry.bestSet?.weightKg ?? 0
+                      return (
+                        <div key={entry.session.id} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                          <span className="text-[11px] font-bold text-secondary">{weight} kg</span>
+                          <div
+                            className="w-full max-w-14 rounded-t-lg bg-brand"
+                            style={{ height: `${Math.max(8, (weight / maxWeight) * 80)}%` }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-2 flex gap-2 px-1 sm:gap-4 sm:px-2">
+                    {chartEntries.map((entry) => (
+                      <span key={entry.session.id} className="flex-1 text-center text-[10px] font-semibold text-secondary">
+                        {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-2 flex gap-2 px-1 sm:gap-4 sm:px-2">
-                  {chartEntries.map((entry) => (
-                    <span key={entry.session.id} className="flex-1 text-center text-[10px] font-semibold text-secondary">
-                      {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
-                    </span>
+                <div className="divide-y divide-line rounded-xl bg-muted/60 px-3">
+                  {progressEntries.slice(0, 4).map((entry) => (
+                    <p key={entry.session.id} className="flex items-center justify-between gap-3 py-2 text-xs font-semibold text-secondary">
+                      <span>{formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                      <span className="font-extrabold text-ink">{formatSetReps(entry.log.sets)}</span>
+                    </p>
                   ))}
                 </div>
               </div>
@@ -511,6 +529,11 @@ function SessionCard({
                       <p className="mt-1 text-xs font-medium text-secondary">
                         {completed.length} de {log.sets.length} series hechas
                       </p>
+                      {completed.length > 0 && (
+                        <p className="mt-1 text-sm font-extrabold text-ink">
+                          {formatSetReps(log.sets)}
+                        </p>
+                      )}
                       {log.notes && (
                         <p className="mt-2 rounded-xl bg-surface px-3 py-2 text-xs font-medium text-secondary">
                           {log.notes}

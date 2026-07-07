@@ -87,10 +87,12 @@ export function createExerciseLogs(
 export function createDraftFromSession(session: WorkoutSession): DraftExerciseLog[] {
   return session.exerciseLogs.map((log) => ({
     ...log,
-    sets: log.sets.map((set) => ({
-      ...set,
-      reps: set.reps > 0 ? String(set.reps) : ''
-    }))
+    sets: [...log.sets]
+      .sort((a, b) => a.setNumber - b.setNumber)
+      .map((set) => ({
+        ...set,
+        reps: set.reps > 0 ? String(set.reps) : ''
+      }))
   }))
 }
 
@@ -202,7 +204,7 @@ export function updateWorkoutSession(
 
   const exerciseLogs = logs.flatMap((log) => {
     const workingWeightKg = getWorkingWeight(log)
-    const sets = log.sets.flatMap((set): SetLog[] => {
+    const sets = [...log.sets].sort((a, b) => a.setNumber - b.setNumber).flatMap((set): SetLog[] => {
       const reps = set.reps.trim()
       if (!set.completed && reps === '') return []
 

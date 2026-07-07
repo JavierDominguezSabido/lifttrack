@@ -7,6 +7,11 @@ import { getStoredExercises, getStoredTemplates } from '../routineStorage'
 import { supabase } from './supabaseClient'
 
 type DbClient = SupabaseClient<Database>
+type ExerciseLogRow = Database['public']['Tables']['exercise_logs']['Row']
+type SetLogRow = Database['public']['Tables']['set_logs']['Row']
+
+const SUPABASE_PAGE_SIZE = 1000
+const IN_FILTER_CHUNK_SIZE = 150
 
 function requireClient(): DbClient {
   if (!supabase) {
@@ -41,6 +46,72 @@ function validateSessionSets(session: WorkoutSession, context: string) {
       `[workout:${context}] ${session.id} / ${log.exerciseId} / ${log.sets.length} series / ${log.sets.map((set) => set.reps).join('-')} / ${log.workingWeightKg ?? log.sets[0]?.weightKg ?? 0} kg`
     )
   }
+}
+
+function chunkIds(ids: string[], size = IN_FILTER_CHUNK_SIZE) {
+  const chunks: string[][] = []
+  for (let index = 0; index < ids.length; index += size) {
+    chunks.push(ids.slice(index, index + size))
+  }
+  return chunks
+}
+
+async function fetchExerciseLogsForSessions(
+  client: DbClient,
+  userId: string,
+  sessionIds: string[]
+) {
+  const rows: ExerciseLogRow[] = []
+
+  for (const chunk of chunkIds(sessionIds)) {
+    let from = 0
+    while (true) {
+      const { data, error } = await client
+        .from('exercise_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .in('session_id', chunk)
+        .order('session_id', { ascending: true })
+        .order('position', { ascending: true })
+        .range(from, from + SUPABASE_PAGE_SIZE - 1)
+      throwIfError(error)
+
+      rows.push(...(data ?? []))
+      if (!data || data.length < SUPABASE_PAGE_SIZE) break
+      from += SUPABASE_PAGE_SIZE
+    }
+  }
+
+  return rows
+}
+
+async function fetchSetLogsForExerciseLogs(
+  client: DbClient,
+  userId: string,
+  exerciseLogIds: string[]
+) {
+  const rows: SetLogRow[] = []
+
+  for (const chunk of chunkIds(exerciseLogIds)) {
+    let from = 0
+    while (true) {
+      const { data, error } = await client
+        .from('set_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .in('exercise_log_id', chunk)
+        .order('exercise_log_id', { ascending: true })
+        .order('set_number', { ascending: true })
+        .range(from, from + SUPABASE_PAGE_SIZE - 1)
+      throwIfError(error)
+
+      rows.push(...(data ?? []))
+      if (!data || data.length < SUPABASE_PAGE_SIZE) break
+      from += SUPABASE_PAGE_SIZE
+    }
+  }
+
+  return rows
 }
 
 async function persistSession(session: WorkoutSession) {
@@ -176,22 +247,14 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
     throwIfError(sessionsError)
     if (!sessions?.length) return []
 
-    const { data: logs, error: logsError } = await client
-      .from('exercise_logs')
-      .select('*')
-      .in('session_id', sessions.map((session) => session.id))
-      .order('position')
-    throwIfError(logsError)
-
-    const { data: sets, error: setsError } = logs?.length
-      ? await client
-          .from('set_logs')
-          .select('*')
-          .in('exercise_log_id', logs.map((log) => log.id))
-          .order('set_number', { ascending: true })
-          .range(0, 99999)
-      : { data: [], error: null }
-    throwIfError(setsError)
+    const logs = await fetchExerciseLogsForSessions(
+      client,
+      userId,
+      sessions.map((session) => session.id)
+    )
+    const sets = logs.length
+      ? await fetchSetLogsForExerciseLogs(client, userId, logs.map((log) => log.id))
+      : []
 
     const { data: dbExercises, error: exercisesError } = await client
       .from('exercises')
@@ -220,8 +283,9 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
       durationMinutes: session.duration_minutes ?? undefined,
       volumeKg: session.volume_kg ?? undefined,
       notes: session.notes ?? undefined,
-      exerciseLogs: (logs ?? [])
+      exerciseLogs: logs
         .filter((log) => log.session_id === session.id)
+        .sort((a, b) => a.position - b.position)
         .map((log) => ({
           id: log.client_id,
           sessionId: session.client_id,
@@ -229,7 +293,7 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
           order: log.position,
           workingWeightKg: log.working_weight_kg ?? undefined,
           notes: log.notes ?? undefined,
-          sets: (sets ?? [])
+          sets: sets
             .filter((set) => set.exercise_log_id === log.id)
             .sort((a, b) => a.set_number - b.set_number)
             .map((set) => ({
