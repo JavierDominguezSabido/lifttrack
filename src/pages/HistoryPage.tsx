@@ -714,6 +714,12 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
     const y = 56 - ((getProgressEntryWeight(entry) - minWeight) / range) * 42 - 7
     return { x, y, entry }
   })
+  const labeledPointIndexes = new Set<number>([
+    0,
+    points.length - 1,
+    weights.indexOf(minWeight),
+    weights.indexOf(maxWeight)
+  ])
   const path = points.map((point, index) =>
     `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`
   ).join(' ')
@@ -732,12 +738,17 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
         <line x1="0" y1="55" x2="100" y2="55" className="stroke-line" strokeWidth="1" />
         <line x1="0" y1="10" x2="100" y2="10" className="stroke-line" strokeWidth="1" strokeDasharray="3 3" />
         <path d={path} className="fill-none stroke-brand" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map(({ x, y, entry }) => (
+        {points.map(({ x, y, entry }, index) => (
           <g key={entry.session.id}>
+            <title>
+              {`${formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })}: ${getProgressEntryWeight(entry)} kg`}
+            </title>
             <circle cx={x} cy={y} r="3.2" className="fill-surface stroke-brand" strokeWidth="2.2" />
-            <text x={x} y={Math.max(7, y - 6)} textAnchor="middle" className="fill-secondary text-[5px] font-bold">
-              {getProgressEntryWeight(entry)} kg
-            </text>
+            {labeledPointIndexes.has(index) && (
+              <text x={x} y={Math.max(7, y - 6)} textAnchor="middle" className="fill-secondary text-[5px] font-bold">
+                {getProgressEntryWeight(entry)} kg
+              </text>
+            )}
           </g>
         ))}
       </svg>
