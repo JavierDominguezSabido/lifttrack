@@ -95,6 +95,27 @@ interface SessionBuilder {
   logs: Map<string, ExerciseLog>
 }
 
+function parseTargetSetCount(value: string) {
+  const match = value.trim().toLowerCase().match(/^\s*[^x×]+\s*[x×]\s*(\d+)\s*$/)
+  return match ? Number(match[1]) : null
+}
+
+function logCsvDiagnostics(sessions: WorkoutSession[], exerciseMap: Map<string, Exercise>) {
+  if (!import.meta.env.DEV) return
+
+  for (const session of sessions) {
+    for (const log of session.exerciseLogs) {
+      const exerciseName = exerciseMap.get(log.exerciseId)?.name ?? log.exerciseId
+      const reps = log.sets.map((set) => set.reps).join('-')
+      const weights = [...new Set(log.sets.map((set) => set.weightKg))]
+      const weightLabel = weights.length === 1 ? `${weights[0]}` : weights.join('/')
+      console.info(
+        `[import:csv] ${session.id} / ${exerciseName} / ${log.sets.length} series / ${reps} / ${weightLabel} kg`
+      )
+    }
+  }
+}
+
 export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
   const rows = parseCsvRows(text.replace(/^\uFEFF/, ''))
   if (rows.length === 0) {
@@ -132,6 +153,7 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
     const reps = parseNumber(value(row, 'reps'))
     const weight = parseNumber(value(row, 'peso'))
     const completed = parseBoolean(value(row, 'hecha'))
+    const targetSetCount = parseTargetSetCount(value(row, 'objetivo'))
 
     if (!date) errors.push(`Fila ${line}: fecha no válida.`)
     if (dayOfWeek < 0) errors.push(`Fila ${line}: día no válido.`)
@@ -211,6 +233,8 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
       exerciseMap.set(exerciseId, {
         id: exerciseId,
         name: exerciseName,
+        targetSets: targetSetCount ?? undefined,
+        targetReps: value(row, 'objetivo').split(/[x×]/)[0]?.trim() || undefined,
         active: true
       })
     }
@@ -231,6 +255,20 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
     )
     return { ...session, volumeKg, exerciseLogs }
   })
+
+  for (const session of sessions) {
+    for (const log of session.exerciseLogs) {
+      const targetSetCount = exerciseMap.get(log.exerciseId)?.targetSets
+      if (targetSetCount && log.sets.length < targetSetCount) {
+        const exerciseName = exerciseMap.get(log.exerciseId)?.name ?? log.exerciseId
+        console.error(
+          `[import:csv] Posible pérdida de series: ${session.id} / ${exerciseName} esperaba ${targetSetCount} y se detectaron ${log.sets.length}.`
+        )
+      }
+    }
+  }
+
+  logCsvDiagnostics(sessions, exerciseMap)
 
   return {
     source: 'csv',

@@ -27,6 +27,66 @@ import { isInitialSession } from '../../utils/workout'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
+function mergeCanonicalizedSessionLogs(
+  payload: ReturnType<typeof parseWorkoutCsv>
+): ReturnType<typeof parseWorkoutCsv> {
+  const sessions = payload.sessions.map((session) => {
+    const mergedLogs = new Map<string, typeof session.exerciseLogs[number]>()
+
+    for (const log of session.exerciseLogs) {
+      const existing = mergedLogs.get(log.exerciseId)
+      if (!existing) {
+        mergedLogs.set(log.exerciseId, { ...log, sets: [...log.sets] })
+        continue
+      }
+
+      let nextSetNumber = Math.max(0, ...existing.sets.map((set) => set.setNumber)) + 1
+      const setNumbers = new Set(existing.sets.map((set) => set.setNumber))
+      const additions = log.sets.map((set) => {
+        if (!setNumbers.has(set.setNumber)) {
+          setNumbers.add(set.setNumber)
+          return set
+        }
+
+        const renumberedSet = { ...set, setNumber: nextSetNumber }
+        nextSetNumber += 1
+        console.error(
+          `[import] Serie renumerada al fusionar ${session.id} / ${log.exerciseId}: ${set.setNumber} -> ${renumberedSet.setNumber}.`
+        )
+        return renumberedSet
+      })
+      existing.sets = [...existing.sets, ...additions]
+        .sort((a, b) => a.setNumber - b.setNumber)
+        .map((set) => ({
+          ...set,
+          id: `${existing.id}-set-${set.setNumber}`,
+          exerciseLogId: existing.id
+        }))
+    }
+
+    const exerciseLogs = [...mergedLogs.values()].map((log, index) => ({
+      ...log,
+      order: index + 1
+    }))
+    const volumeKg = exerciseLogs.reduce(
+      (total, log) =>
+        total + log.sets.reduce(
+          (sum, set) => sum + (set.completed ? set.reps * set.weightKg : 0),
+          0
+        ),
+      0
+    )
+
+    return {
+      ...session,
+      volumeKg,
+      exerciseLogs
+    }
+  })
+
+  return { ...payload, sessions }
+}
+
 function canonicalizeImportedPayload(
   payload: ReturnType<typeof parseWorkoutCsv>,
   existingExercises: ReturnType<typeof useWorkouts>['exercises'],
@@ -50,13 +110,24 @@ function canonicalizeImportedPayload(
     if (canonicalId && canonicalId !== exercise.id) idMap.set(exercise.id, canonicalId)
   }
 
-  if (idMap.size === 0) return payload
+  if (idMap.size === 0) return mergeCanonicalizedSessionLogs(payload)
 
   const sessions = payload.sessions.map((session) => ({
     ...session,
     exerciseLogs: session.exerciseLogs.map((log) => {
       const canonicalId = idMap.get(log.exerciseId)
-      return canonicalId ? { ...log, exerciseId: canonicalId } : log
+      return canonicalId
+        ? {
+            ...log,
+            exerciseId: canonicalId,
+            id: `${session.id}-${canonicalId}`,
+            sets: log.sets.map((set) => ({
+              ...set,
+              id: `${session.id}-${canonicalId}-set-${set.setNumber}`,
+              exerciseLogId: `${session.id}-${canonicalId}`
+            }))
+          }
+        : log
     })
   }))
   const exercises = payload.exercises.filter((exercise) => !idMap.has(exercise.id))
@@ -67,11 +138,11 @@ function canonicalizeImportedPayload(
     }
   }
 
-  return {
+  return mergeCanonicalizedSessionLogs({
     ...payload,
     sessions,
     exercises
-  }
+  })
 }
 
 export function DataSettings() {

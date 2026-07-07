@@ -26,9 +26,27 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message)
 }
 
+function validateSessionSets(session: WorkoutSession, context: string) {
+  if (!import.meta.env.DEV) return
+
+  for (const log of session.exerciseLogs) {
+    const setNumbers = log.sets.map((set) => set.setNumber)
+    const uniqueSetNumbers = new Set(setNumbers)
+    if (uniqueSetNumbers.size !== setNumbers.length) {
+      console.error(
+        `[workout:${context}] ${session.id} / ${log.exerciseId} contiene números de serie duplicados: ${setNumbers.join(', ')}.`
+      )
+    }
+    console.info(
+      `[workout:${context}] ${session.id} / ${log.exerciseId} / ${log.sets.length} series / ${log.sets.map((set) => set.reps).join('-')} / ${log.workingWeightKg ?? log.sets[0]?.weightKg ?? 0} kg`
+    )
+  }
+}
+
 async function persistSession(session: WorkoutSession) {
   const client = requireClient()
   const userId = await requireUserId(client)
+  validateSessionSets(session, 'save:start')
   const domainTemplate = getStoredTemplates().find((item) => item.id === session.templateId)
   let templateId: string | null = null
 
@@ -120,7 +138,7 @@ async function persistSession(session: WorkoutSession) {
     if (!storedLog) throw new Error(`No se pudo guardar ${log.exerciseId}.`)
 
     if (log.sets.length > 0) {
-      const { error: setsError } = await client
+      const { data: insertedSets, error: setsError } = await client
         .from('set_logs')
         .insert(log.sets.map((set) => ({
           user_id: userId,
@@ -133,7 +151,13 @@ async function persistSession(session: WorkoutSession) {
           completed: set.completed,
           is_warmup: set.isWarmup ?? false
         })))
+        .select('set_number')
       throwIfError(setsError)
+      if ((insertedSets?.length ?? 0) !== log.sets.length) {
+        console.error(
+          `[workout:save] ${session.id} / ${log.exerciseId}: se intentaron guardar ${log.sets.length} series y Supabase confirmó ${insertedSets?.length ?? 0}.`
+        )
+      }
     }
   }
 
@@ -164,7 +188,8 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
           .from('set_logs')
           .select('*')
           .in('exercise_log_id', logs.map((log) => log.id))
-          .order('set_number')
+          .order('set_number', { ascending: true })
+          .range(0, 99999)
       : { data: [], error: null }
     throwIfError(setsError)
 
@@ -206,6 +231,7 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
           notes: log.notes ?? undefined,
           sets: (sets ?? [])
             .filter((set) => set.exercise_log_id === log.id)
+            .sort((a, b) => a.set_number - b.set_number)
             .map((set) => ({
               id: set.client_id,
               exerciseLogId: log.client_id,

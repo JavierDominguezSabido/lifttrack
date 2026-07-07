@@ -76,6 +76,28 @@ describe('transferencia de datos', () => {
     expect(csv).toContain('"Controlar, pausa"')
   })
 
+  it('acumula todas las filas de un mismo ejercicio CSV como series ordenadas', () => {
+    const csv = [
+      'session_id,fecha,dia,exercise_id,ejercicio,objetivo,descanso,peso_trabajo,serie,reps,peso,hecha,volumen,nota',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-banca,Press banca,8x4,2:30,65,1,8,65,true,520,',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-banca,Press banca,8x4,2:30,65,2,7,65,true,455,',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-banca,Press banca,8x4,2:30,65,3,7,65,true,455,',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-banca,Press banca,8x4,2:30,65,4,6,65,true,390,',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-inclinado-mancuernas,Press inclinado mancuernas,12x3,2:00,17,1,12,17,true,204,',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-inclinado-mancuernas,Press inclinado mancuernas,12x3,2:00,17,2,12,17,true,204,',
+      'hist-2026-07-06-lunes,2026-07-06,Lunes,press-inclinado-mancuernas,Press inclinado mancuernas,12x3,2:00,17,3,12,17,true,204,'
+    ].join('\n')
+
+    const parsed = parseWorkoutCsv(csv, 'lunes.csv')
+
+    expect(parsed.errors).toEqual([])
+    expect(parsed.sessions).toHaveLength(1)
+    expect(parsed.sessions[0].exerciseLogs).toHaveLength(2)
+    expect(parsed.sessions[0].exerciseLogs[0].sets.map((set) => set.reps)).toEqual([8, 7, 7, 6])
+    expect(parsed.sessions[0].exerciseLogs[0].sets.map((set) => set.setNumber)).toEqual([1, 2, 3, 4])
+    expect(parsed.sessions[0].exerciseLogs[1].sets.map((set) => set.reps)).toEqual([12, 12, 12])
+  })
+
   it('detecta sesiones duplicadas y las excluye de la importación', () => {
     const payload = parseWorkoutCsv(
       sessionsToCsv([session], [exercise], [template]),
