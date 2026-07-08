@@ -754,9 +754,8 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
             />
           </svg>
 
-          {points.map(({ x, y, entry, label, labelOffset, reps }, index) => {
+          {points.map(({ x, y, entry, label, labelOffset, reps }) => {
             const date = formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })
-            const showDate = entries.length <= 5 || index === 0 || index === points.length - 1 || index % 2 === 1
             return (
               <div
                 key={entry.session.id}
@@ -781,14 +780,12 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
                 </span>
                 <span className="block size-3.5 rounded-full border-[2.5px] border-brand bg-surface shadow-sm" />
                 <span className="absolute left-1/2 top-1/2 block size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand" />
-                {showDate && (
-                  <span
-                    className="absolute left-1/2 top-7 whitespace-nowrap text-[10px] font-bold leading-none text-secondary"
-                    style={{ transform: 'translateX(-50%)' }}
-                  >
-                    {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
-                  </span>
-                )}
+                <span
+                  className="absolute left-1/2 top-7 whitespace-nowrap text-[10px] font-bold leading-none text-secondary"
+                  style={{ transform: 'translateX(-50%)' }}
+                >
+                  {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
+                </span>
               </div>
             )
           })}
