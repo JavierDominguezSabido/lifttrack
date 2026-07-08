@@ -19,6 +19,7 @@ import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
 
 const WORKOUT_DRAFT_VERSION = 1
 const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
+const WORKOUT_DRAFT_MAX_AUTO_RESTORE_MS = 12 * 60 * 60 * 1000
 
 interface StoredWorkoutDraft {
   version: number
@@ -49,6 +50,7 @@ function readWorkoutDraft(userKey: string, template: WorkoutTemplate): StoredWor
       parsed.templateId !== template.id ||
       parsed.dayOfWeek !== template.dayOfWeek ||
       typeof parsed.startedAt !== 'string' ||
+      typeof parsed.updatedAt !== 'string' ||
       !Array.isArray(parsed.logs)
     ) {
       return null
@@ -58,6 +60,39 @@ function readWorkoutDraft(userKey: string, template: WorkoutTemplate): StoredWor
     console.error('[workout] No se pudo leer el borrador local:', error)
     return null
   }
+}
+
+function readWorkoutDrafts(userKey: string) {
+  const drafts: StoredWorkoutDraft[] = []
+  try {
+    const keyPrefix = `${WORKOUT_DRAFT_PREFIX}.${userKey}.`
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (!key?.startsWith(keyPrefix)) continue
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+      const parsed = JSON.parse(raw) as Partial<StoredWorkoutDraft>
+      if (
+        parsed.version === WORKOUT_DRAFT_VERSION &&
+        parsed.userKey === userKey &&
+      typeof parsed.templateId === 'string' &&
+      typeof parsed.dayOfWeek === 'number' &&
+      typeof parsed.startedAt === 'string' &&
+      typeof parsed.updatedAt === 'string' &&
+      Array.isArray(parsed.logs)
+      ) {
+        drafts.push(parsed as StoredWorkoutDraft)
+      }
+    }
+  } catch (error) {
+    console.error('[workout] No se pudieron leer los borradores locales:', error)
+  }
+  return drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+function isRecentWorkoutDraft(draft: StoredWorkoutDraft) {
+  const updatedAt = new Date(draft.updatedAt).getTime()
+  return Number.isFinite(updatedAt) && Date.now() - updatedAt <= WORKOUT_DRAFT_MAX_AUTO_RESTORE_MS
 }
 
 function writeWorkoutDraft(userKey: string, template: WorkoutTemplate, startedAt: string, logs: DraftExerciseLog[]) {
@@ -85,8 +120,24 @@ function removeWorkoutDraft(userKey: string, template: WorkoutTemplate) {
   }
 }
 
+function removeWorkoutDraftByDay(userKey: string, dayOfWeek: number) {
+  try {
+    window.localStorage.removeItem(`${WORKOUT_DRAFT_PREFIX}.${userKey}.day-${dayOfWeek}`)
+  } catch (error) {
+    console.error('[workout] No se pudo borrar el borrador local:', error)
+  }
+}
+
 function logsAreEqual(left: DraftExerciseLog[], right: DraftExerciseLog[]) {
   return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function createFreshWorkoutLogs(
+  template: WorkoutTemplate,
+  sessions: Parameters<typeof createExerciseLogs>[1],
+  exercises: Parameters<typeof createExerciseLogs>[2]
+) {
+  return createExerciseLogs(template, sessions, exercises)
 }
 
 export function WorkoutPage() {
@@ -96,14 +147,39 @@ export function WorkoutPage() {
   const { sessions, saveSession, templates, exercises, getExerciseById } = useWorkouts()
   const template = templates.find((item) => item.id === templateId) ?? getTodayTemplate(templates)
   const userKey = getDraftUserKey(user?.id)
-  const [logs, setLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions, exercises))
-  const [initialLogs, setInitialLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions, exercises))
-  const [startedAt, setStartedAt] = useState(() => new Date().toISOString())
-  const [pendingDraft, setPendingDraft] = useState<StoredWorkoutDraft | null>(() => readWorkoutDraft(userKey, template))
-  const [draftActive, setDraftActive] = useState(false)
+  const initialStateRef = useRef<{
+    logs: DraftExerciseLog[]
+    initialLogs: DraftExerciseLog[]
+    startedAt: string
+    pendingDraft: StoredWorkoutDraft | null
+    draftActive: boolean
+    restoredDraft: boolean
+  }>()
+  if (!initialStateRef.current) {
+    const freshLogs = createFreshWorkoutLogs(template, sessions, exercises)
+    const sameDayDraft = readWorkoutDraft(userKey, template)
+    const allDrafts = readWorkoutDrafts(userKey)
+    const ambiguousDraft = !sameDayDraft && allDrafts.length > 0 ? allDrafts[0] : null
+    const canAutoRestore = sameDayDraft && isRecentWorkoutDraft(sameDayDraft)
+    initialStateRef.current = {
+      logs: canAutoRestore ? sameDayDraft.logs : freshLogs,
+      initialLogs: freshLogs,
+      startedAt: canAutoRestore ? sameDayDraft.startedAt : new Date().toISOString(),
+      pendingDraft: canAutoRestore ? null : sameDayDraft ?? ambiguousDraft,
+      draftActive: Boolean(canAutoRestore),
+      restoredDraft: Boolean(canAutoRestore)
+    }
+  }
+  const [logs, setLogs] = useState<DraftExerciseLog[]>(() => initialStateRef.current!.logs)
+  const [initialLogs, setInitialLogs] = useState<DraftExerciseLog[]>(() => initialStateRef.current!.initialLogs)
+  const [startedAt, setStartedAt] = useState(() => initialStateRef.current!.startedAt)
+  const [pendingDraft, setPendingDraft] = useState<StoredWorkoutDraft | null>(() => initialStateRef.current!.pendingDraft)
+  const [draftActive, setDraftActive] = useState(() => initialStateRef.current!.draftActive)
+  const [draftRestoredNotice, setDraftRestoredNotice] = useState(() => initialStateRef.current!.restoredDraft)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const previousTemplateRef = useRef(template)
+  const draftToContinueRef = useRef<StoredWorkoutDraft | null>(null)
 
   const progress = useMemo(() => {
     const sets = logs.flatMap((log) => log.sets)
@@ -127,34 +203,32 @@ export function WorkoutPage() {
     const previousTemplate = previousTemplateRef.current
     if (previousTemplate.id === template.id && previousTemplate.dayOfWeek === template.dayOfWeek) return
 
+    let previousDraft: StoredWorkoutDraft | null = null
     const shouldStorePreviousDraft = draftActive || hasDraftChanges
     if (shouldStorePreviousDraft) {
-      const keepDraft = window.confirm(
-        'Tienes un entrenamiento en curso. Acepta para conservarlo como borrador y cambiar de dia. Cancela para descartarlo y cambiar de dia.'
-      )
-      if (keepDraft) {
-        writeWorkoutDraft(userKey, previousTemplate, startedAt, logs)
-      } else {
-        removeWorkoutDraft(userKey, previousTemplate)
-      }
+      writeWorkoutDraft(userKey, previousTemplate, startedAt, logs)
+      previousDraft = readWorkoutDraft(userKey, previousTemplate)
     }
 
     const nextInitialLogs = createExerciseLogs(template, sessions, exercises)
     const nextDraft = readWorkoutDraft(userKey, template)
+    const forcedDraft = draftToContinueRef.current?.templateId === template.id
+      ? draftToContinueRef.current
+      : null
+    draftToContinueRef.current = null
+    const draftToRestore = forcedDraft ?? (nextDraft && isRecentWorkoutDraft(nextDraft) ? nextDraft : null)
+    const draftToAsk = draftToRestore
+      ? null
+      : nextDraft ?? previousDraft ?? readWorkoutDrafts(userKey).find((draft) => draft.templateId !== template.id) ?? null
     previousTemplateRef.current = template
     setInitialLogs(nextInitialLogs)
-    setLogs(nextInitialLogs)
-    setStartedAt(new Date().toISOString())
-    setPendingDraft(nextDraft)
-    setDraftActive(false)
+    setLogs(draftToRestore?.logs ?? nextInitialLogs)
+    setStartedAt(draftToRestore?.startedAt ?? new Date().toISOString())
+    setPendingDraft(draftToAsk)
+    setDraftActive(Boolean(draftToRestore))
+    setDraftRestoredNotice(Boolean(draftToRestore))
     setSaveError(null)
   }, [draftActive, exercises, hasDraftChanges, logs, sessions, startedAt, template, userKey])
-
-  useEffect(() => {
-    const storedDraft = readWorkoutDraft(userKey, template)
-    setPendingDraft(storedDraft)
-    setDraftActive(false)
-  }, [template, userKey])
 
   useEffect(() => {
     if (pendingDraft) return
@@ -167,23 +241,54 @@ export function WorkoutPage() {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
   }
 
-  function continueDraft() {
-    if (!pendingDraft) return
-    setLogs(pendingDraft.logs)
-    setStartedAt(pendingDraft.startedAt)
+  function restoreDraft(draft: StoredWorkoutDraft) {
+    if (draft.templateId !== template.id) {
+      draftToContinueRef.current = draft
+      navigate(`/entrenamiento/${draft.templateId}`)
+      return
+    }
+    const nextInitialLogs = createExerciseLogs(template, sessions, exercises)
+    setInitialLogs(nextInitialLogs)
+    setLogs(draft.logs)
+    setStartedAt(draft.startedAt)
     setDraftActive(true)
+    setDraftRestoredNotice(true)
     setPendingDraft(null)
     setSaveError(null)
   }
 
+  function continueDraft() {
+    if (!pendingDraft) return
+    restoreDraft(pendingDraft)
+  }
+
   function discardDraft() {
-    removeWorkoutDraft(userKey, template)
+    if (pendingDraft) {
+      removeWorkoutDraftByDay(userKey, pendingDraft.dayOfWeek)
+    } else {
+      removeWorkoutDraft(userKey, template)
+    }
     const nextLogs = createExerciseLogs(template, sessions, exercises)
     setInitialLogs(nextLogs)
     setLogs(nextLogs)
     setStartedAt(new Date().toISOString())
     setPendingDraft(null)
     setDraftActive(false)
+    setDraftRestoredNotice(false)
+    setSaveError(null)
+  }
+
+  function startNewWorkout() {
+    const nextLogs = createExerciseLogs(template, sessions, exercises)
+    if (pendingDraft?.templateId === template.id) {
+      removeWorkoutDraft(userKey, template)
+    }
+    setInitialLogs(nextLogs)
+    setLogs(nextLogs)
+    setStartedAt(new Date().toISOString())
+    setPendingDraft(null)
+    setDraftActive(false)
+    setDraftRestoredNotice(false)
     setSaveError(null)
   }
 
@@ -207,6 +312,7 @@ export function WorkoutPage() {
       removeWorkoutDraft(userKey, template)
       setDraftActive(false)
       setPendingDraft(null)
+      setDraftRestoredNotice(false)
       navigate('/historial', { state: { workoutSaved: true } })
     } catch (error) {
       console.error('[workout] Error exacto al guardar el entrenamiento:', error)
@@ -263,16 +369,16 @@ export function WorkoutPage() {
             <div>
               <p className="text-sm font-extrabold text-ink">Tienes un entrenamiento en curso.</p>
               <p className="mt-0.5 text-xs font-semibold text-secondary">
-                Continualo o descartalo para empezar este dia desde cero.
+                Elige si quieres continuar ese borrador o empezar este entrenamiento desde cero.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+            <div className="grid gap-2 sm:flex sm:shrink-0">
               <button
                 type="button"
                 onClick={continueDraft}
                 className="btn-primary !min-h-10 !px-3 !py-2 !text-sm"
               >
-                Continuar
+                Continuar borrador
               </button>
               <button
                 type="button"
@@ -281,8 +387,28 @@ export function WorkoutPage() {
               >
                 Descartar
               </button>
+              <button
+                type="button"
+                onClick={startNewWorkout}
+                className="btn-secondary !min-h-10 !px-3 !py-2 !text-sm"
+              >
+                Empezar nuevo
+              </button>
             </div>
           </div>
+        </section>
+      )}
+
+      {draftRestoredNotice && !pendingDraft && (
+        <section className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm shadow-sm">
+          <span className="font-bold text-secondary">Borrador restaurado</span>
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="text-xs font-extrabold text-secondary underline decoration-line underline-offset-4 hover:text-danger"
+          >
+            Descartar borrador
+          </button>
         </section>
       )}
 
