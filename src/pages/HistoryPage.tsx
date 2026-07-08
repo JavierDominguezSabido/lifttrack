@@ -73,11 +73,9 @@ export function HistoryPage() {
   const {
     sessions,
     deleteSession,
-    clearLocalSessions,
     exercises,
     templates,
-    getExerciseById,
-    dataMode
+    getExerciseById
   } = useWorkouts()
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -180,29 +178,13 @@ export function HistoryPage() {
     }
   }
 
-  async function clearTestData() {
-    if (!window.confirm('Vas a borrar todos los entrenamientos guardados en este dispositivo. La rutina base se conservará. Esta acción no se puede deshacer. ¿Continuar?')) {
-      return
-    }
-
-    setActionError(null)
-    setActionMessage(null)
-    try {
-      await clearLocalSessions()
-      setActionMessage('Datos locales borrados. La rutina base se ha conservado.')
-    } catch (error) {
-      console.error('[workout] Error al limpiar los datos locales:', error)
-      setActionError('No se pudieron borrar los datos locales. Inténtalo de nuevo.')
-    }
-  }
-
   const successMessage = location.state?.workoutSaved
     ? 'Entrenamiento guardado correctamente.'
     : location.state?.sessionUpdated
       ? 'Entrenamiento actualizado correctamente.'
       : actionMessage
 
-    return (
+  return (
     <div className="space-y-5 md:space-y-6">
       {successMessage && (
         <p role="status" className="status-success">
@@ -210,7 +192,6 @@ export function HistoryPage() {
           <span>{successMessage}</span>
         </p>
       )}
-
       {actionError && (
         <p role="alert" className="status-error">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
