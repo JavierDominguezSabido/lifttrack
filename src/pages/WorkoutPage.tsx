@@ -490,44 +490,71 @@ export function WorkoutPage() {
 
   return (
     <div className="space-y-4 pb-24 sm:space-y-5">
-      <section className="overflow-hidden rounded-3xl bg-hero p-4 text-on-hero shadow-card md:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-hero-accent">Entrenar</p>
-            <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{template.name}</h2>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-hero-muted">
-              <span className="flex items-center gap-1.5">
-                <Dumbbell className="size-4 text-hero-accent" aria-hidden="true" />
-                {template.exercises.length} ejercicios
-              </span>
-              <span>{progress.completed}/{progress.total} series</span>
-              <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
-              {(draftActive || (hasDraftState && !pendingDraft)) && (
-                <span className="font-extrabold text-hero-accent">Borrador guardado</span>
-              )}
-            </div>
+      {viewMode === 'guided' ? (
+        <section className="rounded-2xl border border-line bg-surface px-4 py-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="truncate text-lg font-extrabold text-ink">{template.name}</h2>
+            <span className="shrink-0 text-sm font-extrabold text-secondary">
+              {progress.completed}/{progress.total} series
+            </span>
           </div>
-          <div className="min-w-36 flex-1 sm:max-w-64">
-            <div className="mb-2 flex justify-between text-xs font-bold">
-              <span>Progreso</span>
-              <span className="text-hero-muted">{progress.completed} / {progress.total}</span>
-            </div>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-label="Progreso de series realizadas"
+            aria-valuemin={0}
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.completed}
+          >
             <div
-              className="h-2.5 overflow-hidden rounded-full bg-on-hero/15"
-              role="progressbar"
-              aria-label="Progreso de series realizadas"
-              aria-valuemin={0}
-              aria-valuemax={progress.total}
-              aria-valuenow={progress.completed}
-            >
+              className="h-full rounded-full bg-brand transition-all duration-300"
+              style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
+            />
+          </div>
+          {(draftActive || (hasDraftState && !pendingDraft)) && (
+            <p className="mt-2 text-xs font-bold text-secondary">Borrador guardado</p>
+          )}
+        </section>
+      ) : (
+        <section className="overflow-hidden rounded-3xl bg-hero p-4 text-on-hero shadow-card md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-hero-accent">Entrenar</p>
+              <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{template.name}</h2>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-hero-muted">
+                <span className="flex items-center gap-1.5">
+                  <Dumbbell className="size-4 text-hero-accent" aria-hidden="true" />
+                  {template.exercises.length} ejercicios
+                </span>
+                <span>{progress.completed}/{progress.total} series</span>
+                <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
+                {(draftActive || (hasDraftState && !pendingDraft)) && (
+                  <span className="font-extrabold text-hero-accent">Borrador guardado</span>
+                )}
+              </div>
+            </div>
+            <div className="min-w-36 flex-1 sm:max-w-64">
+              <div className="mb-2 flex justify-between text-xs font-bold">
+                <span>Progreso</span>
+                <span className="text-hero-muted">{progress.completed} / {progress.total}</span>
+              </div>
               <div
-                className="h-full rounded-full bg-hero-accent transition-all duration-300"
-                style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
-              />
+                className="h-2.5 overflow-hidden rounded-full bg-on-hero/15"
+                role="progressbar"
+                aria-label="Progreso de series realizadas"
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.completed}
+              >
+                <div
+                  className="h-full rounded-full bg-hero-accent transition-all duration-300"
+                  style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {pendingDraft && (
         <section className="rounded-2xl border border-brand/30 bg-brand-soft px-4 py-3 shadow-sm">
@@ -628,6 +655,12 @@ export function WorkoutPage() {
                   <p className="text-[11px] font-bold text-secondary">kg volumen</p>
                 </div>
               </div>
+              {saveError && (
+                <p role="alert" className="status-error">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <span>{saveError}</span>
+                </p>
+              )}
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
@@ -644,77 +677,39 @@ export function WorkoutPage() {
               </div>
             </div>
           ) : currentGuidedStep ? (
-            <div className="space-y-5 p-5 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="eyebrow">{template.name}</p>
-                  <p className="mt-1 text-sm font-extrabold text-brand">
-                    Serie {currentGuidedIndex + 1} de {guidedSteps.length}
-                  </p>
-                </div>
-                <button type="button" onClick={() => setViewMode('full')} className="btn-secondary !min-h-10 !px-3 !py-2 !text-xs">
-                  Ver vista completa
-                </button>
-              </div>
-
-              <div>
+            <div className="mx-auto max-w-xl space-y-4 p-4 sm:p-5">
+              <div className="text-center">
                 <p className="text-xs font-bold uppercase tracking-wider text-secondary">
                   {currentGuidedStep.exercise?.muscleGroup ?? 'Ejercicio'}
                 </p>
-                <h3 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
+                <h3 className="mt-1 text-3xl font-extrabold tracking-tight text-ink">
                   {currentGuidedStep.exercise?.name ?? 'Ejercicio'}
                 </h3>
-                <p className="mt-1 text-sm font-semibold text-secondary">
-                  Objetivo {currentGuidedStep.templateExercise.targetReps}x{currentGuidedStep.templateExercise.targetSets} · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
+                <p className="mt-2 text-sm font-bold text-secondary">
+                  Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
                 </p>
               </div>
 
-              {(guidedPreviousPerformance || guidedSuggestion) && (
-                <div className="rounded-2xl bg-muted px-4 py-3 text-sm">
-                  {guidedPreviousPerformance && (
-                    <p className="font-semibold text-secondary">
-                      Ultima vez:{' '}
-                      <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
-                      {guidedPreviousPerformance.weightKg > 0
-                        ? ` con ${guidedPreviousPerformance.weightKg} kg`
-                        : ' sin peso anadido'}
-                    </p>
-                  )}
-                  {guidedSuggestion && (
-                    <p className="mt-1 text-xs font-extrabold text-brand">Sugerencia: {guidedSuggestion}</p>
-                  )}
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-line bg-muted/60 p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <label htmlFor={`guided-weight-${currentGuidedStep.log.id}`} className="text-sm font-extrabold text-ink">
-                    Peso de trabajo
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById(`guided-weight-${currentGuidedStep.log.id}`)?.focus()}
-                    className="text-xs font-extrabold text-secondary underline decoration-line underline-offset-4"
-                  >
-                    Editar peso
-                  </button>
-                </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                  <span className="relative">
-                    <input
-                      id={`guided-weight-${currentGuidedStep.log.id}`}
-                      className="min-h-12 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-lg font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.25"
-                      value={String(getWorkingWeight(currentGuidedStep.log))}
-                      onChange={(event) => updateGuidedWeight(Number(event.target.value))}
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
-                      kg
+              <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                  <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
+                    <span className="relative block">
+                      <input
+                        id={`guided-weight-${currentGuidedStep.log.id}`}
+                        className="min-h-12 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.25"
+                        value={String(getWorkingWeight(currentGuidedStep.log))}
+                        onChange={(event) => updateGuidedWeight(Number(event.target.value))}
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
+                        kg
+                      </span>
                     </span>
-                  </span>
+                  </label>
                   <button
                     type="button"
                     onClick={() => updateGuidedWeight(getWorkingWeight(currentGuidedStep.log) + 1.25)}
@@ -723,31 +718,11 @@ export function WorkoutPage() {
                     +1.25 kg
                   </button>
                 </div>
-              </div>
-
-              <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-secondary">
-                      Serie actual
-                    </p>
-                    <h4 className="mt-1 text-xl font-extrabold text-ink">
-                      Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length}
-                    </h4>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-                    currentGuidedStep.set.completed
-                      ? 'bg-success-soft text-success-text'
-                      : 'bg-muted text-secondary'
-                  }`}>
-                    {currentGuidedStep.set.completed ? 'Hecha' : 'Pendiente'}
-                  </span>
-                </div>
 
                 <label className="mt-4 block">
-                  <span className="mb-1 block text-sm font-extrabold text-ink">Reps</span>
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Reps reales</span>
                   <input
-                    className="min-h-14 w-full rounded-2xl border border-control bg-raised px-4 text-2xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                    className="min-h-16 w-full rounded-2xl border border-control bg-raised px-4 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -758,6 +733,29 @@ export function WorkoutPage() {
                 </label>
               </div>
 
+              {(guidedPreviousPerformance || guidedSuggestion) && (
+                <div className="space-y-1 px-1 text-center text-xs font-semibold text-secondary">
+                  {guidedPreviousPerformance && (
+                    <p>
+                      Ultima vez: <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
+                      {guidedPreviousPerformance.weightKg > 0
+                        ? ` con ${guidedPreviousPerformance.weightKg} kg`
+                        : ' sin peso anadido'}
+                    </p>
+                  )}
+                  {guidedSuggestion && (
+                    <p className="font-extrabold text-brand">Sugerencia: {guidedSuggestion}</p>
+                  )}
+                </div>
+              )}
+
+              {saveError && (
+                <p role="alert" className="status-error">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <span>{saveError}</span>
+                </p>
+              )}
+
               <div className="grid gap-2">
                 <button
                   type="button"
@@ -767,15 +765,15 @@ export function WorkoutPage() {
                   <CheckCircle2 className="size-5" aria-hidden="true" />
                   Marcar hecha y continuar
                 </button>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 disabled:cursor-not-allowed disabled:opacity-40">
+                <div className="grid grid-cols-3 gap-2">
+                  <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
                     Anterior
                   </button>
-                  <button type="button" onClick={skipGuidedSet} disabled={currentGuidedIndex >= guidedSteps.length - 1} className="btn-secondary !min-h-11 disabled:cursor-not-allowed disabled:opacity-40">
+                  <button type="button" onClick={skipGuidedSet} disabled={currentGuidedIndex >= guidedSteps.length - 1} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
                     Saltar serie
                   </button>
-                  <button type="button" onClick={() => setViewMode('full')} className="btn-secondary !min-h-11 sm:col-auto col-span-2">
-                    Ver vista completa
+                  <button type="button" onClick={() => setViewMode('full')} className="btn-secondary !min-h-11 !px-2">
+                    Vista completa
                   </button>
                 </div>
               </div>
@@ -826,29 +824,31 @@ export function WorkoutPage() {
         </div>
       )}
 
-      <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur-xl lg:bottom-4">
-        {saveError && (
-          <p role="alert" className="status-error mb-3">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span>{saveError}</span>
-          </p>
-        )}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-          <div className="rounded-xl bg-muted px-3 py-2 text-center">
-            <p className="text-base font-extrabold text-ink">{progress.completed}/{progress.total}</p>
-            <p className="text-[11px] font-bold text-secondary">series</p>
+      {viewMode === 'full' && (
+        <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur-xl lg:bottom-4">
+          {saveError && (
+            <p role="alert" className="status-error mb-3">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>{saveError}</span>
+            </p>
+          )}
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+            <div className="rounded-xl bg-muted px-3 py-2 text-center">
+              <p className="text-base font-extrabold text-ink">{progress.completed}/{progress.total}</p>
+              <p className="text-[11px] font-bold text-secondary">series</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void finishWorkout()}
+              disabled={saving || progress.completed === 0}
+              className="btn-primary w-full !min-h-12 !bg-success-solid !text-base !text-on-brand hover:!bg-success-solid-hover"
+            >
+              <CheckCircle2 className="size-5" aria-hidden="true" />
+              {saving ? 'Guardando…' : 'Finalizar y guardar'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void finishWorkout()}
-            disabled={saving || progress.completed === 0}
-            className="btn-primary w-full !min-h-12 !bg-success-solid !text-base !text-on-brand hover:!bg-success-solid-hover"
-          >
-            <CheckCircle2 className="size-5" aria-hidden="true" />
-            {saving ? 'Guardando…' : 'Finalizar y guardar'}
-          </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }
