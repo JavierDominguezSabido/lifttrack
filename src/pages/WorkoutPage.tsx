@@ -245,12 +245,19 @@ export function WorkoutPage() {
       setIndex
     }))
   }), [getExerciseById, logs, template.exercises])
-  const firstPendingStep = guidedSteps.find((step) => !step.set.completed) ?? guidedSteps[0]
-  const currentGuidedIndex = Math.max(0, guidedSteps.findIndex((step) =>
+  const firstPendingStep = guidedSteps.find((step) => !step.set.completed) ?? null
+  const selectedGuidedStep = guidedSteps.find((step) =>
     step.log.id === guidedPosition?.logId && step.set.id === guidedPosition.setId
-  ))
-  const currentGuidedStep = guidedSteps[currentGuidedIndex] ?? firstPendingStep
+  ) ?? null
   const guidedIsComplete = guidedSteps.length > 0 && guidedSteps.every((step) => step.set.completed)
+  const currentGuidedStep = !guidedIsComplete && selectedGuidedStep && !selectedGuidedStep.set.completed
+    ? selectedGuidedStep
+    : firstPendingStep
+  const currentGuidedIndex = currentGuidedStep
+    ? guidedSteps.findIndex((step) =>
+        step.log.id === currentGuidedStep.log.id && step.set.id === currentGuidedStep.set.id
+      )
+    : -1
   const guidedPreviousPerformance = useMemo(() => {
     if (!currentGuidedStep) return null
     const equivalentIds = new Set(getEquivalentExerciseIds(exercises, currentGuidedStep.templateExercise.exerciseId))
@@ -278,13 +285,21 @@ export function WorkoutPage() {
 
   useEffect(() => {
     if (viewMode !== 'guided' || guidedSteps.length === 0) return
-    const hasValidPosition = guidedSteps.some((step) =>
+    const selectedStep = guidedSteps.find((step) =>
       step.log.id === guidedPosition?.logId && step.set.id === guidedPosition.setId
-    )
-    if (!hasValidPosition && firstPendingStep) {
+    ) ?? null
+
+    if (guidedIsComplete) {
+      if (guidedPosition && !selectedStep) {
+        setGuidedPosition(null)
+      }
+      return
+    }
+
+    if (firstPendingStep && (!selectedStep || selectedStep.set.completed)) {
       setGuidedPosition({ logId: firstPendingStep.log.id, setId: firstPendingStep.set.id })
     }
-  }, [firstPendingStep, guidedPosition, guidedSteps, viewMode])
+  }, [firstPendingStep, guidedIsComplete, guidedPosition, guidedSteps, viewMode])
 
   useEffect(() => () => {
     if (guidedFeedbackTimeoutRef.current) {
@@ -369,8 +384,15 @@ export function WorkoutPage() {
   }
 
   function goToPreviousGuidedStep() {
-    if (guidedSteps.length === 0) return
+    if (currentGuidedIndex <= 0) return
     goToGuidedStep(currentGuidedIndex - 1)
+  }
+
+  function findNextPendingGuidedStep(fromIndex: number) {
+    const nextPendingStep = guidedSteps.find((step, index) => index > fromIndex && !step.set.completed)
+    if (nextPendingStep) return nextPendingStep
+
+    return guidedSteps.find((step, index) => index !== fromIndex && !step.set.completed) ?? null
   }
 
   function completeGuidedSet() {
@@ -386,9 +408,9 @@ export function WorkoutPage() {
     }
 
     setSaveError(null)
+    const nextStep = findNextPendingGuidedStep(currentGuidedIndex)
     updateGuidedSet(currentGuidedStep.log.id, currentGuidedStep.set.id, { completed: true, reps })
-    if (currentGuidedIndex < guidedSteps.length - 1) {
-      const nextStep = guidedSteps[currentGuidedIndex + 1]
+    if (nextStep) {
       const exerciseChanged = nextStep.log.id !== currentGuidedStep.log.id
       showGuidedFeedback(
         exerciseChanged
@@ -403,6 +425,7 @@ export function WorkoutPage() {
       setGuidedPosition({ logId: nextStep.log.id, setId: nextStep.set.id })
     } else {
       showGuidedFeedback({ message: 'Entrenamiento completado' })
+      setGuidedPosition(null)
     }
   }
 
@@ -419,8 +442,11 @@ export function WorkoutPage() {
   }
 
   function enterGuidedMode() {
-    const step = currentGuidedStep ?? firstPendingStep
-    if (step) setGuidedPosition({ logId: step.log.id, setId: step.set.id })
+    if (firstPendingStep) {
+      setGuidedPosition({ logId: firstPendingStep.log.id, setId: firstPendingStep.set.id })
+    } else {
+      setGuidedPosition(null)
+    }
     setViewMode('guided')
   }
 
