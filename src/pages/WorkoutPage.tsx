@@ -32,6 +32,11 @@ interface GuidedPosition {
   setId: string
 }
 
+interface GuidedFeedback {
+  message: string
+  detail?: string
+}
+
 const WORKOUT_DRAFT_VERSION = 1
 const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
 const WORKOUT_DRAFT_MAX_AUTO_RESTORE_MS = 12 * 60 * 60 * 1000
@@ -179,7 +184,6 @@ export function WorkoutPage() {
     startedAt: string
     pendingDraft: StoredWorkoutDraft | null
     draftActive: boolean
-    restoredDraft: boolean
     viewMode: WorkoutViewMode
     guidedPosition: GuidedPosition | null
   }>()
@@ -195,7 +199,6 @@ export function WorkoutPage() {
       startedAt: canAutoRestore ? sameDayDraft.startedAt : new Date().toISOString(),
       pendingDraft: canAutoRestore ? null : sameDayDraft ?? ambiguousDraft,
       draftActive: Boolean(canAutoRestore),
-      restoredDraft: Boolean(canAutoRestore),
       viewMode: canAutoRestore ? sameDayDraft.viewMode ?? 'full' : 'full',
       guidedPosition: canAutoRestore ? sameDayDraft.guidedPosition ?? null : null
     }
@@ -205,13 +208,15 @@ export function WorkoutPage() {
   const [startedAt, setStartedAt] = useState(() => initialStateRef.current!.startedAt)
   const [pendingDraft, setPendingDraft] = useState<StoredWorkoutDraft | null>(() => initialStateRef.current!.pendingDraft)
   const [draftActive, setDraftActive] = useState(() => initialStateRef.current!.draftActive)
-  const [draftRestoredNotice, setDraftRestoredNotice] = useState(() => initialStateRef.current!.restoredDraft)
   const [viewMode, setViewMode] = useState<WorkoutViewMode>(() => initialStateRef.current!.viewMode)
   const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
+  const [guidedFeedback, setGuidedFeedback] = useState<GuidedFeedback | null>(null)
+  const [guidedStepAnimationKey, setGuidedStepAnimationKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const previousTemplateRef = useRef(template)
   const draftToContinueRef = useRef<StoredWorkoutDraft | null>(null)
+  const guidedFeedbackTimeoutRef = useRef<number | null>(null)
 
   const progress = useMemo(() => {
     const sets = logs.flatMap((log) => log.sets)
@@ -281,6 +286,12 @@ export function WorkoutPage() {
     }
   }, [firstPendingStep, guidedPosition, guidedSteps, viewMode])
 
+  useEffect(() => () => {
+    if (guidedFeedbackTimeoutRef.current) {
+      window.clearTimeout(guidedFeedbackTimeoutRef.current)
+    }
+  }, [])
+
   useEffect(() => {
     const previousTemplate = previousTemplateRef.current
     if (previousTemplate.id === template.id && previousTemplate.dayOfWeek === template.dayOfWeek) return
@@ -308,7 +319,6 @@ export function WorkoutPage() {
     setStartedAt(draftToRestore?.startedAt ?? new Date().toISOString())
     setPendingDraft(draftToAsk)
     setDraftActive(Boolean(draftToRestore))
-    setDraftRestoredNotice(Boolean(draftToRestore))
     setViewMode(draftToRestore?.viewMode ?? 'full')
     setGuidedPosition(draftToRestore?.guidedPosition ?? null)
     setSaveError(null)
@@ -323,6 +333,17 @@ export function WorkoutPage() {
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
+  }
+
+  function showGuidedFeedback(feedback: GuidedFeedback) {
+    setGuidedFeedback(feedback)
+    setGuidedStepAnimationKey((current) => current + 1)
+    if (guidedFeedbackTimeoutRef.current) {
+      window.clearTimeout(guidedFeedbackTimeoutRef.current)
+    }
+    guidedFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setGuidedFeedback(null)
+    }, 1600)
   }
 
   function updateGuidedLog(updatedLog: DraftExerciseLog) {
@@ -377,7 +398,20 @@ export function WorkoutPage() {
     updateGuidedSet(currentGuidedStep.log.id, currentGuidedStep.set.id, { completed: true, reps })
     if (currentGuidedIndex < guidedSteps.length - 1) {
       const nextStep = guidedSteps[currentGuidedIndex + 1]
+      const exerciseChanged = nextStep.log.id !== currentGuidedStep.log.id
+      showGuidedFeedback(
+        exerciseChanged
+          ? {
+              message: 'Ejercicio completado',
+              detail: `Siguiente: ${nextStep.exercise?.name ?? 'siguiente ejercicio'}`
+            }
+          : {
+              message: `Serie ${currentGuidedStep.setIndex + 1} completada`
+            }
+      )
       setGuidedPosition({ logId: nextStep.log.id, setId: nextStep.set.id })
+    } else {
+      showGuidedFeedback({ message: 'Entrenamiento completado' })
     }
   }
 
@@ -410,7 +444,6 @@ export function WorkoutPage() {
     setLogs(draft.logs)
     setStartedAt(draft.startedAt)
     setDraftActive(true)
-    setDraftRestoredNotice(true)
     setViewMode(draft.viewMode ?? 'full')
     setGuidedPosition(draft.guidedPosition ?? null)
     setPendingDraft(null)
@@ -434,7 +467,6 @@ export function WorkoutPage() {
     setStartedAt(new Date().toISOString())
     setPendingDraft(null)
     setDraftActive(false)
-    setDraftRestoredNotice(false)
     setViewMode('full')
     setGuidedPosition(null)
     setSaveError(null)
@@ -450,7 +482,6 @@ export function WorkoutPage() {
     setStartedAt(new Date().toISOString())
     setPendingDraft(null)
     setDraftActive(false)
-    setDraftRestoredNotice(false)
     setViewMode('full')
     setGuidedPosition(null)
     setSaveError(null)
@@ -476,7 +507,6 @@ export function WorkoutPage() {
       removeWorkoutDraft(userKey, template)
       setDraftActive(false)
       setPendingDraft(null)
-      setDraftRestoredNotice(false)
       setViewMode('full')
       setGuidedPosition(null)
       navigate('/historial', { state: { workoutSaved: true } })
@@ -512,7 +542,16 @@ export function WorkoutPage() {
             />
           </div>
           {(draftActive || (hasDraftState && !pendingDraft)) && (
-            <p className="mt-2 text-xs font-bold text-secondary">Borrador guardado</p>
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+              <span className="font-bold text-secondary">Borrador guardado</span>
+              <button
+                type="button"
+                onClick={discardDraft}
+                className="font-extrabold text-secondary underline decoration-line underline-offset-4 hover:text-danger"
+              >
+                Descartar borrador
+              </button>
+            </div>
           )}
         </section>
       ) : (
@@ -592,19 +631,6 @@ export function WorkoutPage() {
         </section>
       )}
 
-      {draftRestoredNotice && !pendingDraft && (
-        <section className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm shadow-sm">
-          <span className="font-bold text-secondary">Borrador restaurado</span>
-          <button
-            type="button"
-            onClick={discardDraft}
-            className="text-xs font-extrabold text-secondary underline decoration-line underline-offset-4 hover:text-danger"
-          >
-            Descartar borrador
-          </button>
-        </section>
-      )}
-
       <div className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-surface p-1.5 shadow-sm">
         <button
           type="button"
@@ -678,76 +704,92 @@ export function WorkoutPage() {
             </div>
           ) : currentGuidedStep ? (
             <div className="mx-auto max-w-xl space-y-4 p-4 sm:p-5">
-              <div className="text-center">
-                <p className="text-xs font-bold uppercase tracking-wider text-secondary">
-                  {currentGuidedStep.exercise?.muscleGroup ?? 'Ejercicio'}
-                </p>
-                <h3 className="mt-1 text-3xl font-extrabold tracking-tight text-ink">
-                  {currentGuidedStep.exercise?.name ?? 'Ejercicio'}
-                </h3>
-                <p className="mt-2 text-sm font-bold text-secondary">
-                  Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-                  <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
-                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
-                    <span className="relative block">
-                      <input
-                        id={`guided-weight-${currentGuidedStep.log.id}`}
-                        className="min-h-12 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.25"
-                        value={String(getWorkingWeight(currentGuidedStep.log))}
-                        onChange={(event) => updateGuidedWeight(Number(event.target.value))}
-                      />
-                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
-                        kg
-                      </span>
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => updateGuidedWeight(getWorkingWeight(currentGuidedStep.log) + 1.25)}
-                    className="min-h-12 whitespace-nowrap rounded-xl bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
-                  >
-                    +1.25 kg
-                  </button>
-                </div>
-
-                <label className="mt-4 block">
-                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Reps reales</span>
-                  <input
-                    className="min-h-16 w-full rounded-2xl border border-control bg-raised px-4 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={currentGuidedStep.set.reps}
-                    placeholder={currentGuidedStep.templateExercise.targetReps}
-                    onChange={(event) => updateGuidedReps(event.target.value)}
-                  />
-                </label>
-              </div>
-
-              {(guidedPreviousPerformance || guidedSuggestion) && (
-                <div className="space-y-1 px-1 text-center text-xs font-semibold text-secondary">
-                  {guidedPreviousPerformance && (
-                    <p>
-                      Ultima vez: <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
-                      {guidedPreviousPerformance.weightKg > 0
-                        ? ` con ${guidedPreviousPerformance.weightKg} kg`
-                        : ' sin peso anadido'}
-                    </p>
-                  )}
-                  {guidedSuggestion && (
-                    <p className="font-extrabold text-brand">Sugerencia: {guidedSuggestion}</p>
+              {guidedFeedback && (
+                <div
+                  role="status"
+                  className="rounded-2xl border border-success/30 bg-success-soft px-4 py-2 text-center shadow-sm transition-all duration-300"
+                >
+                  <p className="text-sm font-extrabold text-success-text">{guidedFeedback.message}</p>
+                  {guidedFeedback.detail && (
+                    <p className="mt-0.5 text-xs font-bold text-success-text/80">{guidedFeedback.detail}</p>
                   )}
                 </div>
               )}
+
+              <div
+                key={guidedStepAnimationKey}
+                className="space-y-4 animate-[guidedStepIn_220ms_ease-out]"
+              >
+                <div className="text-center">
+                  <p className="text-xs font-bold uppercase tracking-wider text-secondary">
+                    {currentGuidedStep.exercise?.muscleGroup ?? 'Ejercicio'}
+                  </p>
+                  <h3 className="mt-1 text-3xl font-extrabold tracking-tight text-ink">
+                    {currentGuidedStep.exercise?.name ?? 'Ejercicio'}
+                  </h3>
+                  <p className="mt-2 text-sm font-bold text-secondary">
+                    Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
+                  </p>
+                </div>
+
+                <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                    <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
+                      <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
+                      <span className="relative block">
+                        <input
+                          id={`guided-weight-${currentGuidedStep.log.id}`}
+                          className="min-h-12 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.25"
+                          value={String(getWorkingWeight(currentGuidedStep.log))}
+                          onChange={(event) => updateGuidedWeight(Number(event.target.value))}
+                        />
+                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
+                          kg
+                        </span>
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => updateGuidedWeight(getWorkingWeight(currentGuidedStep.log) + 1.25)}
+                      className="min-h-12 whitespace-nowrap rounded-xl bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
+                    >
+                      +1.25 kg
+                    </button>
+                  </div>
+
+                  <label className="mt-4 block">
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Reps reales</span>
+                    <input
+                      className="min-h-16 w-full rounded-2xl border border-control bg-raised px-4 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={currentGuidedStep.set.reps}
+                      placeholder={currentGuidedStep.templateExercise.targetReps}
+                      onChange={(event) => updateGuidedReps(event.target.value)}
+                    />
+                  </label>
+                </div>
+
+                {(guidedPreviousPerformance || guidedSuggestion) && (
+                  <div className="space-y-1 px-1 text-center text-xs font-semibold text-secondary">
+                    {guidedPreviousPerformance && (
+                      <p>
+                        Ultima vez: <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
+                        {guidedPreviousPerformance.weightKg > 0
+                          ? ` con ${guidedPreviousPerformance.weightKg} kg`
+                          : ' sin peso anadido'}
+                      </p>
+                    )}
+                    {guidedSuggestion && (
+                      <p className="font-extrabold text-brand">Sugerencia: {guidedSuggestion}</p>
+                    )}
+                  </div>
+                )}
 
               {saveError && (
                 <p role="alert" className="status-error">
@@ -760,22 +802,31 @@ export function WorkoutPage() {
                 <button
                   type="button"
                   onClick={completeGuidedSet}
-                  className="btn-primary !min-h-14 !bg-success-solid !text-base hover:!bg-success-solid-hover"
+                  className={`btn-primary !min-h-14 !text-base ${
+                    guidedFeedback
+                      ? '!bg-success !text-on-brand'
+                      : '!bg-success-solid hover:!bg-success-solid-hover'
+                  }`}
                 >
-                  <CheckCircle2 className="size-5" aria-hidden="true" />
-                  Marcar hecha y continuar
+                  <CheckCircle2 className={guidedFeedback ? 'size-6' : 'size-5'} aria-hidden="true" />
+                  {guidedFeedback ? 'Serie completada' : 'Marcar hecha y continuar'}
                 </button>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
                     Anterior
                   </button>
                   <button type="button" onClick={skipGuidedSet} disabled={currentGuidedIndex >= guidedSteps.length - 1} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
                     Saltar serie
                   </button>
-                  <button type="button" onClick={() => setViewMode('full')} className="btn-secondary !min-h-11 !px-2">
-                    Vista completa
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('full')}
+                  className="mx-auto mt-1 text-xs font-extrabold text-secondary underline decoration-line underline-offset-4 hover:text-ink"
+                >
+                  Ver vista completa
+                </button>
+              </div>
               </div>
             </div>
           ) : (

@@ -81,6 +81,18 @@
     @apply border-line;
   }
 
+  @keyframes guidedStepIn {
+    from {
+      opacity: 0.65;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   html {
     @apply scroll-smooth bg-canvas;
   }
