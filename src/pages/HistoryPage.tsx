@@ -202,35 +202,15 @@ export function HistoryPage() {
       ? 'Entrenamiento actualizado correctamente.'
       : actionMessage
 
-  return (
+    return (
     <div className="space-y-5 md:space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="eyebrow">Historial</p>
-          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
-            Entrenamientos y progreso
-          </h1>
-          <p className="mt-1 text-sm leading-6 text-secondary">
-            Revisa tu evolución y gestiona sesiones sin cargar toda la pantalla de detalles.
-          </p>
-        </div>
-        {realSessions.length > 0 && dataMode === 'local' && (
-          <button
-            type="button"
-            onClick={() => void clearTestData()}
-            className="min-h-11 rounded-xl px-2 text-right text-xs font-bold text-secondary underline decoration-line underline-offset-4 hover:text-danger"
-          >
-            Borrar datos de este dispositivo
-          </button>
-        )}
-      </header>
-
       {successMessage && (
         <p role="status" className="status-success">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>{successMessage}</span>
         </p>
       )}
+
       {actionError && (
         <p role="alert" className="status-error">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
