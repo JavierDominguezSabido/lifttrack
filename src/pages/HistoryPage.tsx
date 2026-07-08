@@ -716,9 +716,7 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
     const x = entries.length === 1 ? 50 : 4 + (index / (entries.length - 1)) * 92
     const y = pointBottom - ((weight - minWeight) / range) * (pointBottom - pointTop)
     const label = `${weight} kg`
-    const labelOffset = entries.length > 4
-      ? index % 2 === 0 ? 34 : 18
-      : 22
+    const labelOffset = 24
     const reps = formatSetReps(entry.log.sets)
     return {
       x,
