@@ -90,6 +90,18 @@ create table if not exists public.workout_sessions (
     references public.workout_templates(id, user_id) on delete set null (template_id)
 );
 
+create table if not exists public.workout_drafts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  day_of_week smallint not null check (day_of_week between 0 and 6),
+  draft_key text not null check (length(trim(draft_key)) > 0),
+  payload jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, draft_key),
+  unique (id, user_id)
+);
+
 create table if not exists public.exercise_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
@@ -141,6 +153,8 @@ create index if not exists template_exercises_template_position_idx
   on public.template_exercises(template_id, position);
 create index if not exists workout_sessions_user_started_idx
   on public.workout_sessions(user_id, started_at desc);
+create index if not exists workout_drafts_user_day_idx
+  on public.workout_drafts(user_id, day_of_week);
 create index if not exists exercise_logs_session_position_idx
   on public.exercise_logs(session_id, position);
 create index if not exists exercise_logs_exercise_idx
@@ -206,6 +220,9 @@ for each row execute function public.set_updated_at();
 drop trigger if exists workout_sessions_set_updated_at on public.workout_sessions;
 create trigger workout_sessions_set_updated_at before update on public.workout_sessions
 for each row execute function public.set_updated_at();
+drop trigger if exists workout_drafts_set_updated_at on public.workout_drafts;
+create trigger workout_drafts_set_updated_at before update on public.workout_drafts
+for each row execute function public.set_updated_at();
 drop trigger if exists exercise_logs_set_updated_at on public.exercise_logs;
 create trigger exercise_logs_set_updated_at before update on public.exercise_logs
 for each row execute function public.set_updated_at();
@@ -238,6 +255,7 @@ alter table public.exercises enable row level security;
 alter table public.workout_templates enable row level security;
 alter table public.template_exercises enable row level security;
 alter table public.workout_sessions enable row level security;
+alter table public.workout_drafts enable row level security;
 alter table public.exercise_logs enable row level security;
 alter table public.set_logs enable row level security;
 
@@ -281,6 +299,14 @@ to authenticated
 using (user_id = auth.uid())
 with check (user_id = auth.uid());
 
+drop policy if exists "workout_drafts_own_rows" on public.workout_drafts;
+create policy "workout_drafts_own_rows"
+on public.workout_drafts
+for all
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
 drop policy if exists "exercise_logs_own_rows" on public.exercise_logs;
 create policy "exercise_logs_own_rows"
 on public.exercise_logs
@@ -303,5 +329,6 @@ grant select, insert, update, delete on public.exercises to authenticated;
 grant select, insert, update, delete on public.workout_templates to authenticated;
 grant select, insert, update, delete on public.template_exercises to authenticated;
 grant select, insert, update, delete on public.workout_sessions to authenticated;
+grant select, insert, update, delete on public.workout_drafts to authenticated;
 grant select, insert, update, delete on public.exercise_logs to authenticated;
 grant select, insert, update, delete on public.set_logs to authenticated;

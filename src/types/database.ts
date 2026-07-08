@@ -139,6 +139,26 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['workout_sessions']['Insert']>
         Relationships: []
       }
+      workout_drafts: {
+        Row: Timestamps & {
+          id: string
+          user_id: string
+          day_of_week: number
+          draft_key: string
+          payload: Json
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          day_of_week: number
+          draft_key: string
+          payload: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['workout_drafts']['Insert']>
+        Relationships: []
+      }
       exercise_logs: {
         Row: Timestamps & {
           id: string
