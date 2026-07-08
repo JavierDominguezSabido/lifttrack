@@ -1,9 +1,10 @@
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
+import { useAuth } from '../context/AuthContext'
 import { useWorkouts } from '../context/WorkoutContext'
-import type { DraftExerciseLog } from '../types'
+import type { DraftExerciseLog, WorkoutTemplate } from '../types'
 import {
   createCanonicalExerciseIdMap,
   getEquivalentExerciseIds
@@ -16,15 +17,93 @@ import {
 } from '../utils/workoutDraft'
 import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
 
+const WORKOUT_DRAFT_VERSION = 1
+const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
+
+interface StoredWorkoutDraft {
+  version: number
+  userKey: string
+  templateId: string
+  dayOfWeek: number
+  startedAt: string
+  logs: DraftExerciseLog[]
+  updatedAt: string
+}
+
+function getDraftUserKey(userId?: string) {
+  return userId ? `user:${userId}` : 'local'
+}
+
+function getWorkoutDraftKey(userKey: string, template: WorkoutTemplate) {
+  return `${WORKOUT_DRAFT_PREFIX}.${userKey}.day-${template.dayOfWeek}`
+}
+
+function readWorkoutDraft(userKey: string, template: WorkoutTemplate): StoredWorkoutDraft | null {
+  try {
+    const raw = window.localStorage.getItem(getWorkoutDraftKey(userKey, template))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<StoredWorkoutDraft>
+    if (
+      parsed.version !== WORKOUT_DRAFT_VERSION ||
+      parsed.userKey !== userKey ||
+      parsed.templateId !== template.id ||
+      parsed.dayOfWeek !== template.dayOfWeek ||
+      typeof parsed.startedAt !== 'string' ||
+      !Array.isArray(parsed.logs)
+    ) {
+      return null
+    }
+    return parsed as StoredWorkoutDraft
+  } catch (error) {
+    console.error('[workout] No se pudo leer el borrador local:', error)
+    return null
+  }
+}
+
+function writeWorkoutDraft(userKey: string, template: WorkoutTemplate, startedAt: string, logs: DraftExerciseLog[]) {
+  try {
+    const draft: StoredWorkoutDraft = {
+      version: WORKOUT_DRAFT_VERSION,
+      userKey,
+      templateId: template.id,
+      dayOfWeek: template.dayOfWeek,
+      startedAt,
+      logs,
+      updatedAt: new Date().toISOString()
+    }
+    window.localStorage.setItem(getWorkoutDraftKey(userKey, template), JSON.stringify(draft))
+  } catch (error) {
+    console.error('[workout] No se pudo guardar el borrador local:', error)
+  }
+}
+
+function removeWorkoutDraft(userKey: string, template: WorkoutTemplate) {
+  try {
+    window.localStorage.removeItem(getWorkoutDraftKey(userKey, template))
+  } catch (error) {
+    console.error('[workout] No se pudo borrar el borrador local:', error)
+  }
+}
+
+function logsAreEqual(left: DraftExerciseLog[], right: DraftExerciseLog[]) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
 export function WorkoutPage() {
   const { templateId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { sessions, saveSession, templates, exercises, getExerciseById } = useWorkouts()
   const template = templates.find((item) => item.id === templateId) ?? getTodayTemplate(templates)
+  const userKey = getDraftUserKey(user?.id)
   const [logs, setLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions, exercises))
-  const [startedAt] = useState(() => new Date().toISOString())
+  const [initialLogs, setInitialLogs] = useState<DraftExerciseLog[]>(() => createExerciseLogs(template, sessions, exercises))
+  const [startedAt, setStartedAt] = useState(() => new Date().toISOString())
+  const [pendingDraft, setPendingDraft] = useState<StoredWorkoutDraft | null>(() => readWorkoutDraft(userKey, template))
+  const [draftActive, setDraftActive] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const previousTemplateRef = useRef(template)
 
   const progress = useMemo(() => {
     const sets = logs.flatMap((log) => log.sets)
@@ -42,9 +121,70 @@ export function WorkoutPage() {
     : progress.completed > 0
       ? 'En curso'
       : 'Pendiente'
+  const hasDraftChanges = !logsAreEqual(logs, initialLogs)
+
+  useEffect(() => {
+    const previousTemplate = previousTemplateRef.current
+    if (previousTemplate.id === template.id && previousTemplate.dayOfWeek === template.dayOfWeek) return
+
+    const shouldStorePreviousDraft = draftActive || hasDraftChanges
+    if (shouldStorePreviousDraft) {
+      const keepDraft = window.confirm(
+        'Tienes un entrenamiento en curso. Acepta para conservarlo como borrador y cambiar de dia. Cancela para descartarlo y cambiar de dia.'
+      )
+      if (keepDraft) {
+        writeWorkoutDraft(userKey, previousTemplate, startedAt, logs)
+      } else {
+        removeWorkoutDraft(userKey, previousTemplate)
+      }
+    }
+
+    const nextInitialLogs = createExerciseLogs(template, sessions, exercises)
+    const nextDraft = readWorkoutDraft(userKey, template)
+    previousTemplateRef.current = template
+    setInitialLogs(nextInitialLogs)
+    setLogs(nextInitialLogs)
+    setStartedAt(new Date().toISOString())
+    setPendingDraft(nextDraft)
+    setDraftActive(false)
+    setSaveError(null)
+  }, [draftActive, exercises, hasDraftChanges, logs, sessions, startedAt, template, userKey])
+
+  useEffect(() => {
+    const storedDraft = readWorkoutDraft(userKey, template)
+    setPendingDraft(storedDraft)
+    setDraftActive(false)
+  }, [template, userKey])
+
+  useEffect(() => {
+    if (pendingDraft) return
+    if (!draftActive && !hasDraftChanges) return
+    writeWorkoutDraft(userKey, template, startedAt, logs)
+    setDraftActive(true)
+  }, [draftActive, hasDraftChanges, logs, pendingDraft, startedAt, template, userKey])
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
+  }
+
+  function continueDraft() {
+    if (!pendingDraft) return
+    setLogs(pendingDraft.logs)
+    setStartedAt(pendingDraft.startedAt)
+    setDraftActive(true)
+    setPendingDraft(null)
+    setSaveError(null)
+  }
+
+  function discardDraft() {
+    removeWorkoutDraft(userKey, template)
+    const nextLogs = createExerciseLogs(template, sessions, exercises)
+    setInitialLogs(nextLogs)
+    setLogs(nextLogs)
+    setStartedAt(new Date().toISOString())
+    setPendingDraft(null)
+    setDraftActive(false)
+    setSaveError(null)
   }
 
   async function finishWorkout() {
@@ -64,6 +204,9 @@ export function WorkoutPage() {
       const session = createWorkoutSession({ template, logs, startedAt })
       console.info('[workout] Payload que se intenta guardar:', session)
       await saveSession(session)
+      removeWorkoutDraft(userKey, template)
+      setDraftActive(false)
+      setPendingDraft(null)
       navigate('/historial', { state: { workoutSaved: true } })
     } catch (error) {
       console.error('[workout] Error exacto al guardar el entrenamiento:', error)
@@ -87,6 +230,9 @@ export function WorkoutPage() {
               </span>
               <span>{progress.completed}/{progress.total} series</span>
               <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
+              {(draftActive || (hasDraftChanges && !pendingDraft)) && (
+                <span className="font-extrabold text-hero-accent">Borrador guardado</span>
+              )}
             </div>
           </div>
           <div className="min-w-36 flex-1 sm:max-w-64">
@@ -110,6 +256,35 @@ export function WorkoutPage() {
           </div>
         </div>
       </section>
+
+      {pendingDraft && (
+        <section className="rounded-2xl border border-brand/30 bg-brand-soft px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-extrabold text-ink">Tienes un entrenamiento en curso.</p>
+              <p className="mt-0.5 text-xs font-semibold text-secondary">
+                Continualo o descartalo para empezar este dia desde cero.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+              <button
+                type="button"
+                onClick={continueDraft}
+                className="btn-primary !min-h-10 !px-3 !py-2 !text-sm"
+              >
+                Continuar
+              </button>
+              <button
+                type="button"
+                onClick={discardDraft}
+                className="btn-secondary !min-h-10 !px-3 !py-2 !text-sm"
+              >
+                Descartar
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         {template.exercises.length === 0 && (
