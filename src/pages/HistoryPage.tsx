@@ -709,34 +709,24 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   const minWeight = Math.min(...weights)
   const maxWeight = Math.max(...weights)
   const range = Math.max(1, maxWeight - minWeight)
-  const chart = {
-    width: 220,
-    height: 86,
-    left: 16,
-    right: 16,
-    pointTop: 27,
-    pointBottom: 57,
-    dateY: 78
-  }
+  const pointTop = 18
+  const pointBottom = 78
   const points = entries.map((entry, index) => {
     const weight = getProgressEntryWeight(entry)
-    const x = entries.length === 1
-      ? chart.width / 2
-      : chart.left + (index / (entries.length - 1)) * (chart.width - chart.left - chart.right)
-    const y = chart.pointBottom - ((weight - minWeight) / range) * (chart.pointBottom - chart.pointTop)
+    const x = entries.length === 1 ? 50 : 4 + (index / (entries.length - 1)) * 92
+    const y = pointBottom - ((weight - minWeight) / range) * (pointBottom - pointTop)
     const label = `${weight} kg`
-    const labelWidth = Math.max(22, label.length * 3.9 + 8)
     const labelOffset = entries.length > 4
-      ? index % 2 === 0 ? 19 : 8
-      : 10
+      ? index % 2 === 0 ? 34 : 18
+      : 22
+    const reps = formatSetReps(entry.log.sets)
     return {
       x,
       y,
       entry,
       label,
-      labelWidth,
-      labelX: Math.min(Math.max(x, labelWidth / 2 + 2), chart.width - labelWidth / 2 - 2),
-      labelY: Math.max(8, y - labelOffset)
+      labelOffset,
+      reps
     }
   })
   const path = points.map((point, index) =>
@@ -753,51 +743,59 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
         <p className="rounded-lg bg-muted px-2.5 py-1 text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
       </div>
 
-      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Evolucion del peso de trabajo por fecha" className="h-44 w-full overflow-visible">
-        <line x1={chart.left} y1={chart.pointBottom + 6} x2={chart.width - chart.right} y2={chart.pointBottom + 6} className="stroke-line" strokeWidth="1" />
-        <path d={path} className="fill-none stroke-brand" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map(({ x, y, entry, label, labelWidth, labelX, labelY }, index) => {
-          const reps = formatSetReps(entry.log.sets)
-          return (
-            <g key={entry.session.id}>
-              <title>
-                {[
-                  formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' }),
+      <div className="relative mt-4 h-48 overflow-visible" role="img" aria-label="Evolucion del peso de trabajo por fecha">
+        <div className="absolute inset-x-1 top-12 bottom-10 sm:inset-x-2">
+          <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              d={path}
+              className="fill-none stroke-brand"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+
+          {points.map(({ x, y, entry, label, labelOffset, reps }, index) => {
+            const date = formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })
+            const showDate = entries.length <= 5 || index === 0 || index === points.length - 1 || index % 2 === 1
+            return (
+              <div
+                key={entry.session.id}
+                className="absolute"
+                style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
+                title={[
+                  date,
                   label,
                   reps ? `${reps} reps` : undefined
                 ].filter(Boolean).join('\n')}
-              </title>
-              <rect
-                x={labelX - labelWidth / 2}
-                y={labelY - 7}
-                width={labelWidth}
-                height="11"
-                rx="5.5"
-                className="fill-surface stroke-line"
-                strokeWidth="0.7"
-              />
-              <text
-                x={labelX}
-                y={labelY + 0.8}
-                textAnchor="middle"
-                className="fill-ink text-[7px] font-extrabold"
+                aria-label={[
+                  date,
+                  label,
+                  reps ? `${reps} reps` : undefined
+                ].filter(Boolean).join(', ')}
               >
-                {label}
-              </text>
-              <circle cx={x} cy={y} r="4.2" className="fill-brand/15 stroke-brand" strokeWidth="2.4" />
-              <circle cx={x} cy={y} r="1.7" className="fill-brand" />
-              <text
-                x={x}
-                y={chart.dateY}
-                textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
-                className="fill-secondary text-[6px] font-bold"
-              >
-                {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
+                <span
+                  className="absolute left-1/2 whitespace-nowrap rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-ink shadow-sm"
+                  style={{ bottom: `${labelOffset}px`, transform: 'translateX(-50%)' }}
+                >
+                  {label}
+                </span>
+                <span className="block size-3.5 rounded-full border-[2.5px] border-brand bg-surface shadow-sm" />
+                <span className="absolute left-1/2 top-1/2 block size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand" />
+                {showDate && (
+                  <span
+                    className="absolute left-1/2 top-7 whitespace-nowrap text-[10px] font-bold leading-none text-secondary"
+                    style={{ transform: 'translateX(-50%)' }}
+                  >
+                    {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
