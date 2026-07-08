@@ -50,6 +50,20 @@ export function AccountSettings() {
   async function logOut() {
     setError(null)
     setMessage(null)
+    const hasWorkoutDraft = (() => {
+      try {
+        for (let index = 0; index < window.localStorage.length; index += 1) {
+          if (window.localStorage.key(index)?.startsWith('lifttrack.workoutDraft.')) return true
+        }
+        return false
+      } catch {
+        return false
+      }
+    })()
+    if (hasWorkoutDraft && !window.confirm('Hay un entrenamiento en curso guardado como borrador en este dispositivo. Si cierras sesión, seguirá guardado localmente. ¿Continuar?')) {
+      return
+    }
+
     setSubmitting(true)
     try {
       await signOut()

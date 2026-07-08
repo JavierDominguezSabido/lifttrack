@@ -84,12 +84,12 @@ export function AppLayout() {
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-line bg-canvas/90 px-4 backdrop-blur-xl md:px-8 lg:h-20">
-          <div>
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-line bg-canvas/90 px-4 backdrop-blur-xl md:px-8 lg:h-20">
+          <div className="min-w-0">
             <p className="hidden text-xs font-semibold capitalize text-subtle sm:block">{currentDate}</p>
-            <h1 className="text-xl font-extrabold tracking-tight lg:text-2xl">{title}</h1>
+            <h1 className="truncate text-xl font-extrabold tracking-tight lg:text-2xl">{title}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <span
               className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-extrabold ${
                 dataMode === 'cloud'

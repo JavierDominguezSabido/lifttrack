@@ -184,7 +184,7 @@ export function ExerciseLogger({
         </section>
 
         <section aria-labelledby={`sets-title-${log.id}`}>
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="mb-2 grid gap-2 sm:flex sm:items-center sm:justify-between sm:gap-3">
             <div>
               <h4 id={`sets-title-${log.id}`} className="font-extrabold text-ink">Series</h4>
               <p className="text-xs font-medium text-secondary">
@@ -215,7 +215,7 @@ export function ExerciseLogger({
             {log.sets.map((set) => (
               <div
                 key={set.id}
-                className={`grid grid-cols-[34px_minmax(0,1fr)_104px] items-center gap-2 rounded-2xl border px-2.5 py-2 transition ${
+                className={`grid grid-cols-[30px_minmax(0,1fr)_96px] items-center gap-2 rounded-2xl border px-2 py-2 transition sm:grid-cols-[34px_minmax(0,1fr)_104px] sm:px-2.5 ${
                   set.completed
                     ? 'border-success/40 bg-success-soft/70'
                     : 'border-line bg-muted'
@@ -249,7 +249,7 @@ export function ExerciseLogger({
                   aria-label={`${set.completed ? 'Marcar como pendiente' : 'Marcar como hecha'} la serie ${set.setNumber}`}
                   aria-pressed={set.completed}
                   onClick={() => updateSet(set.id, { completed: !set.completed })}
-                  className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-extrabold transition active:scale-95 ${
+                  className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border px-1.5 text-xs font-extrabold transition active:scale-95 sm:gap-1.5 sm:px-2 ${
                     set.completed
                       ? 'border-success-solid bg-success-solid text-on-brand shadow-sm'
                       : 'border-control bg-raised text-secondary hover:border-success hover:text-success'

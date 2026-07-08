@@ -94,11 +94,11 @@
   }
 
   html {
-    @apply scroll-smooth bg-canvas;
+    @apply overflow-x-hidden scroll-smooth bg-canvas;
   }
 
   body {
-    @apply m-0 min-w-[320px] bg-canvas font-sans text-ink antialiased;
+    @apply m-0 min-w-[320px] overflow-x-hidden bg-canvas font-sans text-ink antialiased;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -110,6 +110,7 @@
   button,
   a {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+    touch-action: manipulation;
   }
 
   input {

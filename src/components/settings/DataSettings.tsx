@@ -306,11 +306,11 @@ export function DataSettings() {
             onChange={(event) => void selectFile(event)}
           />
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={exportJson} className="btn-secondary">
+            <button type="button" onClick={exportJson} className="btn-secondary w-full">
               <DatabaseBackup className="size-4" aria-hidden="true" />
               Exportar copia JSON
             </button>
-            <button type="button" onClick={() => jsonInput.current?.click()} className="btn-secondary">
+            <button type="button" onClick={() => jsonInput.current?.click()} className="btn-secondary w-full">
               <FileJson className="size-4" aria-hidden="true" />
               Importar copia JSON
             </button>
@@ -457,7 +457,7 @@ function ImportPreviewCard({
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-1.5 sm:gap-2">
         <PreviewStat label="Sesiones" value={preview.sessionCount} />
         <PreviewStat label="Ejercicios" value={preview.exerciseCount} />
         <PreviewStat label="Series" value={preview.setCount} />
@@ -487,11 +487,11 @@ function ImportPreviewCard({
       <p className="mt-4 text-sm font-bold text-ink">
         {preview.sessionsToImport.length} sesiones nuevas listas para importar.
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={onCancel} disabled={importing} className="btn-secondary">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <button type="button" onClick={onCancel} disabled={importing} className="btn-secondary w-full">
           Cancelar
         </button>
-        <button type="button" onClick={onConfirm} disabled={!canImport || importing} className="btn-primary">
+        <button type="button" onClick={onConfirm} disabled={!canImport || importing} className="btn-primary w-full">
           {importing ? 'Importando...' : 'Confirmar importación'}
         </button>
       </div>
@@ -501,7 +501,7 @@ function ImportPreviewCard({
 
 function PreviewStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-surface p-3 text-center shadow-sm">
+    <div className="rounded-xl bg-surface p-2 text-center shadow-sm sm:p-3">
       <p className="text-xl font-extrabold text-ink">{value}</p>
       <p className="mt-0.5 text-[11px] font-bold text-secondary">{label}</p>
     </div>

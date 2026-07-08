@@ -304,7 +304,7 @@ export function SettingsPage() {
                 setEditingExercise(null)
                 setShowExerciseForm(true)
               }}
-              className="btn-primary self-end"
+              className="btn-primary w-full self-end lg:w-auto"
             >
               <Plus className="size-4" /> Añadir ejercicio
             </button>
@@ -320,7 +320,7 @@ export function SettingsPage() {
                 key={value}
                 type="button"
                 onClick={() => setExerciseStatus(value)}
-                className={`min-h-11 rounded-xl text-sm font-bold transition ${
+                className={`min-h-11 rounded-xl px-1 text-xs font-bold transition sm:text-sm ${
                   exerciseStatus === value ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
                 }`}
               >
@@ -348,7 +348,7 @@ export function SettingsPage() {
             <article key={exercise.id} className={`card p-4 ${exercise.active ? '' : 'opacity-70'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="font-extrabold text-ink">{exercise.name}</h3>
+                  <h3 className="break-words font-extrabold text-ink">{exercise.name}</h3>
                   <p className="mt-1 text-xs font-semibold text-secondary">
                     {exercise.muscleGroup || 'Sin grupo muscular'}
                     {!exercise.active && ' · Archivado'}

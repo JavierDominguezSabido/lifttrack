@@ -17,12 +17,12 @@ export function TemplateExerciseRow({
         {item.order}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold leading-tight text-ink">{exercise.name}</p>
+        <p className="break-words text-sm font-extrabold leading-tight text-ink">{exercise.name}</p>
         <p className="mt-1 text-xs font-medium text-secondary">
           {exercise.muscleGroup}{exercise.equipment ? ` · ${exercise.equipment}` : ''}
         </p>
       </div>
-      <div className="shrink-0 text-right">
+      <div className="shrink-0 pl-1 text-right">
         <p className="text-sm font-extrabold text-ink">{item.targetReps} × {item.targetSets}</p>
         {item.restSeconds && (
           <p className="mt-1 flex items-center justify-end gap-1 text-xs font-medium text-secondary">

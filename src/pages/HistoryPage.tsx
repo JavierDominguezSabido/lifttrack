@@ -476,7 +476,7 @@ function SessionCard({
               <CalendarDays className="size-3.5" aria-hidden="true" />
               {dayNames[session.dayOfWeek] ?? session.name}
             </p>
-            <h3 className="mt-1 text-lg font-extrabold text-ink">
+            <h3 className="mt-1 break-words text-lg font-extrabold text-ink">
               {formatDate(session.startedAt, {
                 weekday: 'long',
                 day: 'numeric',
@@ -497,7 +497,7 @@ function SessionCard({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <button
             type="button"
             onClick={onToggle}
@@ -517,10 +517,11 @@ function SessionCard({
           <button
             type="button"
             onClick={onDelete}
-            className="grid min-h-11 w-11 place-items-center rounded-xl border border-line bg-raised text-secondary transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98]"
+            className="col-span-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-raised px-3 text-sm font-bold text-secondary transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98] sm:col-span-1 sm:grid sm:w-11 sm:px-0"
             aria-label="Borrar sesión"
           >
             <Trash2 className="size-4" aria-hidden="true" />
+            <span className="sm:hidden">Borrar</span>
           </button>
         </div>
       </header>
@@ -536,7 +537,7 @@ function SessionCard({
                 <div key={log.id} className="py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-extrabold leading-tight text-ink">
+                      <p className="break-words font-extrabold leading-tight text-ink">
                         {loggedExercise?.name ?? log.exerciseId}
                       </p>
                       <p className="mt-1 text-xs font-medium text-secondary">

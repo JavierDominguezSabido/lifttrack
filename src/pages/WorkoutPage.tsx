@@ -447,6 +447,10 @@ export function WorkoutPage() {
   }
 
   function discardDraft() {
+    if (!window.confirm('Vas a descartar el entrenamiento en curso guardado como borrador. Esta acción no se puede deshacer. ¿Continuar?')) {
+      return
+    }
+
     if (pendingDraft) {
       removeWorkoutDraftByDay(userKey, pendingDraft.dayOfWeek)
     } else {
@@ -464,6 +468,10 @@ export function WorkoutPage() {
   }
 
   function startNewWorkout() {
+    if (pendingDraft && !window.confirm('Hay un borrador guardado para este entrenamiento. ¿Quieres empezar uno nuevo y descartar ese borrador?')) {
+      return
+    }
+
     const nextLogs = createExerciseLogs(template, sessions, exercises)
     if (pendingDraft?.templateId === template.id) {
       removeWorkoutDraft(userKey, template)
@@ -770,10 +778,10 @@ export function WorkoutPage() {
                   <div className="space-y-1 px-1 text-center text-xs font-semibold text-secondary">
                     {guidedPreviousPerformance && (
                       <p>
-                        Ultima vez: <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
+                        Última vez: <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
                         {guidedPreviousPerformance.weightKg > 0
                           ? ` con ${guidedPreviousPerformance.weightKg} kg`
-                          : ' sin peso anadido'}
+                          : ' sin peso añadido'}
                       </p>
                     )}
                     {guidedSuggestion && (
@@ -813,7 +821,7 @@ export function WorkoutPage() {
           ) : (
             <div className="p-6 text-center">
               <Dumbbell className="mx-auto size-8 text-subtle" aria-hidden="true" />
-              <p className="mt-2 text-sm font-semibold text-secondary">No hay series para guiar en este dia.</p>
+              <p className="mt-2 text-sm font-semibold text-secondary">No hay series para guiar en este día.</p>
             </div>
           )}
         </section>

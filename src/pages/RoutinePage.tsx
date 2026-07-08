@@ -17,11 +17,11 @@ export function RoutinePage() {
 
   return (
     <div className="space-y-5 md:space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="grid gap-3 sm:flex sm:items-start sm:justify-between">
         <p className="max-w-xl text-base leading-6 text-secondary">
           Consulta tu planificación semanal y empieza el entrenamiento de cada día.
         </p>
-        <Link to="/configuracion" className="btn-secondary">
+        <Link to="/configuracion" className="btn-secondary w-full sm:w-auto">
           Configurar rutina
         </Link>
       </div>
