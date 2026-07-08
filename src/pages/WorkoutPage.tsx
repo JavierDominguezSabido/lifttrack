@@ -368,18 +368,9 @@ export function WorkoutPage() {
     setViewMode('guided')
   }
 
-  function goToNextGuidedStep() {
-    if (guidedSteps.length === 0) return
-    goToGuidedStep(currentGuidedIndex + 1)
-  }
-
   function goToPreviousGuidedStep() {
     if (guidedSteps.length === 0) return
     goToGuidedStep(currentGuidedIndex - 1)
-  }
-
-  function skipGuidedSet() {
-    goToNextGuidedStep()
   }
 
   function completeGuidedSet() {
@@ -811,21 +802,11 @@ export function WorkoutPage() {
                   <CheckCircle2 className={guidedFeedback ? 'size-6' : 'size-5'} aria-hidden="true" />
                   {guidedFeedback ? 'Serie completada' : 'Marcar hecha y continuar'}
                 </button>
-                <div className="grid grid-cols-2 gap-2">
+                <div>
                   <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
                     Anterior
                   </button>
-                  <button type="button" onClick={skipGuidedSet} disabled={currentGuidedIndex >= guidedSteps.length - 1} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
-                    Saltar serie
-                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('full')}
-                  className="mx-auto mt-1 text-xs font-extrabold text-secondary underline decoration-line underline-offset-4 hover:text-ink"
-                >
-                  Ver vista completa
-                </button>
               </div>
               </div>
             </div>
