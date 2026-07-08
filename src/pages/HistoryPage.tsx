@@ -709,46 +709,95 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   const minWeight = Math.min(...weights)
   const maxWeight = Math.max(...weights)
   const range = Math.max(1, maxWeight - minWeight)
+  const chart = {
+    width: 220,
+    height: 86,
+    left: 16,
+    right: 16,
+    pointTop: 27,
+    pointBottom: 57,
+    dateY: 78
+  }
   const points = entries.map((entry, index) => {
-    const x = entries.length === 1 ? 50 : (index / (entries.length - 1)) * 100
-    const y = 56 - ((getProgressEntryWeight(entry) - minWeight) / range) * 42 - 7
-    return { x, y, entry }
+    const weight = getProgressEntryWeight(entry)
+    const x = entries.length === 1
+      ? chart.width / 2
+      : chart.left + (index / (entries.length - 1)) * (chart.width - chart.left - chart.right)
+    const y = chart.pointBottom - ((weight - minWeight) / range) * (chart.pointBottom - chart.pointTop)
+    const label = `${weight} kg`
+    const labelWidth = Math.max(22, label.length * 3.9 + 8)
+    const labelOffset = entries.length > 4
+      ? index % 2 === 0 ? 19 : 8
+      : 10
+    return {
+      x,
+      y,
+      entry,
+      label,
+      labelWidth,
+      labelX: Math.min(Math.max(x, labelWidth / 2 + 2), chart.width - labelWidth / 2 - 2),
+      labelY: Math.max(8, y - labelOffset)
+    }
   })
   const path = points.map((point, index) =>
     `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`
   ).join(' ')
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+    <div className="rounded-2xl border border-line bg-surface px-4 py-4 sm:px-5">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h4 className="font-extrabold text-ink">Peso de trabajo</h4>
           <p className="text-xs font-semibold text-secondary">Últimas {entries.length} sesiones registradas</p>
         </div>
-        <p className="text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
+        <p className="rounded-lg bg-muted px-2.5 py-1 text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
       </div>
 
-      <svg viewBox="0 0 100 62" role="img" aria-label="Evolución del peso de trabajo por fecha" className="h-40 w-full overflow-visible">
-        <line x1="0" y1="55" x2="100" y2="55" className="stroke-line" strokeWidth="1" />
-        <line x1="0" y1="10" x2="100" y2="10" className="stroke-line" strokeWidth="1" strokeDasharray="3 3" />
-        <path d={path} className="fill-none stroke-brand" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map(({ x, y, entry }) => (
-          <g key={entry.session.id}>
-            <title>
-              {`${formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })}: ${getProgressEntryWeight(entry)} kg`}
-            </title>
-            <circle cx={x} cy={y} r="3.2" className="fill-surface stroke-brand" strokeWidth="2.2" />
-          </g>
-        ))}
+      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Evolucion del peso de trabajo por fecha" className="h-44 w-full overflow-visible">
+        <line x1={chart.left} y1={chart.pointBottom + 6} x2={chart.width - chart.right} y2={chart.pointBottom + 6} className="stroke-line" strokeWidth="1" />
+        <path d={path} className="fill-none stroke-brand" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map(({ x, y, entry, label, labelWidth, labelX, labelY }, index) => {
+          const reps = formatSetReps(entry.log.sets)
+          return (
+            <g key={entry.session.id}>
+              <title>
+                {[
+                  formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' }),
+                  label,
+                  reps ? `${reps} reps` : undefined
+                ].filter(Boolean).join('\n')}
+              </title>
+              <rect
+                x={labelX - labelWidth / 2}
+                y={labelY - 7}
+                width={labelWidth}
+                height="11"
+                rx="5.5"
+                className="fill-surface stroke-line"
+                strokeWidth="0.7"
+              />
+              <text
+                x={labelX}
+                y={labelY + 0.8}
+                textAnchor="middle"
+                className="fill-ink text-[7px] font-extrabold"
+              >
+                {label}
+              </text>
+              <circle cx={x} cy={y} r="4.2" className="fill-brand/15 stroke-brand" strokeWidth="2.4" />
+              <circle cx={x} cy={y} r="1.7" className="fill-brand" />
+              <text
+                x={x}
+                y={chart.dateY}
+                textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
+                className="fill-secondary text-[6px] font-bold"
+              >
+                {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
+              </text>
+            </g>
+          )
+        })}
       </svg>
-
-      <div className="mt-2 grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(entries.length, 8)}, minmax(0, 1fr))` }}>
-        {entries.map((entry) => (
-          <span key={entry.session.id} className="truncate text-center text-[10px] font-semibold text-secondary">
-            {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
