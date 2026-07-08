@@ -9,13 +9,28 @@ import {
   createCanonicalExerciseIdMap,
   getEquivalentExerciseIds
 } from '../utils/exerciseIdentity'
-import { getTodayTemplate } from '../utils/workout'
 import {
+  formatCompactNumber,
+  formatRestSeconds,
+  getProgressionSuggestion,
+  getTodayTemplate
+} from '../utils/workout'
+import {
+  applyWorkingWeight,
   createExerciseLogs,
   createWorkoutSession,
+  getWorkingWeight,
+  normalizeRepsInput,
   validateWorkoutDraft
 } from '../utils/workoutDraft'
 import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
+
+type WorkoutViewMode = 'full' | 'guided'
+
+interface GuidedPosition {
+  logId: string
+  setId: string
+}
 
 const WORKOUT_DRAFT_VERSION = 1
 const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
@@ -29,6 +44,8 @@ interface StoredWorkoutDraft {
   startedAt: string
   logs: DraftExerciseLog[]
   updatedAt: string
+  viewMode?: WorkoutViewMode
+  guidedPosition?: GuidedPosition
 }
 
 function getDraftUserKey(userId?: string) {
@@ -95,7 +112,14 @@ function isRecentWorkoutDraft(draft: StoredWorkoutDraft) {
   return Number.isFinite(updatedAt) && Date.now() - updatedAt <= WORKOUT_DRAFT_MAX_AUTO_RESTORE_MS
 }
 
-function writeWorkoutDraft(userKey: string, template: WorkoutTemplate, startedAt: string, logs: DraftExerciseLog[]) {
+function writeWorkoutDraft(
+  userKey: string,
+  template: WorkoutTemplate,
+  startedAt: string,
+  logs: DraftExerciseLog[],
+  viewMode: WorkoutViewMode,
+  guidedPosition: GuidedPosition | null
+) {
   try {
     const draft: StoredWorkoutDraft = {
       version: WORKOUT_DRAFT_VERSION,
@@ -104,7 +128,9 @@ function writeWorkoutDraft(userKey: string, template: WorkoutTemplate, startedAt
       dayOfWeek: template.dayOfWeek,
       startedAt,
       logs,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      viewMode,
+      guidedPosition: guidedPosition ?? undefined
     }
     window.localStorage.setItem(getWorkoutDraftKey(userKey, template), JSON.stringify(draft))
   } catch (error) {
@@ -154,6 +180,8 @@ export function WorkoutPage() {
     pendingDraft: StoredWorkoutDraft | null
     draftActive: boolean
     restoredDraft: boolean
+    viewMode: WorkoutViewMode
+    guidedPosition: GuidedPosition | null
   }>()
   if (!initialStateRef.current) {
     const freshLogs = createFreshWorkoutLogs(template, sessions, exercises)
@@ -167,7 +195,9 @@ export function WorkoutPage() {
       startedAt: canAutoRestore ? sameDayDraft.startedAt : new Date().toISOString(),
       pendingDraft: canAutoRestore ? null : sameDayDraft ?? ambiguousDraft,
       draftActive: Boolean(canAutoRestore),
-      restoredDraft: Boolean(canAutoRestore)
+      restoredDraft: Boolean(canAutoRestore),
+      viewMode: canAutoRestore ? sameDayDraft.viewMode ?? 'full' : 'full',
+      guidedPosition: canAutoRestore ? sameDayDraft.guidedPosition ?? null : null
     }
   }
   const [logs, setLogs] = useState<DraftExerciseLog[]>(() => initialStateRef.current!.logs)
@@ -176,6 +206,8 @@ export function WorkoutPage() {
   const [pendingDraft, setPendingDraft] = useState<StoredWorkoutDraft | null>(() => initialStateRef.current!.pendingDraft)
   const [draftActive, setDraftActive] = useState(() => initialStateRef.current!.draftActive)
   const [draftRestoredNotice, setDraftRestoredNotice] = useState(() => initialStateRef.current!.restoredDraft)
+  const [viewMode, setViewMode] = useState<WorkoutViewMode>(() => initialStateRef.current!.viewMode)
+  const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const previousTemplateRef = useRef(template)
@@ -197,16 +229,66 @@ export function WorkoutPage() {
     : progress.completed > 0
       ? 'En curso'
       : 'Pendiente'
+  const guidedSteps = useMemo(() => template.exercises.flatMap((item) => {
+    const log = logs.find((entry) => entry.exerciseId === item.exerciseId)
+    if (!log) return []
+    return log.sets.map((set, setIndex) => ({
+      templateExercise: item,
+      exercise: getExerciseById(item.exerciseId),
+      log,
+      set,
+      setIndex
+    }))
+  }), [getExerciseById, logs, template.exercises])
+  const firstPendingStep = guidedSteps.find((step) => !step.set.completed) ?? guidedSteps[0]
+  const currentGuidedIndex = Math.max(0, guidedSteps.findIndex((step) =>
+    step.log.id === guidedPosition?.logId && step.set.id === guidedPosition.setId
+  ))
+  const currentGuidedStep = guidedSteps[currentGuidedIndex] ?? firstPendingStep
+  const guidedIsComplete = guidedSteps.length > 0 && guidedSteps.every((step) => step.set.completed)
+  const guidedPreviousPerformance = useMemo(() => {
+    if (!currentGuidedStep) return null
+    const equivalentIds = new Set(getEquivalentExerciseIds(exercises, currentGuidedStep.templateExercise.exerciseId))
+    for (const [from, to] of canonicalExerciseIds) {
+      if (to === currentGuidedStep.templateExercise.exerciseId) equivalentIds.add(from)
+    }
+    return getLastExercisePerformanceFromSessions(
+      sessions,
+      currentGuidedStep.templateExercise.exerciseId,
+      [...equivalentIds]
+    )
+  }, [canonicalExerciseIds, currentGuidedStep, exercises, sessions])
+  const guidedSuggestion = currentGuidedStep && guidedPreviousPerformance
+    ? getProgressionSuggestion(guidedPreviousPerformance, currentGuidedStep.templateExercise)
+    : null
+  const completedVolume = useMemo(() => logs.reduce(
+    (total, log) => total + log.sets.reduce(
+      (sum, set) => sum + (set.completed ? Number(set.reps || 0) * set.weightKg : 0),
+      0
+    ),
+    0
+  ), [logs])
   const hasDraftChanges = !logsAreEqual(logs, initialLogs)
+  const hasDraftState = hasDraftChanges || viewMode !== 'full' || Boolean(guidedPosition)
+
+  useEffect(() => {
+    if (viewMode !== 'guided' || guidedSteps.length === 0) return
+    const hasValidPosition = guidedSteps.some((step) =>
+      step.log.id === guidedPosition?.logId && step.set.id === guidedPosition.setId
+    )
+    if (!hasValidPosition && firstPendingStep) {
+      setGuidedPosition({ logId: firstPendingStep.log.id, setId: firstPendingStep.set.id })
+    }
+  }, [firstPendingStep, guidedPosition, guidedSteps, viewMode])
 
   useEffect(() => {
     const previousTemplate = previousTemplateRef.current
     if (previousTemplate.id === template.id && previousTemplate.dayOfWeek === template.dayOfWeek) return
 
     let previousDraft: StoredWorkoutDraft | null = null
-    const shouldStorePreviousDraft = draftActive || hasDraftChanges
+    const shouldStorePreviousDraft = draftActive || hasDraftState
     if (shouldStorePreviousDraft) {
-      writeWorkoutDraft(userKey, previousTemplate, startedAt, logs)
+      writeWorkoutDraft(userKey, previousTemplate, startedAt, logs, viewMode, guidedPosition)
       previousDraft = readWorkoutDraft(userKey, previousTemplate)
     }
 
@@ -227,18 +309,94 @@ export function WorkoutPage() {
     setPendingDraft(draftToAsk)
     setDraftActive(Boolean(draftToRestore))
     setDraftRestoredNotice(Boolean(draftToRestore))
+    setViewMode(draftToRestore?.viewMode ?? 'full')
+    setGuidedPosition(draftToRestore?.guidedPosition ?? null)
     setSaveError(null)
-  }, [draftActive, exercises, hasDraftChanges, logs, sessions, startedAt, template, userKey])
+  }, [draftActive, exercises, guidedPosition, hasDraftState, logs, sessions, startedAt, template, userKey, viewMode])
 
   useEffect(() => {
     if (pendingDraft) return
-    if (!draftActive && !hasDraftChanges) return
-    writeWorkoutDraft(userKey, template, startedAt, logs)
+    if (!draftActive && !hasDraftState) return
+    writeWorkoutDraft(userKey, template, startedAt, logs, viewMode, guidedPosition)
     setDraftActive(true)
-  }, [draftActive, hasDraftChanges, logs, pendingDraft, startedAt, template, userKey])
+  }, [draftActive, guidedPosition, hasDraftState, logs, pendingDraft, startedAt, template, userKey, viewMode])
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
+  }
+
+  function updateGuidedLog(updatedLog: DraftExerciseLog) {
+    updateLog(updatedLog)
+  }
+
+  function updateGuidedSet(logId: string, setId: string, changes: Partial<DraftExerciseLog['sets'][number]>) {
+    setLogs((current) => current.map((log) =>
+      log.id === logId
+        ? {
+            ...log,
+            sets: log.sets.map((set) => set.id === setId ? { ...set, ...changes } : set)
+          }
+        : log
+    ))
+  }
+
+  function goToGuidedStep(index: number) {
+    const step = guidedSteps[Math.min(Math.max(index, 0), guidedSteps.length - 1)]
+    if (!step) return
+    setGuidedPosition({ logId: step.log.id, setId: step.set.id })
+    setViewMode('guided')
+  }
+
+  function goToNextGuidedStep() {
+    if (guidedSteps.length === 0) return
+    goToGuidedStep(currentGuidedIndex + 1)
+  }
+
+  function goToPreviousGuidedStep() {
+    if (guidedSteps.length === 0) return
+    goToGuidedStep(currentGuidedIndex - 1)
+  }
+
+  function skipGuidedSet() {
+    goToNextGuidedStep()
+  }
+
+  function completeGuidedSet() {
+    if (!currentGuidedStep) return
+    const reps = currentGuidedStep.set.reps.trim()
+    if (reps === '') {
+      setSaveError('Escribe las repeticiones de la serie actual antes de marcarla como hecha.')
+      return
+    }
+    if (!/^\d+$/.test(reps) || Number(reps) <= 0) {
+      setSaveError('Las repeticiones deben ser un numero entero mayor que 0.')
+      return
+    }
+
+    setSaveError(null)
+    updateGuidedSet(currentGuidedStep.log.id, currentGuidedStep.set.id, { completed: true, reps })
+    if (currentGuidedIndex < guidedSteps.length - 1) {
+      const nextStep = guidedSteps[currentGuidedIndex + 1]
+      setGuidedPosition({ logId: nextStep.log.id, setId: nextStep.set.id })
+    }
+  }
+
+  function updateGuidedWeight(value: number) {
+    if (!currentGuidedStep) return
+    updateGuidedLog(applyWorkingWeight(currentGuidedStep.log, value))
+  }
+
+  function updateGuidedReps(value: string) {
+    if (!currentGuidedStep) return
+    updateGuidedSet(currentGuidedStep.log.id, currentGuidedStep.set.id, {
+      reps: normalizeRepsInput(value)
+    })
+  }
+
+  function enterGuidedMode() {
+    const step = currentGuidedStep ?? firstPendingStep
+    if (step) setGuidedPosition({ logId: step.log.id, setId: step.set.id })
+    setViewMode('guided')
   }
 
   function restoreDraft(draft: StoredWorkoutDraft) {
@@ -253,6 +411,8 @@ export function WorkoutPage() {
     setStartedAt(draft.startedAt)
     setDraftActive(true)
     setDraftRestoredNotice(true)
+    setViewMode(draft.viewMode ?? 'full')
+    setGuidedPosition(draft.guidedPosition ?? null)
     setPendingDraft(null)
     setSaveError(null)
   }
@@ -275,6 +435,8 @@ export function WorkoutPage() {
     setPendingDraft(null)
     setDraftActive(false)
     setDraftRestoredNotice(false)
+    setViewMode('full')
+    setGuidedPosition(null)
     setSaveError(null)
   }
 
@@ -289,6 +451,8 @@ export function WorkoutPage() {
     setPendingDraft(null)
     setDraftActive(false)
     setDraftRestoredNotice(false)
+    setViewMode('full')
+    setGuidedPosition(null)
     setSaveError(null)
   }
 
@@ -313,6 +477,8 @@ export function WorkoutPage() {
       setDraftActive(false)
       setPendingDraft(null)
       setDraftRestoredNotice(false)
+      setViewMode('full')
+      setGuidedPosition(null)
       navigate('/historial', { state: { workoutSaved: true } })
     } catch (error) {
       console.error('[workout] Error exacto al guardar el entrenamiento:', error)
@@ -336,7 +502,7 @@ export function WorkoutPage() {
               </span>
               <span>{progress.completed}/{progress.total} series</span>
               <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
-              {(draftActive || (hasDraftChanges && !pendingDraft)) && (
+              {(draftActive || (hasDraftState && !pendingDraft)) && (
                 <span className="font-extrabold text-hero-accent">Borrador guardado</span>
               )}
             </div>
@@ -412,7 +578,217 @@ export function WorkoutPage() {
         </section>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-surface p-1.5 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setViewMode('full')}
+          className={`min-h-11 rounded-xl px-3 text-sm font-extrabold transition ${
+            viewMode === 'full'
+              ? 'bg-brand-solid text-on-brand shadow-sm'
+              : 'text-secondary hover:bg-muted'
+          }`}
+        >
+          Vista completa
+        </button>
+        <button
+          type="button"
+          onClick={enterGuidedMode}
+          className={`min-h-11 rounded-xl px-3 text-sm font-extrabold transition ${
+            viewMode === 'guided'
+              ? 'bg-brand-solid text-on-brand shadow-sm'
+              : 'text-secondary hover:bg-muted'
+          }`}
+        >
+          Modo guiado
+        </button>
+      </div>
+
+      {viewMode === 'guided' ? (
+        <section className="card overflow-hidden">
+          {guidedIsComplete ? (
+            <div className="space-y-5 p-5 sm:p-6">
+              <div>
+                <p className="eyebrow">{template.name}</p>
+                <h3 className="mt-1 text-2xl font-extrabold text-ink">Entrenamiento completado</h3>
+                <p className="mt-1 text-sm font-semibold text-secondary">
+                  Revisa el resumen antes de guardar definitivamente.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-2xl bg-muted p-3">
+                  <p className="text-lg font-extrabold text-ink">{logs.length}</p>
+                  <p className="text-[11px] font-bold text-secondary">ejercicios</p>
+                </div>
+                <div className="rounded-2xl bg-muted p-3">
+                  <p className="text-lg font-extrabold text-ink">{progress.completed}</p>
+                  <p className="text-[11px] font-bold text-secondary">series hechas</p>
+                </div>
+                <div className="rounded-2xl bg-muted p-3">
+                  <p className="text-lg font-extrabold text-ink">{formatCompactNumber(completedVolume)}</p>
+                  <p className="text-[11px] font-bold text-secondary">kg volumen</p>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => void finishWorkout()}
+                  disabled={saving || progress.completed === 0}
+                  className="btn-primary !min-h-12 !bg-success-solid hover:!bg-success-solid-hover"
+                >
+                  <CheckCircle2 className="size-5" aria-hidden="true" />
+                  {saving ? 'Guardando...' : 'Finalizar y guardar'}
+                </button>
+                <button type="button" onClick={() => goToGuidedStep(0)} className="btn-secondary !min-h-12">
+                  Volver a revisar
+                </button>
+              </div>
+            </div>
+          ) : currentGuidedStep ? (
+            <div className="space-y-5 p-5 sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="eyebrow">{template.name}</p>
+                  <p className="mt-1 text-sm font-extrabold text-brand">
+                    Serie {currentGuidedIndex + 1} de {guidedSteps.length}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setViewMode('full')} className="btn-secondary !min-h-10 !px-3 !py-2 !text-xs">
+                  Ver vista completa
+                </button>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-secondary">
+                  {currentGuidedStep.exercise?.muscleGroup ?? 'Ejercicio'}
+                </p>
+                <h3 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
+                  {currentGuidedStep.exercise?.name ?? 'Ejercicio'}
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-secondary">
+                  Objetivo {currentGuidedStep.templateExercise.targetReps}x{currentGuidedStep.templateExercise.targetSets} · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
+                </p>
+              </div>
+
+              {(guidedPreviousPerformance || guidedSuggestion) && (
+                <div className="rounded-2xl bg-muted px-4 py-3 text-sm">
+                  {guidedPreviousPerformance && (
+                    <p className="font-semibold text-secondary">
+                      Ultima vez:{' '}
+                      <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
+                      {guidedPreviousPerformance.weightKg > 0
+                        ? ` con ${guidedPreviousPerformance.weightKg} kg`
+                        : ' sin peso anadido'}
+                    </p>
+                  )}
+                  {guidedSuggestion && (
+                    <p className="mt-1 text-xs font-extrabold text-brand">Sugerencia: {guidedSuggestion}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-line bg-muted/60 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <label htmlFor={`guided-weight-${currentGuidedStep.log.id}`} className="text-sm font-extrabold text-ink">
+                    Peso de trabajo
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById(`guided-weight-${currentGuidedStep.log.id}`)?.focus()}
+                    className="text-xs font-extrabold text-secondary underline decoration-line underline-offset-4"
+                  >
+                    Editar peso
+                  </button>
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <span className="relative">
+                    <input
+                      id={`guided-weight-${currentGuidedStep.log.id}`}
+                      className="min-h-12 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-lg font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.25"
+                      value={String(getWorkingWeight(currentGuidedStep.log))}
+                      onChange={(event) => updateGuidedWeight(Number(event.target.value))}
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
+                      kg
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => updateGuidedWeight(getWorkingWeight(currentGuidedStep.log) + 1.25)}
+                    className="min-h-12 whitespace-nowrap rounded-xl bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
+                  >
+                    +1.25 kg
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-secondary">
+                      Serie actual
+                    </p>
+                    <h4 className="mt-1 text-xl font-extrabold text-ink">
+                      Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length}
+                    </h4>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${
+                    currentGuidedStep.set.completed
+                      ? 'bg-success-soft text-success-text'
+                      : 'bg-muted text-secondary'
+                  }`}>
+                    {currentGuidedStep.set.completed ? 'Hecha' : 'Pendiente'}
+                  </span>
+                </div>
+
+                <label className="mt-4 block">
+                  <span className="mb-1 block text-sm font-extrabold text-ink">Reps</span>
+                  <input
+                    className="min-h-14 w-full rounded-2xl border border-control bg-raised px-4 text-2xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={currentGuidedStep.set.reps}
+                    placeholder={currentGuidedStep.templateExercise.targetReps}
+                    onChange={(event) => updateGuidedReps(event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={completeGuidedSet}
+                  className="btn-primary !min-h-14 !bg-success-solid !text-base hover:!bg-success-solid-hover"
+                >
+                  <CheckCircle2 className="size-5" aria-hidden="true" />
+                  Marcar hecha y continuar
+                </button>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 disabled:cursor-not-allowed disabled:opacity-40">
+                    Anterior
+                  </button>
+                  <button type="button" onClick={skipGuidedSet} disabled={currentGuidedIndex >= guidedSteps.length - 1} className="btn-secondary !min-h-11 disabled:cursor-not-allowed disabled:opacity-40">
+                    Saltar serie
+                  </button>
+                  <button type="button" onClick={() => setViewMode('full')} className="btn-secondary !min-h-11 sm:col-auto col-span-2">
+                    Ver vista completa
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 text-center">
+              <Dumbbell className="mx-auto size-8 text-subtle" aria-hidden="true" />
+              <p className="mt-2 text-sm font-semibold text-secondary">No hay series para guiar en este dia.</p>
+            </div>
+          )}
+        </section>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
         {template.exercises.length === 0 && (
           <div className="card border-dashed p-6 text-center xl:col-span-2">
             <Dumbbell className="mx-auto size-8 text-subtle" aria-hidden="true" />
@@ -447,7 +823,8 @@ export function WorkoutPage() {
             />
           ) : null
         })}
-      </div>
+        </div>
+      )}
 
       <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur-xl lg:bottom-4">
         {saveError && (
