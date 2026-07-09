@@ -118,7 +118,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-2 sm:grid-cols-3">
+      <section className="card grid grid-cols-3 divide-x divide-line/70 overflow-hidden">
         <StatCard
           icon={CalendarCheck}
           label="Esta semana"
@@ -278,15 +278,15 @@ function StatCard({
   tone: keyof typeof tones
 }) {
   return (
-    <div className="card flex min-h-20 items-center gap-3 p-3 sm:p-3.5">
-      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${tones[tone]}`}>
-        <Icon className="size-5" />
+    <div className="flex min-h-20 min-w-0 flex-col justify-between gap-2 p-2.5 sm:min-h-16 sm:flex-row sm:items-center sm:justify-start sm:p-3">
+      <span className={`grid size-8 shrink-0 place-items-center rounded-lg sm:size-9 ${tones[tone]}`}>
+        <Icon className="size-[18px] sm:size-5" />
       </span>
-      <div>
-        <p className="text-xs font-semibold leading-tight text-secondary">{label}</p>
-        <p className="mt-0.5 text-lg font-extrabold leading-tight">
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-semibold leading-tight text-secondary sm:text-xs">{label}</p>
+        <p className="mt-0.5 text-base font-extrabold leading-tight sm:text-lg">
           {value}{' '}
-          <span className="block text-[11px] font-semibold text-secondary sm:inline sm:text-xs">
+          <span className="block text-[10px] font-semibold text-secondary sm:inline sm:text-xs">
             {suffix}
           </span>
         </p>

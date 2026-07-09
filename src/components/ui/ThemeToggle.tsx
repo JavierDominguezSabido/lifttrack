@@ -33,7 +33,7 @@ export function ThemeToggle() {
 
   return (
     <div
-      className="flex rounded-lg border border-line bg-raised p-0.5"
+      className="flex rounded-lg border border-line/70 bg-transparent p-0.5 sm:bg-raised"
       role="group"
       aria-label="Tema de la aplicación"
     >
@@ -44,7 +44,7 @@ export function ThemeToggle() {
         title="Modo claro"
         className={`flex size-9 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition sm:w-auto sm:px-2.5 ${
           theme === 'light'
-            ? 'bg-brand-solid text-on-brand'
+            ? 'bg-brand-soft text-brand'
             : 'text-subtle hover:bg-muted hover:text-ink'
         }`}
       >
@@ -59,7 +59,7 @@ export function ThemeToggle() {
         title="Modo oscuro"
         className={`flex size-9 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition sm:w-auto sm:px-2.5 ${
           theme === 'dark'
-            ? 'bg-brand-solid text-on-brand'
+            ? 'bg-brand-soft text-brand'
             : 'text-subtle hover:bg-muted hover:text-ink'
         }`}
       >

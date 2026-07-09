@@ -88,6 +88,7 @@ export function HistoryPage() {
   const [search, setSearch] = useState('')
   const [progressSearch, setProgressSearch] = useState('')
   const [progressSelectorOpen, setProgressSelectorOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [visibleProgressCount, setVisibleProgressCount] = useState(8)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_SESSIONS)
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
@@ -156,6 +157,24 @@ export function HistoryPage() {
     [canonicalExerciseIds, exercises, filterDay, filterExerciseId, rangeFilter, realSessions, search]
   )
   const visibleSessions = filteredSessions.slice(0, visibleCount)
+  const activeFilterCount = [
+    filterExerciseId !== 'all',
+    filterDay !== 'all',
+    rangeFilter !== 'all',
+    search.trim() !== ''
+  ].filter(Boolean).length
+  const filterSummary = activeFilterCount === 0
+    ? 'Sin filtros activos'
+    : [
+        filterExerciseId !== 'all'
+          ? exerciseOptions.find((item) => item.id === filterExerciseId)?.name ?? 'Ejercicio'
+          : null,
+        filterDay !== 'all' ? dayNames[Number(filterDay)] : null,
+        rangeFilter !== 'all'
+          ? rangeFilter === 'week' ? 'Esta semana' : 'Este mes'
+          : null,
+        search.trim() ? `"${search.trim()}"` : null
+      ].filter(Boolean).join(' · ')
 
   async function removeSession(session: WorkoutSession) {
     const sessionDate = getSessionDateObject(session)
@@ -334,11 +353,35 @@ export function HistoryPage() {
       </section>
 
       <section aria-labelledby="history-filters-title" className="card p-3.5 md:p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Filter className="size-5 text-brand" aria-hidden="true" />
-          <h2 id="history-filters-title" className="font-extrabold text-ink">Filtros</h2>
+        <div className="flex items-center justify-between gap-3 md:mb-3">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((current) => !current)}
+            className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg text-left md:pointer-events-none"
+            aria-expanded={filtersOpen}
+            aria-controls="history-filters-panel"
+          >
+            <Filter className="size-4 shrink-0 text-brand" aria-hidden="true" />
+            <span className="min-w-0">
+              <span id="history-filters-title" className="block font-extrabold text-ink">Filtros</span>
+              <span className="block truncate text-xs font-semibold text-secondary">{filterSummary}</span>
+            </span>
+            {activeFilterCount > 0 && (
+              <span className="ml-auto shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-extrabold text-brand">
+                {activeFilterCount}
+              </span>
+            )}
+            {filtersOpen ? (
+              <ChevronUp className="size-4 shrink-0 text-secondary md:hidden" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="size-4 shrink-0 text-secondary md:hidden" aria-hidden="true" />
+            )}
+          </button>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          id="history-filters-panel"
+          className={`${filtersOpen ? 'grid' : 'hidden'} mt-3 gap-2.5 sm:grid-cols-2 md:grid xl:grid-cols-4`}
+        >
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Ejercicio</span>
             <select

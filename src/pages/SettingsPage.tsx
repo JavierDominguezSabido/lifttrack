@@ -16,7 +16,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
-import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
 import { dayNames, formatRestSeconds } from '../utils/workout'
@@ -408,21 +407,6 @@ export function SettingsPage() {
   return (
       <div className="space-y-4 md:space-y-5">
       <AccountSettings />
-
-      <section className="card overflow-hidden" aria-labelledby="appearance-settings-title">
-        <div className="flex flex-wrap items-center justify-between gap-4 p-4 md:p-5">
-          <div>
-            <p className="eyebrow">Apariencia</p>
-            <h2 id="appearance-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
-              Apariencia
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-secondary">
-              Tema actual de la aplicación.
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-      </section>
 
       <section className="card overflow-hidden" aria-labelledby="routine-settings-title">
         <header className="border-b border-line/70 p-4 md:p-5">

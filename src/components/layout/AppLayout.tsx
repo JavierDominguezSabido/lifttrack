@@ -84,17 +84,17 @@ export function AppLayout() {
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line/70 bg-canvas/88 px-4 backdrop-blur-xl md:px-8 lg:h-16">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-line/70 bg-canvas/88 px-4 backdrop-blur-xl md:px-8 lg:h-16">
           <div className="min-w-0">
             <p className="hidden text-xs font-semibold capitalize text-subtle sm:block">{currentDate}</p>
             <h1 className="truncate text-lg font-extrabold tracking-tight lg:text-xl">{title}</h1>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <span
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-extrabold ${
+              className={`inline-flex min-h-9 items-center gap-1 rounded-md px-1.5 text-xs font-extrabold sm:px-2 ${
                 dataMode === 'cloud'
-                  ? 'bg-success-soft text-success-text'
-                  : 'bg-muted text-secondary'
+                  ? 'bg-success-soft/70 text-success-text'
+                  : 'bg-transparent text-secondary'
               }`}
               title={dataMode === 'cloud' ? 'Modo sincronizado en la nube' : 'Modo local'}
             >
@@ -106,7 +106,7 @@ export function AppLayout() {
               </span>
             </span>
             <ThemeToggle />
-            <div aria-label="LiftTrack" className="grid size-9 place-items-center rounded-xl bg-hero text-xs font-extrabold text-hero-accent">
+            <div aria-label="LiftTrack" className="grid size-8 place-items-center rounded-lg bg-muted text-[11px] font-extrabold text-secondary sm:size-9">
               LT
             </div>
           </div>
@@ -128,20 +128,27 @@ export function AppLayout() {
         </main>
       </div>
 
-      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-5 border-t border-line/70 bg-surface/92 px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-nav backdrop-blur-xl lg:hidden">
+      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-5 border-t border-line bg-surface px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_24px_rgba(7,11,18,0.14)] backdrop-blur-sm lg:hidden">
         {navigation.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}
             end={path === '/'}
             className={({ isActive }) =>
-              `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
-                isActive ? 'bg-brand-solid text-on-brand shadow-sm' : 'text-subtle'
+              `relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
+                isActive ? 'bg-brand-soft text-brand' : 'text-subtle'
               }`
             }
           >
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute top-1 h-0.5 w-5 rounded-full bg-brand" aria-hidden="true" />
+                )}
             <Icon className="size-[18px]" strokeWidth={2.3} />
             {label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
