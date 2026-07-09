@@ -1017,9 +1017,46 @@ export function WorkoutPage() {
                   <h3 className="mt-1 text-3xl font-extrabold tracking-tight text-ink">
                     {currentGuidedStep.exercise?.name ?? 'Ejercicio'}
                   </h3>
-                  <p className="mt-2 text-sm font-bold text-secondary">
-                    Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
-                  </p>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm font-bold text-secondary">
+                      Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
+                    </p>
+                    <div
+                      className="flex flex-wrap items-center justify-center gap-1.5"
+                      aria-label={`Series de ${currentGuidedStep.exercise?.name ?? 'este ejercicio'}`}
+                    >
+                      {currentGuidedStep.log.sets.map((set) => {
+                        const isCurrent = set.id === currentGuidedStep.set.id
+
+                        return (
+                          <span
+                            key={set.id}
+                            aria-current={isCurrent ? 'step' : undefined}
+                            aria-label={
+                              set.completed
+                                ? `Serie ${set.setNumber} completada`
+                                : isCurrent
+                                  ? `Serie ${set.setNumber} actual`
+                                  : `Serie ${set.setNumber} pendiente`
+                            }
+                            className={`inline-flex size-7 items-center justify-center rounded-full border text-xs font-extrabold leading-none transition ${
+                              set.completed
+                                ? 'border-success/40 bg-success-soft text-success-text'
+                                : isCurrent
+                                  ? 'border-brand bg-brand-solid text-on-brand shadow-sm ring-2 ring-brand-soft'
+                                  : 'border-line bg-muted text-secondary'
+                            }`}
+                          >
+                            {set.completed ? (
+                              <CheckCircle2 className="size-4" aria-hidden="true" />
+                            ) : (
+                              set.setNumber
+                            )}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
