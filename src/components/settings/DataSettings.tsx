@@ -259,13 +259,13 @@ export function DataSettings() {
 
   return (
     <section className="card overflow-hidden" aria-labelledby="data-settings-title">
-      <header className="border-b border-line bg-muted/40 p-5 md:p-6">
+      <header className="border-b border-line/70 p-4 md:p-5">
         <p className="eyebrow">Datos</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="data-settings-title" className="text-2xl font-extrabold tracking-tight text-ink">
+          <h2 id="data-settings-title" className="text-xl font-extrabold tracking-tight text-ink">
             Datos
           </h2>
-          <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ${
+          <span className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-extrabold ${
             dataMode === 'cloud'
               ? 'bg-success-soft text-success-text'
               : 'bg-muted text-secondary'
@@ -281,7 +281,7 @@ export function DataSettings() {
         </p>
       </header>
 
-      <div className="space-y-5 p-5 md:p-6">
+      <div className="space-y-4 p-4 md:p-5">
         {message && (
           <p role="status" className="status-success">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -327,18 +327,18 @@ export function DataSettings() {
           />
         )}
 
-        <div className="border-t border-line pt-4">
+        <div className="border-t border-line/70 pt-4">
           <button
             type="button"
             onClick={() => setShowAdvanced((current) => !current)}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-secondary hover:text-ink"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-bold text-secondary hover:text-ink"
             aria-expanded={showAdvanced}
           >
             <AlertTriangle className="size-4" aria-hidden="true" />
             Herramientas avanzadas
           </button>
           {showAdvanced && (
-            <div className="mt-3 rounded-2xl border border-line bg-muted/60 p-4">
+            <div className="mt-3 rounded-xl border border-line/70 bg-muted/50 p-3.5">
               <div className="flex items-center gap-2">
                 <FileJson className="size-5 text-brand" aria-hidden="true" />
                 <h3 className="font-extrabold text-ink">Revisar duplicados</h3>
@@ -364,7 +364,7 @@ export function DataSettings() {
           )}
         </div>
 
-        <div className="border-t border-line pt-5">
+        <div className="border-t border-line/70 pt-4">
           <h3 className="font-extrabold text-ink">Estado de sincronización</h3>
           <p className="mt-1 text-sm leading-6 text-secondary">
             {dataMode === 'cloud'

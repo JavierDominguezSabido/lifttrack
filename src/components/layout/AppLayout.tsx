@@ -39,14 +39,14 @@ export function AppLayout() {
     )?.[1] ?? 'LiftTrack'
 
   return (
-    <div className="min-h-dvh bg-canvas transition-colors lg:grid lg:grid-cols-[248px_1fr]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-line bg-surface px-4 py-6 lg:flex">
-        <div className="mb-10 flex items-center gap-3 px-2">
-          <span className="grid size-11 place-items-center rounded-2xl bg-hero text-hero-accent shadow-sm">
-            <Activity className="size-6" strokeWidth={2.5} />
+    <div className="min-h-dvh bg-canvas transition-colors lg:grid lg:grid-cols-[232px_1fr]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-line/70 bg-surface/80 px-3 py-5 backdrop-blur-xl lg:flex">
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <span className="grid size-10 place-items-center rounded-xl bg-hero text-hero-accent">
+            <Activity className="size-5" strokeWidth={2.5} />
           </span>
           <div>
-            <p className="text-lg font-extrabold tracking-tight">LiftTrack</p>
+            <p className="text-base font-extrabold tracking-tight">LiftTrack</p>
             <p className="text-xs font-medium text-subtle">Registro de entrenos</p>
           </div>
         </div>
@@ -58,7 +58,7 @@ export function AppLayout() {
               to={path}
               end={path === '/'}
               className={({ isActive }) =>
-                `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
+                `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition ${
                   isActive ? 'bg-brand-solid text-on-brand shadow-sm' : 'text-secondary hover:bg-muted hover:text-ink'
                 }`
               }
@@ -69,9 +69,9 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="mt-auto rounded-2xl bg-brand-soft p-4">
+        <div className="mt-auto rounded-xl border border-line/70 bg-raised p-3">
           <p className="text-xs font-bold uppercase tracking-wider text-brand">Semana activa</p>
-          <p className="mt-1 text-2xl font-extrabold text-ink">
+          <p className="mt-1 text-xl font-extrabold text-ink">
             {weeklySessionCount} / {activeTemplateCount}
           </p>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -84,14 +84,14 @@ export function AppLayout() {
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-line bg-canvas/90 px-4 backdrop-blur-xl md:px-8 lg:h-20">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line/70 bg-canvas/88 px-4 backdrop-blur-xl md:px-8 lg:h-16">
           <div className="min-w-0">
             <p className="hidden text-xs font-semibold capitalize text-subtle sm:block">{currentDate}</p>
-            <h1 className="truncate text-xl font-extrabold tracking-tight lg:text-2xl">{title}</h1>
+            <h1 className="truncate text-lg font-extrabold tracking-tight lg:text-xl">{title}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span
-              className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-extrabold ${
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-extrabold ${
                 dataMode === 'cloud'
                   ? 'bg-success-soft text-success-text'
                   : 'bg-muted text-secondary'
@@ -106,7 +106,7 @@ export function AppLayout() {
               </span>
             </span>
             <ThemeToggle />
-            <div aria-label="LiftTrack" className="grid size-10 place-items-center rounded-2xl bg-hero text-sm font-extrabold text-hero-accent shadow-sm">
+            <div aria-label="LiftTrack" className="grid size-9 place-items-center rounded-xl bg-hero text-xs font-extrabold text-hero-accent">
               LT
             </div>
           </div>
@@ -128,19 +128,19 @@ export function AppLayout() {
         </main>
       </div>
 
-      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[72px] grid-cols-5 border-t border-line bg-surface/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-nav backdrop-blur-xl lg:hidden">
+      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-5 border-t border-line/70 bg-surface/92 px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-nav backdrop-blur-xl lg:hidden">
         {navigation.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}
             end={path === '/'}
             className={({ isActive }) =>
-              `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5 text-xs font-bold transition ${
-                isActive ? 'bg-brand-soft text-brand' : 'text-subtle'
+              `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
+                isActive ? 'bg-brand-solid text-on-brand shadow-sm' : 'text-subtle'
               }`
             }
           >
-            <Icon className="size-5" strokeWidth={2.3} />
+            <Icon className="size-[18px]" strokeWidth={2.3} />
             {label}
           </NavLink>
         ))}

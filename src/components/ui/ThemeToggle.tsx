@@ -33,7 +33,7 @@ export function ThemeToggle() {
 
   return (
     <div
-      className="flex rounded-xl border border-control bg-surface p-1 shadow-sm"
+      className="flex rounded-lg border border-line bg-raised p-0.5"
       role="group"
       aria-label="Tema de la aplicación"
     >
@@ -42,9 +42,9 @@ export function ThemeToggle() {
         onClick={() => selectTheme('light')}
         aria-pressed={theme === 'light'}
         title="Modo claro"
-        className={`flex size-11 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition sm:w-auto sm:px-2.5 ${
+        className={`flex size-9 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition sm:w-auto sm:px-2.5 ${
           theme === 'light'
-            ? 'bg-brand-soft text-brand'
+            ? 'bg-brand-solid text-on-brand'
             : 'text-subtle hover:bg-muted hover:text-ink'
         }`}
       >
@@ -57,9 +57,9 @@ export function ThemeToggle() {
         onClick={() => selectTheme('dark')}
         aria-pressed={theme === 'dark'}
         title="Modo oscuro"
-        className={`flex size-11 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition sm:w-auto sm:px-2.5 ${
+        className={`flex size-9 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition sm:w-auto sm:px-2.5 ${
           theme === 'dark'
-            ? 'bg-brand-soft text-brand'
+            ? 'bg-brand-solid text-on-brand'
             : 'text-subtle hover:bg-muted hover:text-ink'
         }`}
       >

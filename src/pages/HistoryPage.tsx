@@ -203,7 +203,7 @@ export function HistoryPage() {
       )}
 
       <section aria-labelledby="exercise-progress-title" className="card overflow-hidden">
-        <div className="border-b border-line bg-muted/40 p-5 md:p-6">
+        <div className="border-b border-line/70 p-4 md:p-5">
           <p className="eyebrow">Progreso por ejercicio</p>
           <h2 id="exercise-progress-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
             Evolución
@@ -214,7 +214,7 @@ export function HistoryPage() {
         </div>
 
         {selectedExercise && selectedSummary ? (
-          <div className="space-y-5 p-5 md:p-6">
+          <div className="space-y-4 p-4 md:p-5">
             <div>
               <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
                 Ejercicio seleccionado
@@ -232,7 +232,7 @@ export function HistoryPage() {
             </div>
 
             <div className="min-w-0 space-y-5">
-              <div className="rounded-2xl border border-line bg-surface p-4">
+              <div className="rounded-xl bg-muted/45 p-3.5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="eyebrow">{selectedExercise.muscleGroup ?? 'Ejercicio'}</p>
@@ -250,7 +250,7 @@ export function HistoryPage() {
                       {selectedSummary.latestWeight} kg · {selectedSummary.latestReps || 'sin reps'}
                     </p>
                   </div>
-                  <span className="rounded-lg bg-muted px-2.5 py-1.5 text-xs font-bold text-secondary">
+                  <span className="rounded-md bg-raised px-2 py-1 text-xs font-bold text-secondary">
                     Peso de trabajo por fecha
                   </span>
                 </div>
@@ -271,7 +271,7 @@ export function HistoryPage() {
               {chartEntries.length > 0 ? (
                 <ProgressLineChart entries={chartEntries} />
               ) : (
-                <div className="rounded-2xl border border-dashed border-line bg-muted px-4 py-8 text-center">
+                <div className="rounded-xl border border-dashed border-line bg-muted/60 px-4 py-8 text-center">
                   <BarChart3 className="mx-auto size-7 text-subtle" aria-hidden="true" />
                   <p className="mt-2 text-sm font-semibold text-secondary">
                     Guarda una sesión con este ejercicio para ver su evolución.
@@ -279,8 +279,8 @@ export function HistoryPage() {
                 </div>
               )}
 
-              <div className="rounded-2xl border border-line bg-surface">
-                <div className="border-b border-line px-4 py-3">
+              <div className="rounded-xl border border-line/70 bg-surface">
+                <div className="border-b border-line/70 px-4 py-3">
                   <h4 className="font-extrabold text-ink">Registros recientes</h4>
                 </div>
                 <div className="divide-y divide-line px-4">
@@ -333,12 +333,12 @@ export function HistoryPage() {
         )}
       </section>
 
-      <section aria-labelledby="history-filters-title" className="card p-4 md:p-5">
-        <div className="mb-4 flex items-center gap-2">
+      <section aria-labelledby="history-filters-title" className="card p-3.5 md:p-4">
+        <div className="mb-3 flex items-center gap-2">
           <Filter className="size-5 text-brand" aria-hidden="true" />
           <h2 id="history-filters-title" className="font-extrabold text-ink">Filtros</h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Ejercicio</span>
             <select
@@ -701,13 +701,13 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   ).join(' ')
 
   return (
-    <div className="rounded-2xl border border-line bg-surface px-4 py-4 sm:px-5">
+    <div className="rounded-xl border border-line/70 bg-surface px-3.5 py-4 sm:px-5">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h4 className="font-extrabold text-ink">Peso de trabajo</h4>
           <p className="text-xs font-semibold text-secondary">Últimas {entries.length} sesiones registradas</p>
         </div>
-        <p className="rounded-lg bg-muted px-2.5 py-1 text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
+        <p className="rounded-md bg-muted px-2 py-1 text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
       </div>
 
       <div className="relative mt-4 h-48 overflow-visible" role="img" aria-label="Evolucion del peso de trabajo por fecha">
@@ -778,8 +778,8 @@ function HistoryStat({
   compact?: boolean
 }) {
   return (
-    <div className={`card flex ${compact ? 'min-h-20' : 'min-h-24'} items-center gap-3 p-3.5 sm:p-4 ${wide ? 'col-span-2 md:col-span-1' : ''}`}>
-      <span className={`${compact ? 'size-9' : 'size-10 sm:size-11'} grid shrink-0 place-items-center rounded-xl bg-brand-soft text-brand`}>
+    <div className={`card flex ${compact ? 'min-h-18' : 'min-h-20'} items-center gap-3 p-3 sm:p-3.5 ${wide ? 'col-span-2 md:col-span-1' : ''}`}>
+      <span className={`${compact ? 'size-8' : 'size-9'} grid shrink-0 place-items-center rounded-lg bg-muted text-brand`}>
         <Icon className={compact ? 'size-4' : 'size-5'} aria-hidden="true" />
       </span>
       <div className="min-w-0">
@@ -800,8 +800,8 @@ function EmptyHistoryState({
   showAction?: boolean
 }) {
   return (
-    <div className="card border-dashed px-5 py-12 text-center">
-      <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-muted text-subtle">
+    <div className="card border-dashed px-5 py-10 text-center">
+      <span className="mx-auto grid size-12 place-items-center rounded-xl bg-muted text-subtle">
         <Dumbbell className="size-7" aria-hidden="true" />
       </span>
       <h3 className="mt-4 text-lg font-extrabold text-ink">{title}</h3>

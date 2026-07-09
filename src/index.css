@@ -5,22 +5,22 @@
 @tailwind utilities;
 
 :root {
-  --color-canvas: 246 247 249;
+  --color-canvas: 242 244 247;
   --color-surface: 255 255 255;
-  --color-raised: 255 255 255;
-  --color-muted: 245 245 244;
-  --color-line: 226 224 221;
-  --color-control: 148 143 137;
-  --color-ink: 23 32 51;
-  --color-secondary: 87 83 78;
-  --color-subtle: 120 113 108;
+  --color-raised: 248 250 252;
+  --color-muted: 241 245 249;
+  --color-line: 220 226 235;
+  --color-control: 132 143 158;
+  --color-ink: 18 24 38;
+  --color-secondary: 80 91 107;
+  --color-subtle: 118 130 146;
   --color-brand: 194 65 12;
   --color-brand-hover: 154 52 18;
   --color-brand-solid: 194 65 12;
   --color-brand-solid-hover: 154 52 18;
-  --color-brand-soft: 255 237 213;
+  --color-brand-soft: 255 241 224;
   --color-on-brand: 255 255 255;
-  --color-hero: 23 32 51;
+  --color-hero: 18 24 38;
   --color-on-hero: 255 255 255;
   --color-hero-muted: 214 211 209;
   --color-hero-accent: 251 146 60;
@@ -41,22 +41,22 @@
 }
 
 :root.dark {
-  --color-canvas: 10 15 26;
-  --color-surface: 17 24 39;
-  --color-raised: 24 33 50;
-  --color-muted: 30 41 59;
-  --color-line: 55 65 81;
-  --color-control: 100 116 139;
-  --color-ink: 241 245 249;
-  --color-secondary: 203 213 225;
-  --color-subtle: 148 163 184;
+  --color-canvas: 7 11 18;
+  --color-surface: 13 19 30;
+  --color-raised: 17 25 38;
+  --color-muted: 22 31 45;
+  --color-line: 38 49 66;
+  --color-control: 82 96 116;
+  --color-ink: 239 244 250;
+  --color-secondary: 177 188 204;
+  --color-subtle: 119 134 155;
   --color-brand: 249 115 22;
   --color-brand-hover: 251 146 60;
   --color-brand-solid: 194 65 12;
   --color-brand-solid-hover: 154 52 18;
-  --color-brand-soft: 67 36 16;
+  --color-brand-soft: 54 35 22;
   --color-on-brand: 255 255 255;
-  --color-hero: 15 23 42;
+  --color-hero: 10 15 24;
   --color-on-hero: 248 250 252;
   --color-hero-muted: 203 213 225;
   --color-hero-accent: 251 146 60;
@@ -99,6 +99,9 @@
 
   body {
     @apply m-0 min-w-[320px] overflow-x-hidden bg-canvas font-sans text-ink antialiased;
+    background:
+      radial-gradient(circle at top right, rgb(var(--color-brand) / 0.08), transparent 28rem),
+      linear-gradient(180deg, rgb(var(--color-canvas)), rgb(var(--color-canvas)));
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -120,31 +123,31 @@
 
 @layer components {
   .card {
-    @apply rounded-3xl border border-line bg-surface shadow-card;
+    @apply rounded-2xl border border-line/80 bg-surface/95 shadow-card;
   }
 
   .eyebrow {
-    @apply text-xs font-bold uppercase tracking-[0.14em] text-subtle;
+    @apply text-[11px] font-extrabold uppercase tracking-[0.12em] text-subtle;
   }
 
   .btn-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-solid px-4 py-3 text-sm font-bold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-solid px-4 py-2.5 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .btn-secondary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-control bg-raised px-4 py-3 text-sm font-bold text-ink shadow-sm transition hover:bg-muted active:scale-[0.98];
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-raised px-4 py-2.5 text-sm font-bold text-secondary transition hover:border-control hover:bg-muted hover:text-ink active:scale-[0.98];
   }
 
   .input {
-    @apply min-h-12 w-full rounded-xl border border-control bg-raised px-3 py-2.5 text-center text-base font-bold text-ink outline-none transition placeholder:text-subtle focus:border-brand focus:ring-4 focus:ring-brand-soft;
+    @apply min-h-11 w-full rounded-lg border border-control bg-raised px-3 py-2 text-center text-base font-bold text-ink outline-none transition placeholder:text-subtle focus:border-brand focus:ring-4 focus:ring-brand-soft;
   }
 
   .status-success {
-    @apply flex items-start gap-2 rounded-2xl border border-success/40 bg-success-soft px-4 py-3 text-sm font-semibold text-success-text;
+    @apply flex items-start gap-2 rounded-xl border border-success/30 bg-success-soft px-3 py-2.5 text-sm font-semibold text-success-text;
   }
 
   .status-error {
-    @apply flex items-start gap-2 rounded-2xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-text;
+    @apply flex items-start gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm font-semibold text-danger-text;
   }
 
   .no-scrollbar {

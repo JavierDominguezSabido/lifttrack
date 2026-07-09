@@ -12,13 +12,13 @@ export function TemplateExerciseRow({
   if (!exercise) return null
 
   return (
-    <div className="flex min-h-16 items-center gap-3 py-3">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-sm font-extrabold text-secondary">
+    <div className="flex min-h-14 items-center gap-3 py-2.5">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-xs font-extrabold text-secondary">
         {item.order}
       </span>
       <div className="min-w-0 flex-1">
         <p className="break-words text-sm font-extrabold leading-tight text-ink">{exercise.name}</p>
-        <p className="mt-1 text-xs font-medium text-secondary">
+        <p className="mt-0.5 text-xs font-medium text-secondary">
           {exercise.muscleGroup}{exercise.equipment ? ` · ${exercise.equipment}` : ''}
         </p>
       </div>

@@ -16,7 +16,7 @@ export function RoutinePage() {
   )
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-4 md:space-y-5">
       <div className="grid gap-3 sm:flex sm:items-start sm:justify-between">
         <p className="max-w-xl text-base leading-6 text-secondary">
           Consulta tu planificación semanal y empieza el entrenamiento de cada día.
@@ -26,8 +26,8 @@ export function RoutinePage() {
         </Link>
       </div>
 
-      <section aria-labelledby="week-overview-title" className="card p-4 md:p-5">
-        <h2 id="week-overview-title" className="mb-4 text-sm font-extrabold text-ink">
+      <section aria-labelledby="week-overview-title" className="card p-3.5 md:p-4">
+        <h2 id="week-overview-title" className="mb-3 text-sm font-extrabold text-ink">
           Vista semanal
         </h2>
         <div className="grid grid-cols-7 gap-2">
@@ -37,8 +37,8 @@ export function RoutinePage() {
             return (
               <div key={`${day}-${index}`} className="text-center">
                 <p className="mb-2 text-xs font-bold text-secondary">{day}</p>
-                <div className={`mx-auto grid size-10 place-items-center rounded-xl text-sm font-bold ${
-                  active ? 'bg-hero text-hero-accent shadow-sm' : 'bg-muted text-subtle'
+                <div className={`mx-auto grid size-9 place-items-center rounded-lg text-sm font-bold ${
+                  active ? 'bg-brand-solid text-on-brand shadow-sm' : 'bg-muted text-subtle'
                 }`}>
                   {active ? <Dumbbell className="size-4" aria-hidden="true" /> : '—'}
                 </div>
@@ -48,15 +48,15 @@ export function RoutinePage() {
         </div>
       </section>
 
-      <section aria-label="Rutina semanal" className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      <section aria-label="Rutina semanal" className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {orderedTemplates.map((template) => (
           <article key={template.id} className="card flex flex-col overflow-hidden">
-            <header className="border-b border-line bg-muted/40 p-5">
+            <header className="border-b border-line/70 p-4">
               <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand">
                 <CalendarDays className="size-3.5" aria-hidden="true" />
                 {dayNames[template.dayOfWeek]}
               </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-ink">
+              <h2 className="mt-1.5 text-xl font-extrabold tracking-tight text-ink">
                 {template.name}
               </h2>
               {template.notes && (
@@ -64,14 +64,14 @@ export function RoutinePage() {
               )}
             </header>
 
-            <div className="flex-1 divide-y divide-line px-5 py-1">
+            <div className="flex-1 divide-y divide-line/70 px-4 py-1">
               {template.exercises.map((item) => {
                 const exercise = getExerciseById(item.exerciseId)
                 return (
                   <div key={item.id}>
                     <TemplateExerciseRow item={item} exercise={exercise} />
                     {(exercise?.notes || item.notes) && (
-                      <div className="-mt-2 mb-3 ml-[52px] space-y-1.5">
+                      <div className="-mt-1 mb-2 ml-11 space-y-1.5">
                         {exercise?.notes && (
                           <p className="rounded-lg bg-warning-soft px-2.5 py-2 text-xs font-medium text-warning-text">
                             <strong>Técnica:</strong> {exercise.notes}
@@ -94,7 +94,7 @@ export function RoutinePage() {
               )}
             </div>
 
-            <footer className="p-4 pt-2">
+            <footer className="p-3.5 pt-2">
               {template.exercises.length > 0 ? (
                 <Link
                   to={`/entrenamiento/${template.id}`}

@@ -887,7 +887,7 @@ export function WorkoutPage() {
   return (
     <div className="space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
       {viewMode === 'guided' ? (
-        <section className="rounded-2xl border border-line bg-surface px-4 py-3 shadow-sm">
+        <section className="rounded-2xl border border-line/70 bg-surface/90 px-3.5 py-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="truncate text-lg font-extrabold text-ink">{template.name}</h2>
             <span className="shrink-0 text-sm font-extrabold text-secondary">
@@ -916,7 +916,7 @@ export function WorkoutPage() {
           )}
         </section>
       ) : (
-        <section className="overflow-hidden rounded-3xl bg-hero p-4 text-on-hero shadow-card md:p-5">
+        <section className="overflow-hidden rounded-2xl border border-line/70 bg-hero p-4 text-on-hero shadow-card md:p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-hero-accent">Entrenar</p>
@@ -1003,11 +1003,11 @@ export function WorkoutPage() {
         </section>
       )}
 
-      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-surface p-1.5 shadow-sm">
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
         <button
           type="button"
           onClick={() => setViewMode('full')}
-          className={`min-h-11 rounded-xl px-3 text-sm font-extrabold transition ${
+          className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
             viewMode === 'full'
               ? 'bg-brand-solid text-on-brand shadow-sm'
               : 'text-secondary hover:bg-muted'
@@ -1018,7 +1018,7 @@ export function WorkoutPage() {
         <button
           type="button"
           onClick={enterGuidedMode}
-          className={`min-h-11 rounded-xl px-3 text-sm font-extrabold transition ${
+          className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
             viewMode === 'guided'
               ? 'bg-brand-solid text-on-brand shadow-sm'
               : 'text-secondary hover:bg-muted'
@@ -1075,11 +1075,11 @@ export function WorkoutPage() {
               </div>
             </div>
           ) : currentGuidedStep ? (
-            <div className="mx-auto max-w-xl space-y-4 p-4 sm:p-5">
+            <div className="mx-auto max-w-lg space-y-3 p-3.5 sm:p-4">
               {guidedFeedback && (
                 <div
                   role="status"
-                  className="rounded-2xl border border-success/30 bg-success-soft px-4 py-2 text-center shadow-sm transition-all duration-300"
+                  className="rounded-xl border border-success/30 bg-success-soft px-3 py-2 text-center transition-all duration-300"
                 >
                   <p className="text-sm font-extrabold text-success-text">{guidedFeedback.message}</p>
                   {guidedFeedback.detail && (
@@ -1090,13 +1090,13 @@ export function WorkoutPage() {
 
               <div
                 key={guidedStepAnimationKey}
-                className="space-y-4 animate-[guidedStepIn_220ms_ease-out]"
+                className="space-y-3 animate-[guidedStepIn_220ms_ease-out]"
               >
                 <div className="text-center">
                   <p className="text-xs font-bold uppercase tracking-wider text-secondary">
                     {currentGuidedStep.exercise?.muscleGroup ?? 'Ejercicio'}
                   </p>
-                  <h3 className="mt-1 text-3xl font-extrabold tracking-tight text-ink">
+                  <h3 className="mt-1 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
                     {currentGuidedStep.exercise?.name ?? 'Ejercicio'}
                   </h3>
                   <div className="mt-2 space-y-2">
@@ -1104,7 +1104,7 @@ export function WorkoutPage() {
                       Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
                     </p>
                     {currentGuidedStep.set.completed && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success-soft px-2 py-1 text-xs font-extrabold text-success-text">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success-soft px-2 py-0.5 text-xs font-extrabold text-success-text">
                         <CheckCircle2 className="size-3.5" aria-hidden="true" />
                         Completada
                       </span>
@@ -1127,7 +1127,7 @@ export function WorkoutPage() {
                                   ? `Serie ${set.setNumber} actual`
                                   : `Serie ${set.setNumber} pendiente`
                             }
-                            className={`inline-flex size-7 items-center justify-center rounded-full border text-xs font-extrabold leading-none transition ${
+                            className={`inline-flex size-7 items-center justify-center rounded-lg border text-xs font-extrabold leading-none transition ${
                               set.completed && isCurrent
                                 ? 'border-brand bg-success-soft text-success-text shadow-sm ring-2 ring-brand'
                                 : set.completed
@@ -1149,14 +1149,14 @@ export function WorkoutPage() {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+                <div className="rounded-2xl bg-muted/45 p-3.5">
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
                     <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
                       <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
                       <span className="relative block">
                         <input
                           id={`guided-weight-${currentGuidedStep.log.id}`}
-                          className="min-h-12 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                          className="min-h-11 w-full rounded-lg border border-control bg-surface py-2 pl-3 pr-10 text-xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                           type="number"
                           inputMode="decimal"
                           min="0"
@@ -1172,7 +1172,7 @@ export function WorkoutPage() {
                     <button
                       type="button"
                       onClick={() => updateGuidedWeight(getWorkingWeight(currentGuidedStep.log) + 1.25)}
-                      className="min-h-12 whitespace-nowrap rounded-xl bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
+                      className="min-h-11 whitespace-nowrap rounded-lg bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
                     >
                       +1.25 kg
                     </button>
@@ -1181,7 +1181,7 @@ export function WorkoutPage() {
                   <label className="mt-4 block">
                     <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Reps reales</span>
                     <input
-                      className="min-h-16 w-full rounded-2xl border border-control bg-raised px-4 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                      className="min-h-14 w-full rounded-xl border border-control bg-surface px-4 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"

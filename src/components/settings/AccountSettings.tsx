@@ -102,7 +102,7 @@ export function AccountSettings() {
 
   return (
     <section className="card overflow-hidden" aria-labelledby="account-settings-title">
-      <div className="flex flex-wrap items-start justify-between gap-4 p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-4 md:p-5">
         <div>
           <p className="eyebrow">Cuenta</p>
           <h2 id="account-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
@@ -110,7 +110,7 @@ export function AccountSettings() {
           </h2>
           {user?.email && <p className="mt-1 break-all text-sm font-semibold text-secondary">{user.email}</p>}
         </div>
-        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ${
+        <span className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-extrabold ${
           dataMode === 'cloud'
             ? 'bg-success-soft text-success-text'
             : 'bg-muted text-secondary'
@@ -122,12 +122,12 @@ export function AccountSettings() {
         </span>
       </div>
 
-      <div className="space-y-4 border-t border-line p-5 md:p-6">
+      <div className="space-y-3 border-t border-line/70 p-4 md:p-5">
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p role="alert" className="status-error">{error}</p>}
 
         {!configured ? (
-          <p className="rounded-2xl border border-warning/40 bg-warning-soft p-4 text-sm font-semibold text-warning-text">
+          <p className="rounded-xl border border-warning/30 bg-warning-soft/80 p-3 text-sm font-semibold text-warning-text">
             La sincronización en la nube no está configurada. LiftTrack guarda los datos en este dispositivo.
           </p>
         ) : loading ? (
@@ -148,7 +148,7 @@ export function AccountSettings() {
             </button>
 
             {localCount > 0 && (
-              <div className="rounded-2xl border border-brand/30 bg-brand-soft p-4 sm:col-span-2">
+              <div className="rounded-xl border border-brand/20 bg-brand-soft/60 p-3.5 sm:col-span-2">
                 <p className="font-extrabold text-ink">Datos locales disponibles</p>
                 <p className="mt-1 text-sm leading-6 text-secondary">
                   Hay {localCount} entrenamiento{localCount === 1 ? '' : 's'} local{localCount === 1 ? '' : 'es'}.
@@ -167,11 +167,11 @@ export function AccountSettings() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
               <button
                 type="button"
                 onClick={() => setMode('signin')}
-                className={`min-h-11 rounded-xl text-sm font-bold ${
+                className={`min-h-10 rounded-lg text-sm font-bold ${
                   mode === 'signin' ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
                 }`}
               >
@@ -180,7 +180,7 @@ export function AccountSettings() {
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className={`min-h-11 rounded-xl text-sm font-bold ${
+                className={`min-h-10 rounded-lg text-sm font-bold ${
                   mode === 'signup' ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
                 }`}
               >

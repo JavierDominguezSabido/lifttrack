@@ -172,7 +172,7 @@ export function SettingsPage() {
 
   if (settingsView === 'routine') {
     return (
-      <div className="space-y-5 md:space-y-6">
+      <div className="space-y-4 md:space-y-5">
         <SettingsSubpageHeader
           eyebrow="Rutina"
           title="Editar rutina"
@@ -188,7 +188,7 @@ export function SettingsPage() {
         <section aria-label="Editar entrenamientos por día" className="space-y-4">
           {orderedDrafts.map((template) => (
             <article key={template.id} className="card overflow-hidden">
-              <header className="border-b border-line bg-muted/40 p-4 sm:p-5">
+              <header className="border-b border-line/70 p-3.5 sm:p-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-brand">
                   {dayNames[template.dayOfWeek]}
                 </p>
@@ -196,7 +196,7 @@ export function SettingsPage() {
                 {template.notes && <p className="mt-1 text-sm text-secondary">{template.notes}</p>}
               </header>
 
-              <div className="space-y-3 p-3 sm:p-4">
+              <div className="space-y-2.5 p-3 sm:p-4">
                 {template.exercises.map((item, index) => (
                   <RoutineExerciseEditor
                     key={item.id}
@@ -216,7 +216,7 @@ export function SettingsPage() {
                   </p>
                 )}
 
-                <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto]">
+                <div className="grid gap-2 border-t border-line/70 pt-3 sm:grid-cols-[1fr_auto]">
                   <select
                     aria-label={`Ejercicio para ${template.name}`}
                     value={daySelections[template.id] ?? ''}
@@ -248,7 +248,7 @@ export function SettingsPage() {
                 </button>
               </div>
 
-              <div className="border-t border-line p-3 sm:p-4">
+              <div className="border-t border-line/70 p-3 sm:p-4">
                 <Link to={`/entrenamiento/${template.id}`} className="text-sm font-bold text-brand">
                   Entrenar {template.name.toLowerCase()}
                 </Link>
@@ -257,7 +257,7 @@ export function SettingsPage() {
           ))}
         </section>
 
-        <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 grid gap-2 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4">
+        <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 grid gap-2 rounded-xl border border-line/70 bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4">
           <button type="button" onClick={openOverview} className="btn-secondary w-full">
             Volver a configuración
           </button>
@@ -282,7 +282,7 @@ export function SettingsPage() {
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p role="alert" className="status-error">{error}</p>}
 
-        <section className="card space-y-4 p-4 sm:p-5">
+        <section className="card space-y-3 p-3.5 sm:p-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
             <label className="block">
               <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
@@ -310,7 +310,7 @@ export function SettingsPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1.5">
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
             {([
               ['active', 'Activos'],
               ['all', 'Todos'],
@@ -320,7 +320,7 @@ export function SettingsPage() {
                 key={value}
                 type="button"
                 onClick={() => setExerciseStatus(value)}
-                className={`min-h-11 rounded-xl px-1 text-xs font-bold transition sm:text-sm ${
+                className={`min-h-10 rounded-lg px-1 text-xs font-bold transition sm:text-sm ${
                   exerciseStatus === value ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
                 }`}
               >
@@ -345,7 +345,7 @@ export function SettingsPage() {
 
         <div className="grid gap-3 md:grid-cols-2">
           {filteredExercises.map((exercise) => (
-            <article key={exercise.id} className={`card p-4 ${exercise.active ? '' : 'opacity-70'}`}>
+            <article key={exercise.id} className={`card p-3.5 ${exercise.active ? '' : 'opacity-70'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="break-words font-extrabold text-ink">{exercise.name}</h3>
@@ -406,11 +406,11 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+      <div className="space-y-4 md:space-y-5">
       <AccountSettings />
 
       <section className="card overflow-hidden" aria-labelledby="appearance-settings-title">
-        <div className="flex flex-wrap items-center justify-between gap-4 p-5 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 md:p-5">
           <div>
             <p className="eyebrow">Apariencia</p>
             <h2 id="appearance-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
@@ -425,11 +425,11 @@ export function SettingsPage() {
       </section>
 
       <section className="card overflow-hidden" aria-labelledby="routine-settings-title">
-        <header className="border-b border-line bg-muted/40 p-5 md:p-6">
+        <header className="border-b border-line/70 p-4 md:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="eyebrow">Rutina</p>
-              <h2 id="routine-settings-title" className="mt-1 text-2xl font-extrabold tracking-tight text-ink">
+              <h2 id="routine-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
                 Rutina y ejercicios
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
@@ -442,10 +442,10 @@ export function SettingsPage() {
           </div>
         </header>
 
-        <div className="space-y-4 p-5 md:p-6">
+        <div className="space-y-3 p-4 md:p-5">
           <div className="grid gap-2 sm:grid-cols-2">
             {orderedDrafts.map((template) => (
-              <div key={template.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-raised px-4 py-3">
+              <div key={template.id} className="flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-raised px-3 py-2.5">
                 <span className="font-bold text-ink">{dayNames[template.dayOfWeek]}</span>
                 <span className="text-sm font-semibold text-secondary">
                   {template.exercises.length > 0
@@ -487,8 +487,8 @@ function SettingsSubpageHeader({
   onBack: () => void
 }) {
   return (
-    <section className="card p-5 md:p-6">
-      <button type="button" onClick={onBack} className="btn-secondary mb-4">
+    <section className="card p-4 md:p-5">
+      <button type="button" onClick={onBack} className="btn-secondary mb-3">
         <ArrowLeft className="size-4" /> Volver a configuración
       </button>
       <p className="eyebrow">{eyebrow}</p>
@@ -518,19 +518,19 @@ function RoutineExerciseEditor({
   onError: (message: string | null) => void
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-raised p-3">
+    <div className="rounded-xl border border-line/70 bg-raised p-3">
       <div className="flex items-start gap-2">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-sm font-extrabold">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-xs font-extrabold">
           {item.order}
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-extrabold text-ink">{exercise?.name ?? 'Ejercicio no disponible'}</p>
           <p className="text-xs text-secondary">{exercise?.muscleGroup || 'Sin grupo muscular'}</p>
         </div>
-        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-11 place-items-center rounded-xl border border-line disabled:opacity-30" aria-label="Subir">
+        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-10 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label="Subir">
           <ArrowUp className="size-4" />
         </button>
-        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-11 place-items-center rounded-xl border border-line disabled:opacity-30" aria-label="Bajar">
+        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-10 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label="Bajar">
           <ArrowDown className="size-4" />
         </button>
       </div>

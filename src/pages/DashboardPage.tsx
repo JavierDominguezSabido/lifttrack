@@ -54,9 +54,8 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5 md:space-y-6">
-      <section className="relative overflow-hidden rounded-3xl bg-hero text-on-hero shadow-card">
-        <div className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-hero-accent/15" />
-        <div className="relative grid gap-6 p-6 md:grid-cols-[1fr_auto] md:p-8">
+      <section className="relative overflow-hidden rounded-2xl border border-line/70 bg-hero text-on-hero shadow-card">
+        <div className="relative grid gap-4 p-4 md:grid-cols-[1fr_auto] md:p-6">
           <div>
             <p className="eyebrow !text-hero-accent">
               {heroState === 'week-complete'
@@ -65,7 +64,7 @@ export function DashboardPage() {
                   ? 'Entrenamiento de hoy completado'
                   : 'Tu próximo entrenamiento'}
             </p>
-            <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
+            <h2 className="mt-1 text-2xl font-extrabold tracking-tight md:text-3xl">
               {heroState === 'week-complete'
                 ? 'Todos los entrenamientos hechos'
                 : heroState === 'today-complete'
@@ -79,7 +78,7 @@ export function DashboardPage() {
                   ? `Próximo entrenamiento: ${heroTemplate?.name ?? 'sin pendientes'}`
                   : heroTemplate?.notes}
             </p>
-            <div className="mt-5 flex flex-wrap gap-4 text-sm text-hero-muted">
+            <div className="mt-4 flex flex-wrap gap-3 text-sm text-hero-muted">
               {heroState === 'week-complete' ? (
                 <span className="flex items-center gap-2">
                   <CheckCircle2 className="size-4 text-hero-accent" />
@@ -107,7 +106,7 @@ export function DashboardPage() {
               : heroTemplate
                 ? `/entrenamiento/${heroTemplate.id}`
                 : '/rutina'}
-            className="btn-primary self-end !min-h-12 !text-base md:min-w-44"
+            className="btn-primary self-end !min-h-11 md:min-w-40"
           >
             {heroState === 'week-complete'
               ? 'Ver historial'
@@ -119,7 +118,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-2 sm:grid-cols-3">
         <StatCard
           icon={CalendarCheck}
           label="Esta semana"
@@ -195,7 +194,7 @@ export function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <div className="card p-5 md:p-6">
+        <div className="card p-4 md:p-5">
           <div className="mb-3 flex items-start justify-between">
             <div>
               <p className="eyebrow">Próxima sesión</p>
@@ -222,18 +221,18 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="card p-5 md:p-6">
+        <div className="card p-4 md:p-5">
           <p className="eyebrow">Objetivo semanal</p>
-          <div className="mt-6">
+          <div className="mt-4">
             <ProgressRing
               value={weeklyProgressValue}
               label={`${completedRoutineDays} de ${activeTemplates.length} días`}
               detail="Progreso de la rutina semanal."
             />
           </div>
-          <div className="mt-7 border-t border-line pt-5">
+          <div className="mt-5 border-t border-line/70 pt-4">
             <p className="text-sm font-bold">Última sesión</p>
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-muted p-3">
+            <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/70 p-2.5">
               <div>
                 <p className="text-sm font-semibold">{recentSessions[0]?.name ?? 'Sin sesiones'}</p>
                 <p className="text-xs text-secondary">
@@ -260,9 +259,9 @@ export function DashboardPage() {
 }
 
 const tones = {
-  orange: 'bg-brand-soft text-brand',
-  blue: 'bg-warning-soft text-warning-text',
-  purple: 'bg-brand-soft text-brand'
+  orange: 'bg-brand-soft/70 text-brand',
+  blue: 'bg-muted text-secondary',
+  purple: 'bg-muted text-secondary'
 }
 
 function StatCard({
@@ -279,13 +278,13 @@ function StatCard({
   tone: keyof typeof tones
 }) {
   return (
-    <div className="card flex min-h-24 items-center gap-3 p-3.5 sm:gap-4 sm:p-4">
-      <span className={`grid size-10 shrink-0 place-items-center rounded-xl sm:size-11 ${tones[tone]}`}>
+    <div className="card flex min-h-20 items-center gap-3 p-3 sm:p-3.5">
+      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${tones[tone]}`}>
         <Icon className="size-5" />
       </span>
       <div>
         <p className="text-xs font-semibold leading-tight text-secondary">{label}</p>
-        <p className="mt-1 text-lg font-extrabold leading-tight sm:text-xl">
+        <p className="mt-0.5 text-lg font-extrabold leading-tight">
           {value}{' '}
           <span className="block text-[11px] font-semibold text-secondary sm:inline sm:text-xs">
             {suffix}
