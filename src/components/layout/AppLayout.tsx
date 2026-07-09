@@ -112,7 +112,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
+        <main className="mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
           {sessionsLoading ? (
             <p role="status" className="mb-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-secondary">
               Cargando entrenamientos…

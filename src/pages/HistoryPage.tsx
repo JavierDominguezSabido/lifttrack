@@ -473,14 +473,14 @@ function SessionCard({
 
   return (
     <article className="card overflow-hidden">
-      <header className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
+      <header className="p-3.5 sm:p-5">
+        <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand">
               <CalendarDays className="size-3.5" aria-hidden="true" />
               {dayNames[sessionDate.getDay()]}
             </p>
-            <h3 className="mt-1 break-words text-lg font-extrabold text-ink">
+            <h3 className="mt-0.5 break-words text-base font-extrabold leading-snug text-ink sm:text-lg">
               {formatDate(sessionDate, {
                 weekday: 'long',
                 day: 'numeric',
@@ -488,8 +488,12 @@ function SessionCard({
                 year: 'numeric'
               })}
             </h3>
-            <p className="mt-1 text-sm font-medium text-secondary">
-              {session.exerciseLogs.length} ejercicios · {completedSets} series · {formatCompactNumber(volume)} kg
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-secondary sm:text-sm">
+              <span>{session.exerciseLogs.length} ejercicios</span>
+              <span aria-hidden="true">·</span>
+              <span>{completedSets} series</span>
+              <span aria-hidden="true">·</span>
+              <span className="whitespace-nowrap">{formatCompactNumber(volume)} kg</span>
             </p>
           </div>
           <span className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold ${
@@ -501,11 +505,11 @@ function SessionCard({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
           <button
             type="button"
             onClick={onToggle}
-            className="btn-secondary !min-h-11 !px-2 !py-2.5 text-xs sm:text-sm"
+            className="btn-secondary !min-h-10 !px-2 !py-2 text-xs sm:!min-h-11 sm:text-sm"
             aria-expanded={expanded}
           >
             {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
@@ -513,7 +517,7 @@ function SessionCard({
           </button>
           <Link
             to={`/historial/sesion/${session.id}/editar`}
-            className="btn-secondary !min-h-11 !px-2 !py-2.5 text-xs sm:text-sm"
+            className="btn-secondary !min-h-10 !px-2 !py-2 text-xs sm:!min-h-11 sm:text-sm"
           >
             <Edit3 className="size-4" aria-hidden="true" />
             Editar
@@ -521,11 +525,10 @@ function SessionCard({
           <button
             type="button"
             onClick={onDelete}
-            className="col-span-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-raised px-3 text-sm font-bold text-secondary transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98] sm:col-span-1 sm:grid sm:w-11 sm:px-0"
+            className="inline-flex min-h-10 w-11 items-center justify-center rounded-xl border border-line bg-transparent text-subtle transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98] sm:min-h-11"
             aria-label="Borrar sesión"
           >
             <Trash2 className="size-4" aria-hidden="true" />
-            <span className="sm:hidden">Borrar</span>
           </button>
         </div>
       </header>

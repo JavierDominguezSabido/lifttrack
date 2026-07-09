@@ -155,39 +155,42 @@ export function DashboardPage() {
             Ver rutina
           </Link>
         </div>
-        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-7 md:px-0">
-          {orderedTemplates.map((template) => {
-            const completed = completedDays.has(template.dayOfWeek)
-            const isNext = !weekCompleted && heroTemplate?.id === template.id
-            const hasExercises = template.exercises.length > 0
+        <div className="relative -mx-4 overflow-hidden md:mx-0">
+          <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 pr-10 md:grid md:grid-cols-7 md:overflow-visible md:px-0 md:pr-0">
+            {orderedTemplates.map((template) => {
+              const completed = completedDays.has(template.dayOfWeek)
+              const isNext = !weekCompleted && heroTemplate?.id === template.id
+              const hasExercises = template.exercises.length > 0
 
-            return (
-              <Link
-                key={template.id}
-                to={hasExercises ? `/entrenamiento/${template.id}` : '/configuracion'}
-                className={`card min-w-36 snap-start p-4 transition hover:-translate-y-0.5 hover:border-brand ${
-                  completed
-                    ? '!border-success/50 bg-success-soft/40'
-                    : isNext
-                      ? '!border-brand ring-2 ring-brand-soft'
-                      : ''
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className={`text-xs font-extrabold uppercase tracking-wider ${completed ? 'text-success-text' : 'text-brand'}`}>
-                    {template.name}
+              return (
+                <Link
+                  key={template.id}
+                  to={hasExercises ? `/entrenamiento/${template.id}` : '/configuracion'}
+                  className={`card min-w-36 snap-start scroll-ml-4 p-4 transition hover:-translate-y-0.5 hover:border-brand md:min-w-0 ${
+                    completed
+                      ? '!border-success/50 bg-success-soft/40'
+                      : isNext
+                        ? '!border-brand ring-2 ring-brand-soft'
+                        : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`text-xs font-extrabold uppercase tracking-wider ${completed ? 'text-success-text' : 'text-brand'}`}>
+                      {template.name}
+                    </p>
+                    {completed && (
+                      <CheckCircle2 className="size-4 shrink-0 text-success-text" aria-hidden="true" />
+                    )}
+                  </div>
+                  <p className="mt-2 text-2xl font-extrabold text-ink">{template.exercises.length}</p>
+                  <p className="text-xs font-medium text-secondary">
+                    {!hasExercises ? 'sin ejercicios' : completed ? 'completado esta semana' : 'pendiente'}
                   </p>
-                  {completed && (
-                    <CheckCircle2 className="size-4 shrink-0 text-success-text" aria-hidden="true" />
-                  )}
-                </div>
-                <p className="mt-2 text-2xl font-extrabold text-ink">{template.exercises.length}</p>
-                <p className="text-xs font-medium text-secondary">
-                  {!hasExercises ? 'sin ejercicios' : completed ? 'completado esta semana' : 'pendiente'}
-                </p>
-              </Link>
-            )
-          })}
+                </Link>
+              )
+            })}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-canvas to-transparent md:hidden" />
         </div>
       </section>
 

@@ -885,7 +885,7 @@ export function WorkoutPage() {
   }
 
   return (
-    <div className="space-y-4 pb-24 sm:space-y-5">
+    <div className="space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
       {viewMode === 'guided' ? (
         <section className="rounded-2xl border border-line bg-surface px-4 py-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -908,8 +908,10 @@ export function WorkoutPage() {
             />
           </div>
           {(draftActive || (hasDraftState && !pendingDraft)) && (
-            <div className="mt-2 text-xs">
-              <span className="font-bold text-secondary">{draftStatusLabel}</span>
+            <div className="mt-2 flex items-center">
+              <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-extrabold leading-none text-secondary">
+                {draftStatusLabel}
+              </span>
             </div>
           )}
         </section>
@@ -927,7 +929,9 @@ export function WorkoutPage() {
                 <span>{progress.completed}/{progress.total} series</span>
                 <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
                 {(draftActive || (hasDraftState && !pendingDraft)) && (
-                  <span className="font-extrabold text-hero-accent">{draftStatusLabel}</span>
+                  <span className="rounded-full bg-on-hero/10 px-2 py-0.5 text-xs font-extrabold text-hero-accent">
+                    {draftStatusLabel}
+                  </span>
                 )}
               </div>
               {(draftActive || (hasDraftState && !pendingDraft)) && (
