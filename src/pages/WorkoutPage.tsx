@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useAuth } from '../context/AuthContext'
@@ -34,13 +34,29 @@ type WorkoutViewMode = 'full' | 'guided'
 type DraftSyncStatus = 'idle' | 'local' | 'pending' | 'synced'
 
 interface GuidedPosition {
-  logId: string
+  exerciseId?: string
+  logId?: string
   setId: string
 }
 
 interface GuidedFeedback {
   message: string
   detail?: string
+}
+
+function normalizeGuidedPosition(
+  logs: DraftExerciseLog[],
+  guidedPosition: GuidedPosition | null
+): GuidedPosition | null {
+  if (!guidedPosition) return null
+  const log = logs.find((entry) =>
+    guidedPosition.exerciseId
+      ? entry.exerciseId === guidedPosition.exerciseId
+      : entry.id === guidedPosition.logId
+  )
+  const set = log?.sets.find((item) => item.id === guidedPosition.setId)
+  if (!log || !set) return null
+  return { exerciseId: log.exerciseId, setId: set.id }
 }
 
 const WORKOUT_DRAFT_VERSION = 1
@@ -80,6 +96,7 @@ function createStoredWorkoutDraft(
   guidedPosition: GuidedPosition | null,
   updatedAt = new Date().toISOString()
 ): StoredWorkoutDraft {
+  const normalizedGuidedPosition = normalizeGuidedPosition(logs, guidedPosition)
   return {
     version: WORKOUT_DRAFT_VERSION,
     userKey,
@@ -89,7 +106,7 @@ function createStoredWorkoutDraft(
     logs,
     updatedAt,
     viewMode,
-    guidedPosition: guidedPosition ?? undefined
+    guidedPosition: normalizedGuidedPosition ?? undefined
   }
 }
 
@@ -324,13 +341,16 @@ export function WorkoutPage() {
     }))
   }), [getExerciseById, logs, template.exercises])
   const firstPendingStep = guidedSteps.find((step) => !step.set.completed) ?? null
+  const fallbackGuidedStep = firstPendingStep ?? guidedSteps[0] ?? null
   const selectedGuidedStep = guidedSteps.find((step) =>
-    step.log.id === guidedPosition?.logId && step.set.id === guidedPosition.setId
+    step.set.id === guidedPosition?.setId &&
+    (
+      step.log.exerciseId === guidedPosition.exerciseId ||
+      (!guidedPosition.exerciseId && step.log.id === guidedPosition.logId)
+    )
   ) ?? null
   const guidedIsComplete = guidedSteps.length > 0 && guidedSteps.every((step) => step.set.completed)
-  const currentGuidedStep = !guidedIsComplete && selectedGuidedStep && !selectedGuidedStep.set.completed
-    ? selectedGuidedStep
-    : firstPendingStep
+  const currentGuidedStep = selectedGuidedStep ?? (!guidedPosition && !guidedIsComplete ? fallbackGuidedStep : null)
   const currentGuidedIndex = currentGuidedStep
     ? guidedSteps.findIndex((step) =>
         step.log.id === currentGuidedStep.log.id && step.set.id === currentGuidedStep.set.id
@@ -367,23 +387,78 @@ export function WorkoutPage() {
         ? 'Pendiente de sincronizar'
         : 'Borrador guardado localmente'
 
+  const getGuidedPositionFromStep = useCallback((step: (typeof guidedSteps)[number]): GuidedPosition => {
+    return { exerciseId: step.log.exerciseId, setId: step.set.id }
+  }, [])
+
+  function getSetNumberFromSetId(setId: string) {
+    const match = setId.match(/-set-(\d+)$/)
+    if (!match) return null
+    const setNumber = Number(match[1])
+    return Number.isInteger(setNumber) && setNumber > 0 ? setNumber : null
+  }
+
+  const findRecoveryGuidedStep = useCallback((position: GuidedPosition | null) => {
+    if (guidedSteps.length === 0) return null
+    if (!position) return firstPendingStep ?? guidedSteps[0]
+
+    const exerciseSteps = guidedSteps.filter((step) =>
+      position.exerciseId
+        ? step.log.exerciseId === position.exerciseId
+        : step.log.id === position.logId
+    )
+    if (exerciseSteps.length > 0) {
+      const removedSetNumber = getSetNumberFromSetId(position.setId)
+      if (removedSetNumber) {
+        return (
+          exerciseSteps.find((step) => step.set.setNumber >= removedSetNumber) ??
+          exerciseSteps[exerciseSteps.length - 1]
+        )
+      }
+      return exerciseSteps[exerciseSteps.length - 1]
+    }
+
+    return firstPendingStep ?? guidedSteps[0]
+  }, [firstPendingStep, guidedSteps])
+
   useEffect(() => {
-    if (viewMode !== 'guided' || guidedSteps.length === 0) return
+    if (viewMode !== 'guided') return
+    if (guidedSteps.length === 0) {
+      if (guidedPosition) setGuidedPosition(null)
+      return
+    }
     const selectedStep = guidedSteps.find((step) =>
-      step.log.id === guidedPosition?.logId && step.set.id === guidedPosition.setId
+      step.set.id === guidedPosition?.setId &&
+      (
+        step.log.exerciseId === guidedPosition.exerciseId ||
+        (!guidedPosition.exerciseId && step.log.id === guidedPosition.logId)
+      )
     ) ?? null
 
-    if (guidedIsComplete) {
-      if (guidedPosition && !selectedStep) {
-        setGuidedPosition(null)
+    if (selectedStep) {
+      if (!guidedPosition?.exerciseId) {
+        setGuidedPosition(getGuidedPositionFromStep(selectedStep))
       }
       return
     }
 
-    if (firstPendingStep && (!selectedStep || selectedStep.set.completed)) {
-      setGuidedPosition({ logId: firstPendingStep.log.id, setId: firstPendingStep.set.id })
+    if (!guidedPosition && guidedIsComplete) return
+
+    const recoveryStep = findRecoveryGuidedStep(guidedPosition)
+    if (recoveryStep) {
+      setGuidedPosition(getGuidedPositionFromStep(recoveryStep))
+    } else if (guidedPosition) {
+      setGuidedPosition(null)
     }
-  }, [firstPendingStep, guidedIsComplete, guidedPosition, guidedSteps, viewMode])
+  }, [
+    findRecoveryGuidedStep,
+    firstPendingStep,
+    getGuidedPositionFromStep,
+    guidedIsComplete,
+    guidedPosition,
+    guidedSteps,
+    viewMode
+  ])
 
   useEffect(() => () => {
     if (guidedFeedbackTimeoutRef.current) {
@@ -623,7 +698,7 @@ export function WorkoutPage() {
   function goToGuidedStep(index: number) {
     const step = guidedSteps[Math.min(Math.max(index, 0), guidedSteps.length - 1)]
     if (!step) return
-    setGuidedPosition({ logId: step.log.id, setId: step.set.id })
+    setGuidedPosition(getGuidedPositionFromStep(step))
     setViewMode('guided')
   }
 
@@ -632,41 +707,42 @@ export function WorkoutPage() {
     goToGuidedStep(currentGuidedIndex - 1)
   }
 
-  function findNextPendingGuidedStep(fromIndex: number) {
-    const nextPendingStep = guidedSteps.find((step, index) => index > fromIndex && !step.set.completed)
-    if (nextPendingStep) return nextPendingStep
-
-    return guidedSteps.find((step, index) => index !== fromIndex && !step.set.completed) ?? null
+  function findNextGuidedStep(fromIndex: number) {
+    return guidedSteps[fromIndex + 1] ?? null
   }
 
   function completeGuidedSet() {
     if (!currentGuidedStep) return
     const reps = currentGuidedStep.set.reps.trim()
-    if (reps === '') {
+    if (!currentGuidedStep.set.completed && reps === '') {
       setSaveError('Escribe las repeticiones de la serie actual antes de marcarla como hecha.')
       return
     }
-    if (!/^\d+$/.test(reps) || Number(reps) <= 0) {
+    if (!currentGuidedStep.set.completed && (!/^\d+$/.test(reps) || Number(reps) <= 0)) {
       setSaveError('Las repeticiones deben ser un numero entero mayor que 0.')
       return
     }
 
     setSaveError(null)
-    const nextStep = findNextPendingGuidedStep(currentGuidedIndex)
-    updateGuidedSet(currentGuidedStep.log.id, currentGuidedStep.set.id, { completed: true, reps })
+    const nextStep = findNextGuidedStep(currentGuidedIndex)
+    if (!currentGuidedStep.set.completed) {
+      updateGuidedSet(currentGuidedStep.log.id, currentGuidedStep.set.id, { completed: true, reps })
+    }
     if (nextStep) {
       const exerciseChanged = nextStep.log.id !== currentGuidedStep.log.id
-      showGuidedFeedback(
-        exerciseChanged
-          ? {
-              message: 'Ejercicio completado',
-              detail: `Siguiente: ${nextStep.exercise?.name ?? 'siguiente ejercicio'}`
-            }
-          : {
-              message: `Serie ${currentGuidedStep.setIndex + 1} completada`
-            }
-      )
-      setGuidedPosition({ logId: nextStep.log.id, setId: nextStep.set.id })
+      if (!currentGuidedStep.set.completed) {
+        showGuidedFeedback(
+          exerciseChanged
+            ? {
+                message: 'Ejercicio completado',
+                detail: `Siguiente: ${nextStep.exercise?.name ?? 'siguiente ejercicio'}`
+              }
+            : {
+                message: `Serie ${currentGuidedStep.setIndex + 1} completada`
+              }
+        )
+      }
+      setGuidedPosition(getGuidedPositionFromStep(nextStep))
     } else {
       showGuidedFeedback({ message: 'Entrenamiento completado' })
       setGuidedPosition(null)
@@ -686,8 +762,10 @@ export function WorkoutPage() {
   }
 
   function enterGuidedMode() {
-    if (firstPendingStep) {
-      setGuidedPosition({ logId: firstPendingStep.log.id, setId: firstPendingStep.set.id })
+    if (selectedGuidedStep) {
+      setGuidedPosition(getGuidedPositionFromStep(selectedGuidedStep))
+    } else if (firstPendingStep) {
+      setGuidedPosition(getGuidedPositionFromStep(firstPendingStep))
     } else {
       setGuidedPosition(null)
     }
@@ -948,7 +1026,7 @@ export function WorkoutPage() {
 
       {viewMode === 'guided' ? (
         <section className="card overflow-hidden">
-          {guidedIsComplete ? (
+          {guidedIsComplete && !currentGuidedStep ? (
             <div className="space-y-5 p-5 sm:p-6">
               <div>
                 <p className="eyebrow">{template.name}</p>
@@ -1021,6 +1099,12 @@ export function WorkoutPage() {
                     <p className="text-sm font-bold text-secondary">
                       Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
                     </p>
+                    {currentGuidedStep.set.completed && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success-soft px-2 py-1 text-xs font-extrabold text-success-text">
+                        <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                        Completada
+                      </span>
+                    )}
                     <div
                       className="flex flex-wrap items-center justify-center gap-1.5"
                       aria-label={`Series de ${currentGuidedStep.exercise?.name ?? 'este ejercicio'}`}
@@ -1040,11 +1124,13 @@ export function WorkoutPage() {
                                   : `Serie ${set.setNumber} pendiente`
                             }
                             className={`inline-flex size-7 items-center justify-center rounded-full border text-xs font-extrabold leading-none transition ${
-                              set.completed
-                                ? 'border-success/40 bg-success-soft text-success-text'
-                                : isCurrent
-                                  ? 'border-brand bg-brand-solid text-on-brand shadow-sm ring-2 ring-brand-soft'
-                                  : 'border-line bg-muted text-secondary'
+                              set.completed && isCurrent
+                                ? 'border-brand bg-success-soft text-success-text shadow-sm ring-2 ring-brand'
+                                : set.completed
+                                  ? 'border-success/40 bg-success-soft text-success-text'
+                                  : isCurrent
+                                    ? 'border-brand bg-brand-solid text-on-brand shadow-sm ring-2 ring-brand-soft'
+                                    : 'border-line bg-muted text-secondary'
                             }`}
                           >
                             {set.completed ? (
@@ -1136,7 +1222,7 @@ export function WorkoutPage() {
                   }`}
                 >
                   <CheckCircle2 className={guidedFeedback ? 'size-6' : 'size-5'} aria-hidden="true" />
-                  {guidedFeedback ? 'Serie completada' : 'Marcar hecha y continuar'}
+                  {currentGuidedStep.set.completed ? 'Continuar' : 'Marcar hecha y continuar'}
                 </button>
                 <div>
                   <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
