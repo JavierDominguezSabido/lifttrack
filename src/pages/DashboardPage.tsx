@@ -11,6 +11,8 @@ import {
   getCompletedRoutineDaysForWeek,
   getCurrentWeekSessions,
   getNextPendingTemplate,
+  getSessionDate,
+  getSessionDateObject,
   getSessionVolume,
   isInitialSession
 } from '../utils/workout'
@@ -26,7 +28,7 @@ export function DashboardPage() {
   const activeTemplates = orderedTemplates.filter((template) => template.exercises.length > 0)
   const recentSessions = [...sessions]
     .filter((session) => session.completedAt && !isInitialSession(session.id))
-    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+    .sort((a, b) => getSessionDate(b).localeCompare(getSessionDate(a)))
   const weeklySessions = getCurrentWeekSessions(sessions, today)
   const completedDays = getCompletedRoutineDaysForWeek(sessions, templates, today)
   const nextTemplate = getNextPendingTemplate(templates, completedDays, today)
@@ -233,11 +235,11 @@ export function DashboardPage() {
                 <p className="text-sm font-semibold">{recentSessions[0]?.name ?? 'Sin sesiones'}</p>
                 <p className="text-xs text-secondary">
                   {recentSessions[0]
-                    ? `${formatDate(recentSessions[0].startedAt, {
+                    ? `${formatDate(getSessionDateObject(recentSessions[0]), {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric'
-                      })} · ${dayNames[recentSessions[0].dayOfWeek] ?? recentSessions[0].name}`
+                      })} · ${dayNames[getSessionDateObject(recentSessions[0]).getDay()]}`
                     : 'Cuando guardes una sesión aparecerá aquí.'}
                 </p>
               </div>

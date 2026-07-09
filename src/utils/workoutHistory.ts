@@ -1,5 +1,5 @@
 import type { LastExercisePerformance, WorkoutSession } from '../types'
-import { isInitialSession } from './workout'
+import { getSessionDate, isInitialSession } from './workout'
 
 /**
  * Obtiene el último rendimiento usando el identificador estable del ejercicio.
@@ -16,7 +16,7 @@ export function getLastExercisePerformanceFromSessions(
     .sort((a, b) => {
       const sourceDifference =
         Number(isInitialSession(a.id)) - Number(isInitialSession(b.id))
-      return sourceDifference || b.startedAt.localeCompare(a.startedAt)
+      return sourceDifference || getSessionDate(b).localeCompare(getSessionDate(a))
     })
 
   for (const session of sortedSessions) {

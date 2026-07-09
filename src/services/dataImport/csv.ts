@@ -1,5 +1,6 @@
 import type { Exercise, ExerciseLog, SetLog, WorkoutSession } from '../../types'
 import { dayNames } from '../../utils/workout'
+import { parseLocalDate, toLocalDateKey } from '../../utils/date'
 import type { ImportPayload } from './types'
 
 const REQUIRED_COLUMNS = [
@@ -74,11 +75,8 @@ function parseDay(value: string) {
 }
 
 function safeDate(value: string) {
-  const trimmed = value.trim()
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
-    ? new Date(`${trimmed}T12:00:00.000Z`)
-    : new Date(trimmed)
-  return Number.isNaN(date.getTime()) ? null : date
+  const date = parseLocalDate(value)
+  return date && !Number.isNaN(date.getTime()) ? date : null
 }
 
 function stableHash(value: string) {
@@ -182,7 +180,7 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
     ) return
 
     const explicitSessionId = value(row, 'session_id').trim()
-    const dateKey = date.toISOString().slice(0, 10)
+    const dateKey = toLocalDateKey(date)
     const sessionKey = explicitSessionId || `import-${stableHash(`${dateKey}:${dayOfWeek}`)}`
     let builder = builders.get(sessionKey)
     if (!builder) {

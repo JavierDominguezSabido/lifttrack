@@ -1,8 +1,10 @@
 import type { WorkoutSession } from '../../types'
+import { getSessionDate } from '../../utils/workout'
+import { toLocalDateKey } from '../../utils/date'
 import type { ImportPayload, ImportPreview } from './types'
 
 function sessionSignature(session: WorkoutSession) {
-  const day = session.startedAt.slice(0, 10)
+  const day = toLocalDateKey(getSessionDate(session))
   const exercises = session.exerciseLogs
     .map((log) => {
       const sets = log.sets

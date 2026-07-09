@@ -18,6 +18,7 @@ import {
   findExerciseDuplicateGroups,
   normalizeExerciseName
 } from '../../utils/exerciseIdentity'
+import { toLocalDateKey } from '../../utils/date'
 import { isInitialSession } from '../../utils/workout'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -156,7 +157,7 @@ export function DataSettings() {
   )
 
   function filename() {
-    return `lifttrack-${new Date().toISOString().slice(0, 10)}.json`
+    return `lifttrack-${toLocalDateKey(new Date())}.json`
   }
 
   function exportJson() {

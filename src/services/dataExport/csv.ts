@@ -1,5 +1,6 @@
 import type { Exercise, WorkoutSession, WorkoutTemplate } from '../../types'
-import { dayNames, formatRestSeconds } from '../../utils/workout'
+import { dayNames, formatRestSeconds, getSessionDate, getSessionDateObject } from '../../utils/workout'
+import { toLocalDateKey } from '../../utils/date'
 
 export const CSV_COLUMNS = [
   'session_id',
@@ -21,14 +22,6 @@ export const CSV_COLUMNS = [
 function escapeCsv(value: unknown) {
   const text = value == null ? '' : String(value)
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-function formatLocalDate(value: string) {
-  const date = new Date(value)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 export function sessionsToCsv(
@@ -54,8 +47,8 @@ export function sessionsToCsv(
         const setVolume = set.completed ? set.reps * set.weightKg : 0
         rows.push([
           session.id,
-          formatLocalDate(session.startedAt),
-          dayNames[session.dayOfWeek] ?? session.name,
+          toLocalDateKey(getSessionDate(session)),
+          dayNames[getSessionDateObject(session).getDay()],
           log.exerciseId,
           exercise?.name ?? log.exerciseId,
           objective,

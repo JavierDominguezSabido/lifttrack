@@ -4,7 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { DraftExerciseLog } from '../types'
-import { formatDate, isInitialSession } from '../utils/workout'
+import { formatDate, getSessionDateObject, isInitialSession } from '../utils/workout'
 import {
   createDraftFromSession,
   updateWorkoutSession,
@@ -76,7 +76,7 @@ export function EditSessionPage() {
         <p className="eyebrow mt-3">Editar entrenamiento</p>
         <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{session.name}</h2>
         <p className="mt-1 text-sm font-medium text-secondary">
-          {formatDate(session.startedAt, {
+          {formatDate(getSessionDateObject(session), {
             weekday: 'long',
             day: 'numeric',
             month: 'long',

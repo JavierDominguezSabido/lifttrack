@@ -5,9 +5,24 @@ import type {
   WorkoutTemplate,
   WorkoutTemplateExercise
 } from '../types'
+import {
+  getNextWeekStart,
+  getSessionDate,
+  getSessionDateObject,
+  getWeekKey,
+  getWeekStart
+} from './date'
 
-export const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-export const shortDayNames = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
+export {
+  dayNames,
+  formatDate,
+  getNextWeekStart,
+  getSessionDate,
+  getSessionDateObject,
+  getWeekKey,
+  getWeekStart,
+  shortDayNames
+} from './date'
 
 export function getExercise(exerciseId: string) {
   return exercises.find((exercise) => exercise.id === exerciseId)
@@ -26,31 +41,9 @@ export function getCurrentWeekSessions(
 
   return sessions.filter((session) => {
     if (!session.completedAt || isInitialSession(session.id)) return false
-    const startedAt = new Date(session.startedAt)
-    return startedAt >= start && startedAt < end
+    const sessionDate = getSessionDateObject(session)
+    return sessionDate >= start && sessionDate < end
   })
-}
-
-export function getWeekStart(date = new Date()) {
-  const start = new Date(date)
-  const dayFromMonday = (start.getDay() + 6) % 7
-  start.setHours(0, 0, 0, 0)
-  start.setDate(start.getDate() - dayFromMonday)
-  return start
-}
-
-export function getNextWeekStart(date = new Date()) {
-  const next = getWeekStart(date)
-  next.setDate(next.getDate() + 7)
-  return next
-}
-
-export function getWeekKey(date: Date) {
-  const monday = getWeekStart(date)
-  const year = monday.getFullYear()
-  const month = String(monday.getMonth() + 1).padStart(2, '0')
-  const day = String(monday.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 export function getCompletedRoutineDaysForWeek(
@@ -77,7 +70,7 @@ export function calculateWeeklyStreak(
   const activeWeeks = new Set(
     sessions
       .filter((session) => session.completedAt && !isInitialSession(session.id))
-      .map((session) => getWeekKey(new Date(session.startedAt)))
+      .map((session) => getWeekKey(getSessionDate(session)))
   )
 
   let streak = 0
@@ -154,11 +147,4 @@ export function formatCompactNumber(value: number) {
     notation: value >= 1000 ? 'compact' : 'standard',
     maximumFractionDigits: 1
   }).format(value)
-}
-
-export function formatDate(value: string, options?: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat('es-ES', options ?? {
-    day: 'numeric',
-    month: 'short'
-  }).format(new Date(value))
 }

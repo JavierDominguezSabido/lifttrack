@@ -26,6 +26,8 @@ import {
   formatCompactNumber,
   formatDate,
   getNextWeekStart,
+  getSessionDate,
+  getSessionDateObject,
   getSessionVolume,
   getWeekStart,
   isInitialSession
@@ -93,7 +95,7 @@ export function HistoryPage() {
   const realSessions = useMemo(
     () => [...sessions]
       .filter((session) => !isInitialSession(session.id))
-      .sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+      .sort((a, b) => getSessionDate(b).localeCompare(getSessionDate(a))),
     [sessions]
   )
   const canonicalExerciseIds = useMemo(
@@ -156,7 +158,8 @@ export function HistoryPage() {
   const visibleSessions = filteredSessions.slice(0, visibleCount)
 
   async function removeSession(session: WorkoutSession) {
-    const label = `${dayNames[session.dayOfWeek] ?? session.name}, ${formatDate(session.startedAt, {
+    const sessionDate = getSessionDateObject(session)
+    const label = `${dayNames[sessionDate.getDay()]}, ${formatDate(sessionDate, {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
@@ -236,7 +239,7 @@ export function HistoryPage() {
                     <h3 className="mt-1 text-2xl font-extrabold text-ink">{selectedExercise.name}</h3>
                     <p className="mt-1 text-sm font-medium text-secondary">
                       Última sesión: {latestProgressSession
-                        ? formatDate(latestProgressSession.startedAt, {
+                        ? formatDate(getSessionDateObject(latestProgressSession), {
                             day: 'numeric',
                             month: 'long',
                             year: 'numeric'
@@ -284,7 +287,7 @@ export function HistoryPage() {
                   {recentProgressEntries.map((entry) => (
                     <div key={entry.session.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 py-3 text-sm sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:items-center">
                       <span className="font-bold text-ink">
-                        {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        {formatDate(getSessionDateObject(entry.session), { day: '2-digit', month: '2-digit', year: '2-digit' })}
                       </span>
                       <span className="font-extrabold text-brand">{getProgressEntryWeight(entry)} kg</span>
                       <span className="font-semibold text-secondary">{formatSetReps(entry.log.sets)}</span>
@@ -466,6 +469,7 @@ function SessionCard({
   const totalSets = session.exerciseLogs.reduce((sum, log) => sum + log.sets.length, 0)
   const volume = session.volumeKg ?? getSessionVolume(session)
   const status = completedSets >= totalSets ? 'Completada' : 'Parcial'
+  const sessionDate = getSessionDateObject(session)
 
   return (
     <article className="card overflow-hidden">
@@ -474,10 +478,10 @@ function SessionCard({
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand">
               <CalendarDays className="size-3.5" aria-hidden="true" />
-              {dayNames[session.dayOfWeek] ?? session.name}
+              {dayNames[sessionDate.getDay()]}
             </p>
             <h3 className="mt-1 break-words text-lg font-extrabold text-ink">
-              {formatDate(session.startedAt, {
+              {formatDate(sessionDate, {
                 weekday: 'long',
                 day: 'numeric',
                 month: 'long',
@@ -717,7 +721,7 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
           </svg>
 
           {points.map(({ x, y, entry, label, labelOffset, reps }) => {
-            const date = formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit', year: '2-digit' })
+            const date = formatDate(getSessionDateObject(entry.session), { day: '2-digit', month: '2-digit', year: '2-digit' })
             return (
               <div
                 key={entry.session.id}
@@ -746,7 +750,7 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
                   className="absolute left-1/2 top-7 whitespace-nowrap text-[10px] font-bold leading-none text-secondary"
                   style={{ transform: 'translateX(-50%)' }}
                 >
-                  {formatDate(entry.session.startedAt, { day: '2-digit', month: '2-digit' })}
+                  {formatDate(getSessionDateObject(entry.session), { day: '2-digit', month: '2-digit' })}
                 </span>
               </div>
             )
@@ -867,7 +871,8 @@ function getExerciseProgressSummaries(
     })
     .filter((summary) => summary.sessionCount > 0)
     .sort((a, b) =>
-      (b.latestEntry?.session.startedAt ?? '').localeCompare(a.latestEntry?.session.startedAt ?? '') ||
+      (b.latestEntry ? getSessionDate(b.latestEntry.session) : '')
+        .localeCompare(a.latestEntry ? getSessionDate(a.latestEntry.session) : '') ||
       b.sessionCount - a.sessionCount ||
       a.exercise.name.localeCompare(b.exercise.name)
     )
@@ -934,10 +939,10 @@ function filterSessions({
   const normalizedSearch = search.trim().toLowerCase()
 
   return sessions.filter((session) => {
-    const startedAt = new Date(session.startedAt)
-    if (rangeFilter === 'week' && (startedAt < weekStart || startedAt >= nextWeekStart)) return false
-    if (rangeFilter === 'month' && (startedAt < monthStart || startedAt >= nextMonthStart)) return false
-    if (filterDay !== 'all' && session.dayOfWeek !== Number(filterDay)) return false
+    const sessionDate = getSessionDateObject(session)
+    if (rangeFilter === 'week' && (sessionDate < weekStart || sessionDate >= nextWeekStart)) return false
+    if (rangeFilter === 'month' && (sessionDate < monthStart || sessionDate >= nextMonthStart)) return false
+    if (filterDay !== 'all' && sessionDate.getDay() !== Number(filterDay)) return false
 
     if (filterExerciseId !== 'all') {
       const canonicalFilterId = canonicalExerciseIds.get(filterExerciseId) ?? filterExerciseId
