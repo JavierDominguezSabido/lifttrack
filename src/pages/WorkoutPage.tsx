@@ -291,11 +291,6 @@ export function WorkoutPage() {
   const [draftActive, setDraftActive] = useState(() => initialStateRef.current!.draftActive)
   const [viewMode, setViewMode] = useState<WorkoutViewMode>(() => initialStateRef.current!.viewMode)
   const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
-  const [openFullExerciseId, setOpenFullExerciseId] = useState<string | null>(
-    () => initialStateRef.current!.logs.find((log) => log.sets.some((set) => !set.completed))?.id ??
-      initialStateRef.current!.logs[0]?.id ??
-      null
-  )
   const [guidedFeedback, setGuidedFeedback] = useState<GuidedFeedback | null>(null)
   const [guidedStepAnimationKey, setGuidedStepAnimationKey] = useState(0)
   const [draftSyncStatus, setDraftSyncStatus] = useState<DraftSyncStatus>(
@@ -376,11 +371,6 @@ export function WorkoutPage() {
     () => createCanonicalExerciseIdMap(exercises, templates, sessions),
     [exercises, sessions, templates]
   )
-  const workoutStatus = progress.total > 0 && progress.completed === progress.total
-    ? 'Completado'
-    : progress.completed > 0
-      ? 'En curso'
-      : 'Pendiente'
   const guidedSteps = useMemo(() => template.exercises.flatMap((item) => {
     const log = logs.find((entry) => entry.exerciseId === item.exerciseId)
     if (!log) return []
@@ -438,13 +428,6 @@ export function WorkoutPage() {
       : draftSyncStatus === 'pending'
         ? 'Pendiente de sincronizar'
         : 'Borrador guardado localmente'
-
-  useEffect(() => {
-    if (viewMode !== 'full' || logs.length === 0) return
-    if (!openFullExerciseId || !logs.some((log) => log.id === openFullExerciseId)) {
-      setOpenFullExerciseId(logs.find((log) => log.sets.some((set) => !set.completed))?.id ?? logs[0]?.id ?? null)
-    }
-  }, [logs, openFullExerciseId, viewMode])
 
   useLayoutEffect(() => {
     if (viewMode !== 'full') return
@@ -759,17 +742,7 @@ export function WorkoutPage() {
   }, [draftSyncStatus, template, user, userKey])
 
   function updateLog(updatedLog: DraftExerciseLog) {
-    const previousLog = logs.find((log) => log.id === updatedLog.id)
-    const wasCompleted = previousLog
-      ? previousLog.sets.length > 0 && previousLog.sets.every((set) => set.completed)
-      : false
-    const isCompleted = updatedLog.sets.length > 0 && updatedLog.sets.every((set) => set.completed)
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
-    if (!wasCompleted && isCompleted) {
-      const currentIndex = logs.findIndex((log) => log.id === updatedLog.id)
-      const nextLog = logs.find((log, index) => index > currentIndex && log.sets.some((set) => !set.completed))
-      if (nextLog) setOpenFullExerciseId(nextLog.id)
-    }
   }
 
   function showGuidedFeedback(feedback: GuidedFeedback) {
@@ -1001,86 +974,59 @@ export function WorkoutPage() {
 
   return (
     <div className="space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
-      {viewMode === 'guided' ? (
-        <section className="rounded-2xl border border-line/70 bg-surface/90 px-3.5 py-3">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="truncate text-lg font-extrabold text-ink">{template.name}</h2>
-            <span className="shrink-0 text-sm font-extrabold text-secondary">
-              {progress.completed}/{progress.total} series
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
+        <button
+          type="button"
+          onClick={enterFullMode}
+          className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
+            viewMode === 'full'
+              ? 'bg-brand-solid text-on-brand shadow-sm'
+              : 'text-secondary hover:bg-muted'
+          }`}
+        >
+          Vista completa
+        </button>
+        <button
+          type="button"
+          onClick={enterGuidedMode}
+          className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
+            viewMode === 'guided'
+              ? 'bg-brand-solid text-on-brand shadow-sm'
+              : 'text-secondary hover:bg-muted'
+          }`}
+        >
+          Modo guiado
+        </button>
+      </div>
+
+      <section className="rounded-2xl border border-line/70 bg-surface/90 px-3.5 py-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="truncate text-lg font-extrabold text-ink">{template.name}</h2>
+          <span className="shrink-0 text-sm font-extrabold text-secondary">
+            {progress.completed}/{progress.total} series
+          </span>
+        </div>
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-label="Progreso de series realizadas"
+          aria-valuemin={0}
+          aria-valuemax={progress.total}
+          aria-valuenow={progress.completed}
+        >
+          <div
+            className="h-full rounded-full bg-brand transition-all duration-300"
+            style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
+          />
+        </div>
+        {(draftActive || (hasDraftState && !pendingDraft)) && (
+          <div className="mt-2 flex items-center">
+            <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-extrabold leading-none text-secondary">
+              {draftStatusLabel}
             </span>
           </div>
-          <div
-            className="h-1.5 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-label="Progreso de series realizadas"
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-            aria-valuenow={progress.completed}
-          >
-            <div
-              className="h-full rounded-full bg-brand transition-all duration-300"
-              style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
-            />
-          </div>
-          {(draftActive || (hasDraftState && !pendingDraft)) && (
-            <div className="mt-2 flex items-center">
-              <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-extrabold leading-none text-secondary">
-                {draftStatusLabel}
-              </span>
-            </div>
-          )}
-        </section>
-      ) : (
-        <section className="overflow-hidden rounded-2xl border border-line/70 bg-hero p-4 text-on-hero shadow-card md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-hero-accent">Entrenar</p>
-              <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{template.name}</h2>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-hero-muted">
-                <span className="flex items-center gap-1.5">
-                  <Dumbbell className="size-4 text-hero-accent" aria-hidden="true" />
-                  {template.exercises.length} ejercicios
-                </span>
-                <span>{progress.completed}/{progress.total} series</span>
-                <span className="font-extrabold text-hero-accent">{workoutStatus}</span>
-                {(draftActive || (hasDraftState && !pendingDraft)) && (
-                  <span className="rounded-full bg-on-hero/10 px-2 py-0.5 text-xs font-extrabold text-hero-accent">
-                    {draftStatusLabel}
-                  </span>
-                )}
-              </div>
-              {(draftActive || (hasDraftState && !pendingDraft)) && (
-                <button
-                  type="button"
-                  onClick={discardDraft}
-                  className="mt-3 text-xs font-extrabold text-hero-muted underline decoration-on-hero/30 underline-offset-4 transition hover:text-on-hero"
-                >
-                  Descartar borrador
-                </button>
-              )}
-            </div>
-            <div className="min-w-36 flex-1 sm:max-w-64">
-              <div className="mb-2 flex justify-between text-xs font-bold">
-                <span>Progreso</span>
-                <span className="text-hero-muted">{progress.completed} / {progress.total}</span>
-              </div>
-              <div
-                className="h-2.5 overflow-hidden rounded-full bg-on-hero/15"
-                role="progressbar"
-                aria-label="Progreso de series realizadas"
-                aria-valuemin={0}
-                aria-valuemax={progress.total}
-                aria-valuenow={progress.completed}
-              >
-                <div
-                  className="h-full rounded-full bg-hero-accent transition-all duration-300"
-                  style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {pendingDraft && (
         <section className="rounded-2xl border border-brand/30 bg-brand-soft px-4 py-3 shadow-sm">
@@ -1117,31 +1063,6 @@ export function WorkoutPage() {
           </div>
         </section>
       )}
-
-      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
-        <button
-          type="button"
-          onClick={enterFullMode}
-          className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
-            viewMode === 'full'
-              ? 'bg-brand-solid text-on-brand shadow-sm'
-              : 'text-secondary hover:bg-muted'
-          }`}
-        >
-          Vista completa
-        </button>
-        <button
-          type="button"
-          onClick={enterGuidedMode}
-          className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
-            viewMode === 'guided'
-              ? 'bg-brand-solid text-on-brand shadow-sm'
-              : 'text-secondary hover:bg-muted'
-          }`}
-        >
-          Modo guiado
-        </button>
-      </div>
 
       {viewMode === 'guided' ? (
         <section className="card overflow-hidden">
@@ -1379,17 +1300,13 @@ export function WorkoutPage() {
             if (to === item.exerciseId) equivalentIds.add(from)
           }
           const exercise = getExerciseById(item.exerciseId)
-          const completedSets = log?.sets.filter((set) => set.completed).length ?? 0
-          const totalSets = log?.sets.length ?? 0
-          const isOpen = log?.id === openFullExerciseId
-          const isComplete = totalSets > 0 && completedSets === totalSets
           const previousPerformance = getLastExercisePerformanceFromSessions(
             sessions,
             item.exerciseId,
             [...equivalentIds]
           )
           if (!log) return null
-          return isOpen ? (
+          return (
             <ExerciseLogger
               key={item.id}
               templateExercise={item}
@@ -1398,33 +1315,29 @@ export function WorkoutPage() {
               onChange={updateLog}
               exercise={exercise}
             />
-          ) : (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setOpenFullExerciseId(log.id)}
-              className="card flex min-h-20 items-center justify-between gap-3 p-3.5 text-left transition hover:border-brand/50"
-              aria-expanded={false}
-            >
-              <span className="min-w-0">
-                <span className="block truncate font-extrabold text-ink">{exercise?.name ?? 'Ejercicio'}</span>
-                <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs font-semibold text-secondary">
-                  <span>{getWorkingWeight(log)} kg</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{completedSets}/{totalSets} series</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{isComplete ? 'Completado' : completedSets > 0 ? 'En curso' : 'Pendiente'}</span>
-                </span>
-              </span>
-              <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-extrabold ${
-                isComplete ? 'bg-success-soft text-success-text' : 'bg-muted text-secondary'
-              }`}>
-                {isComplete ? 'Hecho' : 'Abrir'}
-              </span>
-            </button>
           )
         })}
         </div>
+      )}
+
+      {viewMode === 'full' && (draftActive || (hasDraftState && !pendingDraft)) && (
+        <section className="rounded-2xl border border-danger/20 bg-danger-soft/30 px-3.5 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-danger-text">Borrador del entrenamiento</p>
+              <p className="mt-0.5 text-xs font-semibold text-secondary">
+                Descarta los cambios locales y vuelve al entrenamiento inicial.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-danger/30 bg-surface px-3 py-2 text-sm font-extrabold text-danger-text transition hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-danger/20 sm:w-auto"
+            >
+              Descartar borrador
+            </button>
+          </div>
+        </section>
       )}
 
       {viewMode === 'full' && (

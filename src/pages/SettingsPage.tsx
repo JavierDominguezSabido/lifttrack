@@ -16,7 +16,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
-import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
 import { dayNames, formatRestSeconds } from '../utils/workout'
@@ -32,7 +31,7 @@ const createId = () => typeof globalThis.crypto?.randomUUID === 'function'
   ? globalThis.crypto.randomUUID()
   : `template-exercise-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 const weekOrder = [1, 2, 3, 4, 5, 6, 0]
-type SettingsSection = 'account' | 'appearance' | 'routine' | 'data'
+type SettingsSection = 'account' | 'routine' | 'data'
 
 function parseTarget(value: string) {
   const match = value.trim().match(/^([1-9]\d*)\s*[xX×]\s*([1-9]\d*)$/)
@@ -421,30 +420,6 @@ export function SettingsPage() {
         onOpen={setOpenSettingsSection}
       />
       {openSettingsSection === 'account' && <AccountSettings />}
-
-      <SettingsAccordionHeader
-        id="appearance"
-        title="Apariencia"
-        summary="Tema claro u oscuro"
-        open={openSettingsSection === 'appearance'}
-        onOpen={setOpenSettingsSection}
-      />
-      {openSettingsSection === 'appearance' && (
-        <section className="card p-4 md:p-5" aria-labelledby="appearance-settings-title">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="eyebrow">Apariencia</p>
-              <h2 id="appearance-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
-                Tema
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-secondary">
-                Ajusta el modo visual de LiftTrack.
-              </p>
-            </div>
-            <ThemeToggle />
-          </div>
-        </section>
-      )}
 
       <SettingsAccordionHeader
         id="routine"
