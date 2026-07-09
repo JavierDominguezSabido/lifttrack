@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useAuth } from '../context/AuthContext'
@@ -62,6 +62,7 @@ function normalizeGuidedPosition(
 const WORKOUT_DRAFT_VERSION = 1
 const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
 const WORKOUT_DRAFT_MAX_AUTO_RESTORE_MS = 12 * 60 * 60 * 1000
+const WORKOUT_FULL_SCROLL_PREFIX = 'lifttrack.workoutFullScroll'
 
 interface StoredWorkoutDraft {
   version: number
@@ -235,6 +236,10 @@ function removeRemoteWorkoutDraftIfAvailable(user: { id: string } | null, templa
   removeRemoteWorkoutDraftByDayIfAvailable(user, template.dayOfWeek)
 }
 
+function scrollToPageTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+}
+
 function logsAreEqual(left: DraftExerciseLog[], right: DraftExerciseLog[]) {
   return JSON.stringify(left) === JSON.stringify(right)
 }
@@ -286,6 +291,11 @@ export function WorkoutPage() {
   const [draftActive, setDraftActive] = useState(() => initialStateRef.current!.draftActive)
   const [viewMode, setViewMode] = useState<WorkoutViewMode>(() => initialStateRef.current!.viewMode)
   const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
+  const [openFullExerciseId, setOpenFullExerciseId] = useState<string | null>(
+    () => initialStateRef.current!.logs.find((log) => log.sets.some((set) => !set.completed))?.id ??
+      initialStateRef.current!.logs[0]?.id ??
+      null
+  )
   const [guidedFeedback, setGuidedFeedback] = useState<GuidedFeedback | null>(null)
   const [guidedStepAnimationKey, setGuidedStepAnimationKey] = useState(0)
   const [draftSyncStatus, setDraftSyncStatus] = useState<DraftSyncStatus>(
@@ -299,6 +309,7 @@ export function WorkoutPage() {
   const remoteRestoreRequestRef = useRef(0)
   const remoteSyncTimeoutRef = useRef<number | null>(null)
   const lastSyncedDraftUpdatedAtRef = useRef<string | null>(null)
+  const previousViewModeRef = useRef(viewMode)
   const lastLocalDraftRef = useRef<StoredWorkoutDraft | null>(
     initialStateRef.current!.draftActive
       ? createStoredWorkoutDraft(
@@ -312,6 +323,47 @@ export function WorkoutPage() {
         )
       : null
   )
+  const restoredFullScrollKeyRef = useRef<string | null>(null)
+  const fullScrollKey = `${WORKOUT_FULL_SCROLL_PREFIX}.${userKey}.${template.id}.day-${template.dayOfWeek}.${startedAt}`
+
+  const saveFullScrollPosition = useCallback(() => {
+    if (viewMode !== 'full') return
+    try {
+      window.sessionStorage.setItem(fullScrollKey, String(Math.max(0, Math.round(window.scrollY))))
+    } catch (error) {
+      console.error('[workout] No se pudo guardar la posición de scroll:', error)
+    }
+  }, [fullScrollKey, viewMode])
+
+  const clearFullScrollPosition = useCallback(() => {
+    try {
+      window.sessionStorage.removeItem(fullScrollKey)
+    } catch (error) {
+      console.error('[workout] No se pudo limpiar la posición de scroll:', error)
+    }
+  }, [fullScrollKey])
+
+  const restoreFullScrollPosition = useCallback(() => {
+    let saved = 0
+    try {
+      saved = Number(window.sessionStorage.getItem(fullScrollKey) ?? 0)
+    } catch (error) {
+      console.error('[workout] No se pudo leer la posición de scroll:', error)
+    }
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const maxScroll = Math.max(
+          0,
+          document.documentElement.scrollHeight - window.innerHeight
+        )
+        window.scrollTo({
+          top: Math.min(Math.max(0, saved), maxScroll),
+          left: 0,
+          behavior: 'auto'
+        })
+      })
+    })
+  }, [fullScrollKey])
 
   const progress = useMemo(() => {
     const sets = logs.flatMap((log) => log.sets)
@@ -386,6 +438,46 @@ export function WorkoutPage() {
       : draftSyncStatus === 'pending'
         ? 'Pendiente de sincronizar'
         : 'Borrador guardado localmente'
+
+  useEffect(() => {
+    if (viewMode !== 'full' || logs.length === 0) return
+    if (!openFullExerciseId || !logs.some((log) => log.id === openFullExerciseId)) {
+      setOpenFullExerciseId(logs.find((log) => log.sets.some((set) => !set.completed))?.id ?? logs[0]?.id ?? null)
+    }
+  }, [logs, openFullExerciseId, viewMode])
+
+  useLayoutEffect(() => {
+    if (viewMode !== 'full') return
+    if (restoredFullScrollKeyRef.current === fullScrollKey) return
+    restoredFullScrollKeyRef.current = fullScrollKey
+    restoreFullScrollPosition()
+  }, [fullScrollKey, restoreFullScrollPosition, viewMode])
+
+  useEffect(() => {
+    if (viewMode !== 'full') return
+    let frameId = 0
+    function handleScroll() {
+      if (frameId) return
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0
+        saveFullScrollPosition()
+      })
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      if (frameId) window.cancelAnimationFrame(frameId)
+      saveFullScrollPosition()
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [saveFullScrollPosition, viewMode])
+
+  useEffect(() => {
+    if (viewMode === 'guided' && previousViewModeRef.current !== 'guided') {
+      scrollToPageTop()
+    }
+    previousViewModeRef.current = viewMode
+  }, [viewMode])
 
   const getGuidedPositionFromStep = useCallback((step: (typeof guidedSteps)[number]): GuidedPosition => {
     return { exerciseId: step.log.exerciseId, setId: step.set.id }
@@ -563,6 +655,7 @@ export function WorkoutPage() {
       writeWorkoutDraft(userKey, previousTemplate, startedAt, logs, viewMode, guidedPosition)
       previousDraft = readWorkoutDraft(userKey, previousTemplate)
     }
+    clearFullScrollPosition()
 
     const nextInitialLogs = createExerciseLogs(template, sessions, exercises)
     const nextDraft = readWorkoutDraft(userKey, template)
@@ -583,7 +676,7 @@ export function WorkoutPage() {
     setViewMode(draftToRestore?.viewMode ?? 'full')
     setGuidedPosition(draftToRestore?.guidedPosition ?? null)
     setSaveError(null)
-  }, [draftActive, exercises, guidedPosition, hasDraftState, logs, sessions, startedAt, template, userKey, viewMode])
+  }, [clearFullScrollPosition, draftActive, exercises, guidedPosition, hasDraftState, logs, sessions, startedAt, template, userKey, viewMode])
 
   useEffect(() => {
     if (pendingDraft) return
@@ -666,7 +759,17 @@ export function WorkoutPage() {
   }, [draftSyncStatus, template, user, userKey])
 
   function updateLog(updatedLog: DraftExerciseLog) {
+    const previousLog = logs.find((log) => log.id === updatedLog.id)
+    const wasCompleted = previousLog
+      ? previousLog.sets.length > 0 && previousLog.sets.every((set) => set.completed)
+      : false
+    const isCompleted = updatedLog.sets.length > 0 && updatedLog.sets.every((set) => set.completed)
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
+    if (!wasCompleted && isCompleted) {
+      const currentIndex = logs.findIndex((log) => log.id === updatedLog.id)
+      const nextLog = logs.find((log, index) => index > currentIndex && log.sets.some((set) => !set.completed))
+      if (nextLog) setOpenFullExerciseId(nextLog.id)
+    }
   }
 
   function showGuidedFeedback(feedback: GuidedFeedback) {
@@ -698,8 +801,10 @@ export function WorkoutPage() {
   function goToGuidedStep(index: number) {
     const step = guidedSteps[Math.min(Math.max(index, 0), guidedSteps.length - 1)]
     if (!step) return
+    saveFullScrollPosition()
     setGuidedPosition(getGuidedPositionFromStep(step))
     setViewMode('guided')
+    scrollToPageTop()
   }
 
   function goToPreviousGuidedStep() {
@@ -762,6 +867,7 @@ export function WorkoutPage() {
   }
 
   function enterGuidedMode() {
+    saveFullScrollPosition()
     if (selectedGuidedStep) {
       setGuidedPosition(getGuidedPositionFromStep(selectedGuidedStep))
     } else if (firstPendingStep) {
@@ -770,6 +876,12 @@ export function WorkoutPage() {
       setGuidedPosition(null)
     }
     setViewMode('guided')
+    scrollToPageTop()
+  }
+
+  function enterFullMode() {
+    setViewMode('full')
+    restoredFullScrollKeyRef.current = null
   }
 
   function restoreDraft(draft: StoredWorkoutDraft) {
@@ -808,6 +920,7 @@ export function WorkoutPage() {
     }
     lastLocalDraftRef.current = null
     lastSyncedDraftUpdatedAtRef.current = null
+    clearFullScrollPosition()
     const nextLogs = createExerciseLogs(template, sessions, exercises)
     setInitialLogs(nextLogs)
     setLogs(nextLogs)
@@ -832,6 +945,7 @@ export function WorkoutPage() {
     }
     lastLocalDraftRef.current = null
     lastSyncedDraftUpdatedAtRef.current = null
+    clearFullScrollPosition()
     setInitialLogs(nextLogs)
     setLogs(nextLogs)
     setStartedAt(new Date().toISOString())
@@ -861,6 +975,7 @@ export function WorkoutPage() {
       console.info('[workout] Payload que se intenta guardar:', session)
       await saveSession(session)
       removeWorkoutDraft(userKey, template)
+      clearFullScrollPosition()
       if (user) {
         try {
           await deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(template))
@@ -1006,7 +1121,7 @@ export function WorkoutPage() {
       <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
         <button
           type="button"
-          onClick={() => setViewMode('full')}
+          onClick={enterFullMode}
           className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
             viewMode === 'full'
               ? 'bg-brand-solid text-on-brand shadow-sm'
@@ -1263,21 +1378,51 @@ export function WorkoutPage() {
           for (const [from, to] of canonicalExerciseIds) {
             if (to === item.exerciseId) equivalentIds.add(from)
           }
+          const exercise = getExerciseById(item.exerciseId)
+          const completedSets = log?.sets.filter((set) => set.completed).length ?? 0
+          const totalSets = log?.sets.length ?? 0
+          const isOpen = log?.id === openFullExerciseId
+          const isComplete = totalSets > 0 && completedSets === totalSets
           const previousPerformance = getLastExercisePerformanceFromSessions(
             sessions,
             item.exerciseId,
             [...equivalentIds]
           )
-          return log ? (
+          if (!log) return null
+          return isOpen ? (
             <ExerciseLogger
               key={item.id}
               templateExercise={item}
               log={log}
               previousPerformance={previousPerformance}
               onChange={updateLog}
-              exercise={getExerciseById(item.exerciseId)}
+              exercise={exercise}
             />
-          ) : null
+          ) : (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setOpenFullExerciseId(log.id)}
+              className="card flex min-h-20 items-center justify-between gap-3 p-3.5 text-left transition hover:border-brand/50"
+              aria-expanded={false}
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-extrabold text-ink">{exercise?.name ?? 'Ejercicio'}</span>
+                <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs font-semibold text-secondary">
+                  <span>{getWorkingWeight(log)} kg</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{completedSets}/{totalSets} series</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{isComplete ? 'Completado' : completedSets > 0 ? 'En curso' : 'Pendiente'}</span>
+                </span>
+              </span>
+              <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-extrabold ${
+                isComplete ? 'bg-success-soft text-success-text' : 'bg-muted text-secondary'
+              }`}>
+                {isComplete ? 'Hecho' : 'Abrir'}
+              </span>
+            </button>
+          )
         })}
         </div>
       )}

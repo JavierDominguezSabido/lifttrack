@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
+import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
 import { dayNames, formatRestSeconds } from '../utils/workout'
@@ -31,6 +32,7 @@ const createId = () => typeof globalThis.crypto?.randomUUID === 'function'
   ? globalThis.crypto.randomUUID()
   : `template-exercise-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 const weekOrder = [1, 2, 3, 4, 5, 6, 0]
+type SettingsSection = 'account' | 'appearance' | 'routine' | 'data'
 
 function parseTarget(value: string) {
   const match = value.trim().match(/^([1-9]\d*)\s*[xX×]\s*([1-9]\d*)$/)
@@ -62,6 +64,7 @@ export function SettingsPage() {
   const [daySelections, setDaySelections] = useState<Record<string, string>>({})
   const [exerciseSearch, setExerciseSearch] = useState('')
   const [exerciseStatus, setExerciseStatus] = useState<'active' | 'all' | 'archived'>('active')
+  const [openSettingsSection, setOpenSettingsSection] = useState<SettingsSection>('account')
 
   useEffect(() => setDrafts(cloneTemplates(templates)), [templates])
 
@@ -83,6 +86,10 @@ export function SettingsPage() {
       })
       .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
   }, [exerciseSearch, exerciseStatus, exercises])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [openSettingsSection, settingsView])
 
   function updateTemplate(templateId: string, update: (template: WorkoutTemplate) => WorkoutTemplate) {
     setDrafts((current) => current.map((item) => item.id === templateId ? update(item) : item))
@@ -406,8 +413,47 @@ export function SettingsPage() {
 
   return (
       <div className="space-y-4 md:space-y-5">
-      <AccountSettings />
+      <SettingsAccordionHeader
+        id="account"
+        title="Cuenta y sincronización"
+        summary="Sesión, nube y datos locales"
+        open={openSettingsSection === 'account'}
+        onOpen={setOpenSettingsSection}
+      />
+      {openSettingsSection === 'account' && <AccountSettings />}
 
+      <SettingsAccordionHeader
+        id="appearance"
+        title="Apariencia"
+        summary="Tema claro u oscuro"
+        open={openSettingsSection === 'appearance'}
+        onOpen={setOpenSettingsSection}
+      />
+      {openSettingsSection === 'appearance' && (
+        <section className="card p-4 md:p-5" aria-labelledby="appearance-settings-title">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="eyebrow">Apariencia</p>
+              <h2 id="appearance-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
+                Tema
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-secondary">
+                Ajusta el modo visual de LiftTrack.
+              </p>
+            </div>
+            <ThemeToggle />
+          </div>
+        </section>
+      )}
+
+      <SettingsAccordionHeader
+        id="routine"
+        title="Rutina y ejercicios"
+        summary={`${orderedDrafts.reduce((total, template) => total + template.exercises.length, 0)} ejercicios planificados`}
+        open={openSettingsSection === 'routine'}
+        onOpen={setOpenSettingsSection}
+      />
+      {openSettingsSection === 'routine' && (
       <section className="card overflow-hidden" aria-labelledby="routine-settings-title">
         <header className="border-b border-line/70 p-4 md:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -450,12 +496,53 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
+      )}
 
       {message && <p role="status" className="status-success">{message}</p>}
       {error && <p role="alert" className="status-error">{error}</p>}
 
-      <DataSettings />
+      <SettingsAccordionHeader
+        id="data"
+        title="Datos"
+        summary="Importar, exportar y revisar sincronización"
+        open={openSettingsSection === 'data'}
+        onOpen={setOpenSettingsSection}
+      />
+      {openSettingsSection === 'data' && <DataSettings />}
     </div>
+  )
+}
+
+function SettingsAccordionHeader({
+  id,
+  title,
+  summary,
+  open,
+  onOpen
+}: {
+  id: SettingsSection
+  title: string
+  summary: string
+  open: boolean
+  onOpen: (section: SettingsSection) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(id)}
+      className={`card flex min-h-16 w-full items-center justify-between gap-3 p-3.5 text-left transition ${
+        open ? '!border-brand/50' : ''
+      }`}
+      aria-expanded={open}
+    >
+      <span className="min-w-0">
+        <span className="block font-extrabold text-ink">{title}</span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-secondary">{summary}</span>
+      </span>
+      <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-extrabold text-secondary">
+        {open ? 'Abierto' : 'Abrir'}
+      </span>
+    </button>
   )
 }
 

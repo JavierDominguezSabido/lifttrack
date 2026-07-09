@@ -13,7 +13,7 @@ import {
   Trophy,
   X
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, ExerciseLog, SetLog, WorkoutSession } from '../types'
@@ -36,6 +36,7 @@ import {
 const INITIAL_VISIBLE_SESSIONS = 10
 
 type RangeFilter = 'week' | 'month' | 'all'
+type HistoryTab = 'progress' | 'sessions'
 
 interface ProgressEntry {
   session: WorkoutSession
@@ -81,6 +82,7 @@ export function HistoryPage() {
   } = useWorkouts()
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('progress')
   const [selectedProgressId, setSelectedProgressId] = useState<string | undefined>(exerciseId)
   const [filterExerciseId, setFilterExerciseId] = useState('all')
   const [filterDay, setFilterDay] = useState('all')
@@ -176,6 +178,10 @@ export function HistoryPage() {
         search.trim() ? `"${search.trim()}"` : null
       ].filter(Boolean).join(' · ')
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [historyTab])
+
   async function removeSession(session: WorkoutSession) {
     const sessionDate = getSessionDateObject(session)
     const label = `${dayNames[sessionDate.getDay()]}, ${formatDate(sessionDate, {
@@ -221,6 +227,25 @@ export function HistoryPage() {
         </p>
       )}
 
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
+        {([
+          ['progress', 'Progreso'],
+          ['sessions', 'Sesiones']
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setHistoryTab(value)}
+            className={`min-h-10 rounded-lg text-sm font-extrabold transition ${
+              historyTab === value ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-muted'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {historyTab === 'progress' && (
       <section aria-labelledby="exercise-progress-title" className="card overflow-hidden">
         <div className="border-b border-line/70 p-4 md:p-5">
           <p className="eyebrow">Progreso por ejercicio</p>
@@ -351,7 +376,10 @@ export function HistoryPage() {
           />
         )}
       </section>
+      )}
 
+      {historyTab === 'sessions' && (
+      <>
       <section aria-labelledby="history-filters-title" className="card p-3.5 md:p-4">
         <div className="flex items-center justify-between gap-3 md:mb-3">
           <button
@@ -488,6 +516,8 @@ export function HistoryPage() {
           <EmptyHistoryState />
         )}
       </section>
+      </>
+      )}
     </div>
   )
 }

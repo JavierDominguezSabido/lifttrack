@@ -94,7 +94,7 @@
   }
 
   html {
-    @apply overflow-x-hidden scroll-smooth bg-canvas;
+    @apply overflow-x-hidden bg-canvas;
   }
 
   body {

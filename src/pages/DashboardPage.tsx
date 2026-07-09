@@ -1,4 +1,5 @@
 import { ArrowRight, CalendarCheck, CheckCircle2, Dumbbell, Flame, Trophy } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ProgressRing } from '../components/ui/ProgressRing'
 import { TemplateExerciseRow } from '../components/workout/TemplateExerciseRow'
@@ -21,6 +22,7 @@ const weekOrder = [1, 2, 3, 4, 5, 6, 0]
 
 export function DashboardPage() {
   const { sessions, templates, getExerciseById } = useWorkouts()
+  const [weeklyPlanOpen, setWeeklyPlanOpen] = useState(false)
   const today = new Date()
   const orderedTemplates = [...templates].sort(
     (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
@@ -143,18 +145,28 @@ export function DashboardPage() {
       </section>
 
       <section aria-labelledby="weekly-workouts-title">
-        <div className="mb-3 flex items-end justify-between">
+        <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <p className="eyebrow">Plan semanal</p>
             <h3 id="weekly-workouts-title" className="mt-1 text-xl font-extrabold tracking-tight">
               Tus entrenamientos
             </h3>
           </div>
-          <Link to="/rutina" className="text-sm font-bold text-brand hover:text-brand-hover">
-            Ver rutina
-          </Link>
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setWeeklyPlanOpen((current) => !current)}
+              className="text-sm font-bold text-brand md:hidden"
+              aria-expanded={weeklyPlanOpen}
+            >
+              {weeklyPlanOpen ? 'Ocultar' : 'Ver plan'}
+            </button>
+            <Link to="/rutina" className="text-sm font-bold text-brand hover:text-brand-hover">
+              Rutina
+            </Link>
+          </div>
         </div>
-        <div className="relative -mx-4 overflow-hidden md:mx-0">
+        <div className={`${weeklyPlanOpen ? 'block' : 'hidden'} relative -mx-4 overflow-hidden md:mx-0 md:block`}>
           <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 pr-10 md:grid md:grid-cols-7 md:overflow-visible md:px-0 md:pr-0">
             {orderedTemplates.map((template) => {
               const completed = completedDays.has(template.dayOfWeek)

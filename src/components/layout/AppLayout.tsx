@@ -1,4 +1,5 @@
 import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, Dumbbell, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { getCurrentWeekSessions } from '../../utils/workout'
@@ -37,6 +38,11 @@ export function AppLayout() {
     Object.entries(pageTitles).find(([path]) =>
       path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
     )?.[1] ?? 'LiftTrack'
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/entrenamiento')) return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
 
   return (
     <div className="min-h-dvh bg-canvas transition-colors lg:grid lg:grid-cols-[232px_1fr]">
