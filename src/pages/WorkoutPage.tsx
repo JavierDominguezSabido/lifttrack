@@ -425,9 +425,7 @@ export function WorkoutPage() {
   const draftStatusLabel =
     draftSyncStatus === 'synced'
       ? 'Borrador sincronizado'
-      : draftSyncStatus === 'pending'
-        ? 'Pendiente de sincronizar'
-        : 'Borrador guardado localmente'
+      : 'Pendiente de sincronizar'
 
   useLayoutEffect(() => {
     if (viewMode !== 'full') return
@@ -753,7 +751,7 @@ export function WorkoutPage() {
     }
     guidedFeedbackTimeoutRef.current = window.setTimeout(() => {
       setGuidedFeedback(null)
-    }, 1600)
+    }, 1100)
   }
 
   function updateGuidedLog(updatedLog: DraftExerciseLog) {
@@ -906,30 +904,6 @@ export function WorkoutPage() {
     setSaveError(null)
   }
 
-  function startNewWorkout() {
-    if (pendingDraft && !window.confirm('Hay un borrador guardado para este entrenamiento. ¿Quieres empezar uno nuevo y descartar ese borrador?')) {
-      return
-    }
-
-    const nextLogs = createExerciseLogs(template, sessions, exercises)
-    if (pendingDraft) {
-      removeWorkoutDraftByDay(userKey, pendingDraft.dayOfWeek)
-      removeRemoteWorkoutDraftByDayIfAvailable(user, pendingDraft.dayOfWeek)
-    }
-    lastLocalDraftRef.current = null
-    lastSyncedDraftUpdatedAtRef.current = null
-    clearFullScrollPosition()
-    setInitialLogs(nextLogs)
-    setLogs(nextLogs)
-    setStartedAt(new Date().toISOString())
-    setPendingDraft(null)
-    setDraftActive(false)
-    setDraftSyncStatus('idle')
-    setViewMode('full')
-    setGuidedPosition(null)
-    setSaveError(null)
-  }
-
   async function finishWorkout() {
     setSaveError(null)
     const validationError = validateWorkoutDraft(logs)[0]
@@ -974,6 +948,24 @@ export function WorkoutPage() {
 
   return (
     <div className="space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
+      <div
+        className="pointer-events-none fixed inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] z-40 flex justify-center lg:left-[calc(232px+1rem)] lg:top-20"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {guidedFeedback && (
+          <div
+            role="status"
+            className="w-fit max-w-md animate-[guidedToast_1100ms_ease-in-out_both] rounded-xl border border-success/30 bg-surface/95 px-4 py-2.5 text-center shadow-card backdrop-blur-xl"
+          >
+            <p className="text-sm font-extrabold text-success-text">{guidedFeedback.message}</p>
+            {guidedFeedback.detail && (
+              <p className="mt-0.5 text-xs font-bold text-secondary">{guidedFeedback.detail}</p>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
         <button
           type="button"
@@ -1029,37 +1021,20 @@ export function WorkoutPage() {
       </section>
 
       {pendingDraft && (
-        <section className="rounded-2xl border border-brand/30 bg-brand-soft px-4 py-3 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-extrabold text-ink">Tienes un entrenamiento en curso.</p>
-              <p className="mt-0.5 text-xs font-semibold text-secondary">
-                Elige si quieres continuar ese borrador o empezar este entrenamiento desde cero.
-              </p>
-            </div>
-            <div className="grid gap-2 sm:flex sm:shrink-0">
-              <button
-                type="button"
-                onClick={continueDraft}
-                className="btn-primary !min-h-10 !px-3 !py-2 !text-sm"
-              >
-                Continuar borrador
-              </button>
-              <button
-                type="button"
-                onClick={discardDraft}
-                className="btn-secondary !min-h-10 !px-3 !py-2 !text-sm"
-              >
-                Descartar
-              </button>
-              <button
-                type="button"
-                onClick={startNewWorkout}
-                className="btn-secondary !min-h-10 !px-3 !py-2 !text-sm"
-              >
-                Empezar nuevo
-              </button>
-            </div>
+        <section className="rounded-xl border border-brand/25 bg-brand-soft/70 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 text-xs font-bold text-secondary sm:text-sm">
+              <span className="font-extrabold text-ink">Entrenamiento en curso</span>
+              <span aria-hidden="true"> · </span>
+              {draftStatusLabel}
+            </p>
+            <button
+              type="button"
+              onClick={continueDraft}
+              className="btn-primary shrink-0 !min-h-11 !px-3 !py-2 !text-sm"
+            >
+              Continuar
+            </button>
           </div>
         </section>
       )}
@@ -1112,18 +1087,6 @@ export function WorkoutPage() {
             </div>
           ) : currentGuidedStep ? (
             <div className="mx-auto max-w-lg space-y-3 p-3.5 sm:p-4">
-              {guidedFeedback && (
-                <div
-                  role="status"
-                  className="rounded-xl border border-success/30 bg-success-soft px-3 py-2 text-center transition-all duration-300"
-                >
-                  <p className="text-sm font-extrabold text-success-text">{guidedFeedback.message}</p>
-                  {guidedFeedback.detail && (
-                    <p className="mt-0.5 text-xs font-bold text-success-text/80">{guidedFeedback.detail}</p>
-                  )}
-                </div>
-              )}
-
               <div
                 key={guidedStepAnimationKey}
                 className="space-y-3 animate-[guidedStepIn_220ms_ease-out]"
@@ -1264,11 +1227,14 @@ export function WorkoutPage() {
                   <CheckCircle2 className={guidedFeedback ? 'size-6' : 'size-5'} aria-hidden="true" />
                   {currentGuidedStep.set.completed ? 'Continuar' : 'Marcar hecha y continuar'}
                 </button>
-                <div>
-                  <button type="button" onClick={goToPreviousGuidedStep} disabled={currentGuidedIndex === 0} className="btn-secondary !min-h-11 !px-2 disabled:cursor-not-allowed disabled:opacity-40">
-                    Anterior
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={goToPreviousGuidedStep}
+                  disabled={currentGuidedIndex === 0}
+                  className="btn-secondary w-full !min-h-11 !px-3 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Anterior
+                </button>
               </div>
               </div>
             </div>
