@@ -107,10 +107,10 @@ La aplicación se encuentra desplegada en Vercel y se utiliza como proyecto real
   <img src="docs/screenshots/sessions-desktop.png" alt="Sesiones guardadas en LiftTrack" width="100%">
 </p>
 
-### Tema claro
+### Sincronización y copias de seguridad
 
 <p align="center">
-  <img src="docs/screenshots/dashboard-mobile-light.jpg" alt="LiftTrack en tema claro" width="330">
+  <img src="docs/screenshots/settings-data-desktop.png" alt="Sincronización y copias de seguridad en LiftTrack" width="100%">
 </p>
 
 ## Tecnologías
@@ -129,124 +129,23 @@ La aplicación se encuentra desplegada en Vercel y se utiliza como proyecto real
 
 ## Arquitectura
 
-LiftTrack separa la interfaz de la capa de persistencia mediante servicios y repositorios.
+LiftTrack utiliza React y TypeScript en el frontend, Supabase para autenticación y persistencia de datos, y Vercel para el despliegue.
 
-- La interfaz trabaja con un estado común para la vista completa y el modo guiado.
-- El repositorio local permite conservar datos y borradores en el dispositivo.
-- El repositorio de Supabase gestiona usuarios, entrenamientos y borradores sincronizados.
-- Los borradores no aparecen en el historial ni afectan al volumen, la racha o el último entrenamiento hasta que la sesión se finaliza.
-- La sincronización remota utiliza la fecha de actualización para seleccionar la versión más reciente.
-- El esquema de Supabase y las políticas RLS se mantienen dentro de `docs/`.
+La aplicación mantiene sincronizadas la vista completa y el modo guiado, conserva borradores de entrenamiento en curso y separa los borradores de las sesiones definitivas para que no afecten al historial ni a las estadísticas hasta que el entrenamiento se guarda.
 
-Archivos destacados:
 
-```text
-src/services/workoutRepository.ts
-src/services/supabase/supabaseWorkoutRepository.ts
-src/services/supabase/supabaseWorkoutDraftRepository.ts
-src/types/database.ts
-docs/supabase-schema.sql
-docs/migrations/
-```
-
-## Instalación local
-
-### Requisitos
-
-- Node.js
-- npm
-- Un proyecto de Supabase
-
-### Pasos
-
-```bash
-git clone https://github.com/JavierDominguezSabido/lifttrack.git
-cd lifttrack
-npm install
-```
-
-Copia el archivo de ejemplo de variables de entorno:
-
-```bash
-cp .env.example .env.local
-```
-
-En PowerShell:
-
-```powershell
-Copy-Item .env.example .env.local
-```
-
-Configura las variables de Supabase:
-
-```env
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
-
-Inicia el entorno de desarrollo:
-
-```bash
-npm run dev
-```
-
-> No subas `.env.local` al repositorio. La clave `service_role` nunca debe utilizarse en el frontend.
-
-## Configuración de Supabase
-
-1. Crea un proyecto en Supabase.
-2. Abre el editor SQL.
-3. Ejecuta el contenido de:
-
-```text
-docs/supabase-schema.sql
-```
-
-4. Ejecuta también las migraciones adicionales disponibles en:
-
-```text
-docs/migrations/
-```
-
-5. Añade la URL y la clave anónima del proyecto a `.env.local`.
-
-Las políticas RLS limitan las operaciones a las filas pertenecientes al usuario autenticado.
-
-## Scripts
-
-```bash
-npm run dev       # Servidor de desarrollo
-npm run build     # Compilación de producción
-npm run lint      # Análisis estático
-npm run preview   # Previsualización de la compilación
-```
-
-## Despliegue
-
-El proyecto está preparado para desplegarse en Vercel.
-
-En el proyecto de Vercel deben configurarse estas variables:
-
-```env
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
-
-Cada cambio enviado a la rama principal genera un nuevo despliegue.
-
-**Aplicación:** https://lifttrack-alpha.vercel.app/
 
 ## Estado del proyecto
 
-LiftTrack es una aplicación funcional y en uso real. Las funcionalidades principales están implementadas y el trabajo actual se centra en pruebas, accesibilidad, estabilidad y pequeños ajustes derivados del uso durante entrenamientos reales.
+LiftTrack es una aplicación funcional, desplegada y utilizada en entrenamientos reales. Las funcionalidades principales están implementadas y el proyecto continúa evolucionando a partir del uso práctico.
 
-## Posibles mejoras
 
-- Aumentar la cobertura de pruebas automatizadas.
-- Incorporar más métricas y comparativas de progreso.
-- Mejorar la estrategia offline-first.
-- Realizar una auditoría completa de accesibilidad.
-- Añadir análisis de récords personales.
+
+## Demo
+
+La aplicación está disponible en:
+
+**https://lifttrack-alpha.vercel.app/**
 
 ## Autor
 
