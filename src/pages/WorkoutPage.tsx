@@ -1149,7 +1149,7 @@ export function WorkoutPage() {
                 </div>
 
                 <div className="rounded-2xl bg-muted/45 p-3.5">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                  <div>
                     <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
                       <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
                       <span className="relative block">
@@ -1168,13 +1168,6 @@ export function WorkoutPage() {
                         </span>
                       </span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => updateGuidedWeight(getWorkingWeight(currentGuidedStep.log) + 1.25)}
-                      className="min-h-11 whitespace-nowrap rounded-lg bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
-                    >
-                      +1.25 kg
-                    </button>
                   </div>
 
                   <label className="mt-4 block">
@@ -1280,6 +1273,7 @@ export function WorkoutPage() {
               previousPerformance={previousPerformance}
               onChange={updateLog}
               exercise={exercise}
+              showWeightIncrement={false}
             />
           )
         })}

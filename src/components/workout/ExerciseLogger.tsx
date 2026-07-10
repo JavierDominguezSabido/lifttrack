@@ -30,6 +30,7 @@ interface ExerciseLoggerProps {
   previousPerformance: LastExercisePerformance | null
   onChange: (log: DraftExerciseLog) => void
   exercise?: Exercise
+  showWeightIncrement?: boolean
 }
 
 export function ExerciseLogger({
@@ -37,7 +38,8 @@ export function ExerciseLogger({
   log,
   previousPerformance,
   onChange,
-  exercise
+  exercise,
+  showWeightIncrement = true
 }: ExerciseLoggerProps) {
   if (!exercise) return null
 
@@ -147,7 +149,7 @@ export function ExerciseLogger({
 
       <div className="space-y-3 p-3.5 sm:p-4">
         <section aria-labelledby={`weight-label-${log.id}`} className="rounded-xl bg-muted/55 p-3">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+          <div className={showWeightIncrement ? 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2' : 'block'}>
             <label className="min-w-0">
               <span
                 id={`weight-label-${log.id}`}
@@ -172,14 +174,16 @@ export function ExerciseLogger({
                 </span>
               </span>
             </label>
-            <button
-              type="button"
-              onClick={() => setWorkingWeight(workingWeight + 1.25)}
-              className="min-h-11 whitespace-nowrap rounded-lg bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
-              aria-label={`Sumar 1,25 kg al peso de ${exercise.name}`}
-            >
-              +1.25 kg
-            </button>
+            {showWeightIncrement && (
+              <button
+                type="button"
+                onClick={() => setWorkingWeight(workingWeight + 1.25)}
+                className="min-h-11 whitespace-nowrap rounded-lg bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
+                aria-label={`Sumar 1,25 kg al peso de ${exercise.name}`}
+              >
+                +1.25 kg
+              </button>
+            )}
           </div>
         </section>
 
