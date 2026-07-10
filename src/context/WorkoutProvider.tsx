@@ -25,7 +25,8 @@ interface RoutineState {
 
 export function WorkoutProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
-  const owner = user?.id ?? 'local'
+  const userId = user?.id
+  const owner = userId ?? 'local'
   const [sessions, setSessions] = useState<WorkoutSession[]>(getStoredSessions)
   const [sessionsLoading, setSessionsLoading] = useState(authLoading)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
@@ -68,28 +69,28 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     void reloadSessions()
     void (async () => {
       try {
-        if (!user) {
+        if (!userId) {
           copyLegacyRoutine('local')
           if (active) setRoutine({ owner: 'local', exercises: getStoredExercises('local'), templates: getStoredTemplates('local'), customized: getHasCustomRoutine('local') })
           return
         }
-        let remote = await loadRemoteRoutine(user.id)
+        let remote = await loadRemoteRoutine(userId)
         // Solo una cuenta con datos remotos previos puede reclamar la antigua rutina global.
         if (!remote.hasCompleteRoutine && remote.hasSessions) {
-          copyLegacyRoutine(user.id, true)
-          const migratedExercises = getStoredExercises(user.id)
-          const migratedTemplates = getStoredTemplates(user.id)
-          await saveRemoteRoutine(user.id, migratedExercises, migratedTemplates)
-          remote = await loadRemoteRoutine(user.id)
+          copyLegacyRoutine(userId, true)
+          const migratedExercises = getStoredExercises(userId)
+          const migratedTemplates = getStoredTemplates(userId)
+          await saveRemoteRoutine(userId, migratedExercises, migratedTemplates)
+          remote = await loadRemoteRoutine(userId)
         }
         const catalog = getExerciseCatalog()
         const byId = new Map(catalog.map((exercise) => [exercise.id, exercise]))
         for (const exercise of remote.exercises) byId.set(exercise.id, exercise)
         const exercises = [...byId.values()]
-        const templates = remote.templates.length ? remote.templates : getStoredTemplates(user.id)
-        storeExercises(user.id, exercises)
-        if (remote.templates.length) storeTemplates(user.id, templates)
-        if (active) setRoutine({ owner: user.id, exercises, templates, customized: remote.templates.length > 0 })
+        const templates = remote.templates.length ? remote.templates : getStoredTemplates(userId)
+        storeExercises(userId, exercises)
+        if (remote.templates.length) storeTemplates(userId, templates)
+        if (active) setRoutine({ owner: userId, exercises, templates, customized: remote.templates.length > 0 })
       } catch (error) {
         console.error('[routine] No se pudo cargar la rutina:', error)
         if (active) setRoutineError('No se pudo cargar la rutina sincronizada.')
@@ -99,7 +100,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       }
     })()
     return () => { active = false }
-  }, [authLoading, owner, reloadSessions, user])
+  }, [authLoading, owner, reloadSessions, userId])
 
   const persist = useCallback((exercises: Exercise[], templates: WorkoutTemplate[]) => {
     storeExercises(owner, exercises)
@@ -122,6 +123,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     routineLoading,
     routineError,
     dataMode,
+    ownerId: owner,
     saveSession: async (session) => {
       const saved = sessions.some((item) => item.id === session.id)
         ? await activeRepository.updateWorkoutSession(session)

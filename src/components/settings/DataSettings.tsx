@@ -18,6 +18,7 @@ import {
 import { rebuildImportRelationships } from '../../services/dataImport/relationships'
 import { createImportPreview } from '../../services/dataImport/preview'
 import type { ImportPayload, ImportPreview } from '../../services/dataImport/types'
+import { shouldResetPendingImport } from '../../services/dataImport/lifecycle'
 import {
   findExerciseDuplicateGroups,
   normalizeExerciseName
@@ -142,6 +143,7 @@ export function DataSettings() {
     exercises,
     templates,
     dataMode,
+    ownerId,
     routineLoading,
     routineError,
     saveSession,
@@ -158,6 +160,7 @@ export function DataSettings() {
   const [mergingDuplicates, setMergingDuplicates] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const importOwner = useRef(ownerId)
   const exportableSessions = sessions.filter((session) => !isInitialSession(session.id))
   const duplicateGroups = useMemo(
     () => findExerciseDuplicateGroups(exercises, templates, exportableSessions),
@@ -168,6 +171,16 @@ export function DataSettings() {
     if (importStatus !== 'ready' || !preview) return
     requestAnimationFrame(() => previewElement.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
   }, [importStatus, preview])
+
+  useEffect(() => {
+    if (!shouldResetPendingImport(importOwner.current, ownerId)) return
+    importOwner.current = ownerId
+    setPreview(null)
+    setImportStatus('idle')
+    setMessage(null)
+    setError(null)
+    if (jsonInput.current) jsonInput.current.value = ''
+  }, [ownerId])
 
   function filename() {
     return `lifttrack-${toLocalDateKey(new Date())}.json`

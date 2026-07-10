@@ -483,7 +483,9 @@ export function SettingsPage() {
         open={openSettingsSection === 'data'}
         onOpen={setOpenSettingsSection}
       />
-      {openSettingsSection === 'data' && <DataSettings />}
+      <div hidden={openSettingsSection !== 'data'}>
+        <DataSettings />
+      </div>
     </div>
   )
 }

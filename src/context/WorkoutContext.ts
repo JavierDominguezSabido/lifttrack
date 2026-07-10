@@ -11,6 +11,7 @@ export interface WorkoutContextValue {
   routineError: string | null
   sessionsError: string | null
   dataMode: 'local' | 'cloud'
+  ownerId: string
   saveSession: (session: WorkoutSession) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   clearLocalSessions: () => Promise<void>

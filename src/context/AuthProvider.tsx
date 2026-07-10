@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '../services/supabase/supabaseClient'
 import { AuthContext, type AuthContextValue } from './AuthContext'
+import { preserveUserIdentity } from './authIdentity'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -17,12 +18,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase.auth.getSession().then(({ data, error }) => {
       if (!active) return
       if (error) console.error('[auth] No se pudo recuperar la sesión:', error)
-      setUser(data.session?.user ?? null)
+      setUser((current) => preserveUserIdentity(current, data.session?.user ?? null))
       setLoading(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      setUser((current) => preserveUserIdentity(current, session?.user ?? null))
       setLoading(false)
     })
 
