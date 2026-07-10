@@ -144,6 +144,13 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       const exercises = [...currentRoutine.exercises, ...imported.filter((exercise) => !ids.has(exercise.id)).map((exercise) => ({ ...exercise, active: exercise.active !== false }))]
       persist(exercises, currentRoutine.templates); setRoutine({ ...currentRoutine, exercises })
     },
+    importRoutine: (imported, templates) => {
+      const ids = new Set(currentRoutine.exercises.map((exercise) => exercise.id))
+      const exercises = [...currentRoutine.exercises, ...imported.filter((exercise) => !ids.has(exercise.id)).map((exercise) => ({ ...exercise, active: exercise.active !== false }))]
+      const nextTemplates = templates?.length ? templates : currentRoutine.templates
+      persist(exercises, nextTemplates)
+      setRoutine({ ...currentRoutine, exercises, templates: nextTemplates, customized: templates?.length ? true : currentRoutine.customized })
+    },
     mergeDuplicateExercises: async (canonicalId, duplicateIds) => { const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds); await reloadSessions(true); return count },
     reloadSessions
   }), [activeRepository, currentRoutine, dataMode, persist, reloadSessions, sessions, sessionsError, sessionsLoading])

@@ -5,6 +5,7 @@ import { sessionsToCsv } from '../dataExport/csv'
 import { parseWorkoutCsv } from './csv'
 import { parseWorkoutBackup } from './json'
 import { createImportPreview } from './preview'
+import { rebuildImportRelationships } from './relationships'
 
 const exercise: Exercise = {
   id: 'press-banca',
@@ -117,5 +118,43 @@ describe('transferencia de datos', () => {
     expect(parsed.sessions[0]).toEqual(session)
     expect(parsed.exercises[0]).toEqual(exercise)
     expect(parsed.templates?.[0]).toEqual(template)
+  })
+
+  it('reconstruye todas las relaciones de una rutina de 23 ejercicios y 7 días', () => {
+    const exercises = Array.from({ length: 23 }, (_, index): Exercise => ({
+      id: `old-exercise-${index + 1}`, name: `Ejercicio ${index + 1}`, active: true
+    }))
+    const expected = [6, 5, 6, 6, 0, 0, 0]
+    let cursor = 0
+    const templates = expected.map((count, day): WorkoutTemplate => ({
+      id: `old-template-${day}`, name: `Día ${day + 1}`, dayOfWeek: day,
+      exercises: Array.from({ length: count }, (_, order) => {
+        const exerciseId = exercises[cursor++].id
+        return { id: `${day}-${order}`, templateId: `old-template-${day}`, exerciseId, order: order + 1, targetSets: 3, targetReps: '8-12', restSeconds: 90, notes: 'Técnica' }
+      })
+    }))
+    const existing: Exercise[] = [{ ...exercises[0], id: 'existing-uuid' }]
+    const historical: WorkoutSession = {
+      ...session, templateId: templates[0].id,
+      exerciseLogs: [{ ...session.exerciseLogs[0], exerciseId: exercises[0].id }]
+    }
+    const payload = parseWorkoutBackup(JSON.stringify(createBackup([historical], exercises, templates, 'local')), 'regression.json')
+    const rebuilt = rebuildImportRelationships(payload, existing, [])
+
+    expect(rebuilt.errors).toEqual([])
+    expect(rebuilt.templates?.map((item) => item.exercises.length)).toEqual(expected)
+    const ids = new Set([...existing, ...rebuilt.exercises].map((item) => item.id))
+    expect(rebuilt.templates?.flatMap((item) => item.exercises).every((item) => ids.has(item.exerciseId))).toBe(true)
+    expect(rebuilt.templates?.[0].exercises[0].exerciseId).toBe('existing-uuid')
+    expect(rebuilt.sessions[0].exerciseLogs[0].exerciseId).toBe('existing-uuid')
+    expect(rebuilt.sessions[0].exerciseLogs.flatMap((log) => log.sets).every((set) => rebuilt.sessions[0].exerciseLogs.some((log) => log.id === set.exerciseLogId))).toBe(true)
+  })
+
+  it('bloquea referencias huérfanas antes de importar', () => {
+    const broken = rebuildImportRelationships({
+      source: 'json', filename: 'roto.json', exercises: [], sessions: [], errors: [],
+      templates: [{ ...template, exercises: [{ ...template.exercises[0], exerciseId: 'missing' }] }]
+    }, [], [])
+    expect(broken.errors[0]).toContain('ejercicio inexistente')
   })
 })

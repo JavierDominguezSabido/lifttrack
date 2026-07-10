@@ -12,6 +12,7 @@ import { useWorkouts } from '../../context/WorkoutContext'
 import { createBackup } from '../../services/dataExport/backup'
 import { downloadTextFile } from '../../services/dataExport/download'
 import { parseWorkoutBackup } from '../../services/dataImport/json'
+import { rebuildImportRelationships } from '../../services/dataImport/relationships'
 import { createImportPreview } from '../../services/dataImport/preview'
 import type { ImportPayload, ImportPreview } from '../../services/dataImport/types'
 import {
@@ -82,6 +83,7 @@ function canonicalizeImportedPayload(
   existingExercises: ReturnType<typeof useWorkouts>['exercises'],
   templates: ReturnType<typeof useWorkouts>['templates']
 ) {
+  payload = rebuildImportRelationships(payload, existingExercises, templates)
   const templateExerciseIds = new Set(
     templates.flatMap((template) => template.exercises.map((item) => item.exerciseId))
   )
@@ -138,8 +140,7 @@ export function DataSettings() {
     templates,
     dataMode,
     saveSession,
-    saveTemplates,
-    mergeExercises,
+    importRoutine,
     mergeDuplicateExercises
   } = useWorkouts()
   const jsonInput = useRef<HTMLInputElement>(null)
@@ -206,8 +207,7 @@ export function DataSettings() {
     setError(null)
     setMessage(null)
     try {
-      mergeExercises(preview.exercises)
-      if (preview.templates?.length) saveTemplates(preview.templates)
+      importRoutine(preview.exercises, preview.templates)
       for (const session of preview.sessionsToImport) {
         await saveSession(session)
       }
