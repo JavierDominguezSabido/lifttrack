@@ -1,5 +1,6 @@
 import { exercises as exampleExercises, templates as exampleTemplates } from '../data/mockData'
 import type { Exercise, WorkoutTemplate } from '../types'
+import { normalizeWeeklyTemplates } from './templateImport'
 
 const LEGACY_EXERCISES_KEY = 'lifttrack.exercises.v1'
 const LEGACY_TEMPLATES_KEY = 'lifttrack.workoutTemplates.v1'
@@ -58,7 +59,11 @@ export function getStoredExercises(owner: string): Exercise[] {
 
 export function getStoredTemplates(owner: string): WorkoutTemplate[] {
   const stored = read<WorkoutTemplate[]>(keys(owner).templates)
-  return Array.isArray(stored) ? clone(stored).sort((a, b) => a.dayOfWeek - b.dayOfWeek) : getEmptyRoutine()
+  if (!Array.isArray(stored)) return getEmptyRoutine()
+  const normalized = normalizeWeeklyTemplates(clone(stored))
+  if (normalized.conflicts.length) console.error('[routine] Conflictos semanales locales:', normalized.conflicts)
+  if (normalized.templates.length !== stored.length) storeTemplates(owner, normalized.templates)
+  return normalized.templates
 }
 
 export function storeExercises(owner: string, exercises: Exercise[]) {
@@ -66,7 +71,7 @@ export function storeExercises(owner: string, exercises: Exercise[]) {
 }
 
 export function storeTemplates(owner: string, templates: WorkoutTemplate[]) {
-  localStorage.setItem(keys(owner).templates, JSON.stringify(templates))
+  localStorage.setItem(keys(owner).templates, JSON.stringify(normalizeWeeklyTemplates(templates).templates))
 }
 
 export function hasCustomRoutine(owner: string) {

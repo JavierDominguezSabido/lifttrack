@@ -25,6 +25,7 @@ import {
 } from '../../utils/exerciseIdentity'
 import { toLocalDateKey } from '../../utils/date'
 import { isInitialSession } from '../../utils/workout'
+import { mergeWeeklyTemplates, normalizeWeeklyTemplates } from '../../services/templateImport'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -234,7 +235,15 @@ export function DataSettings() {
     if (!preview || preview.errors.length > 0) return
     const hasRoutine = Boolean(preview.templates?.length)
     if (preview.sessionsToImport.length === 0 && !hasRoutine && preview.exercises.length === 0) return
-    if (!window.confirm(
+    let templatesToImport = preview.templates
+    const hasExistingRoutine = templates.some((template) => template.exercises.length > 0)
+    if (hasRoutine && hasExistingRoutine) {
+      if (window.confirm('Ya tienes una rutina con ejercicios. Aceptar: reemplazar la rutina actual. Cancelar: elegir entre fusionar o no importar.')) {
+        templatesToImport = normalizeWeeklyTemplates(preview.templates ?? []).templates
+      } else if (window.confirm('¿Quieres fusionar por día sin duplicar plantillas ni ejercicios? Cancelar detendrá la importación.')) {
+        templatesToImport = mergeWeeklyTemplates(templates, preview.templates ?? []).templates
+      } else return
+    } else if (!window.confirm(
       `Se va a importar una copia JSON con ${preview.sessionsToImport.length} sesiones nuevas${hasRoutine ? ' y rutina personalizada' : ''}. No se sobrescribirán sesiones existentes. ¿Continuar?`
     )) return
 
@@ -242,7 +251,7 @@ export function DataSettings() {
     setError(null)
     setMessage(null)
     try {
-      await importRoutine(preview.exercises, preview.templates)
+      await importRoutine(preview.exercises, templatesToImport)
       for (const session of preview.sessionsToImport) {
         await saveSession(session)
       }

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/database'
 import type { Exercise, WorkoutTemplate } from '../../types'
 import { supabase } from './supabaseClient'
+import { normalizeWeeklyTemplates } from '../templateImport'
 
 type DbClient = SupabaseClient<Database>
 
@@ -33,7 +34,7 @@ export async function loadRemoteRoutine(userId: string) {
     notes: row.notes ?? undefined,
     active: row.active
   }))
-  const templates: WorkoutTemplate[] = (templateResult.data ?? []).map((row) => ({
+  const loadedTemplates: WorkoutTemplate[] = (templateResult.data ?? []).map((row) => ({
     id: row.stable_key,
     name: row.name,
     dayOfWeek: row.day_of_week,
@@ -49,6 +50,10 @@ export async function loadRemoteRoutine(userId: string) {
       notes: item.notes ?? undefined
     }))
   }))
+  const normalized = normalizeWeeklyTemplates(loadedTemplates)
+  if (normalized.conflicts.length) console.error('[routine] Conflictos semanales:', normalized.conflicts)
+  const templates = normalized.templates
+  if (templates.length !== loadedTemplates.length) await saveRemoteRoutine(userId, exercises, templates)
   return {
     exercises,
     templates,
@@ -60,6 +65,9 @@ export async function loadRemoteRoutine(userId: string) {
 
 export async function saveRemoteRoutine(userId: string, exercises: Exercise[], templates: WorkoutTemplate[]) {
   const db = client()
+  const normalized = normalizeWeeklyTemplates(templates)
+  if (normalized.conflicts.length) throw new Error(normalized.conflicts.join(' '))
+  templates = normalized.templates
   check((await db.from('profiles').upsert({ id: userId }, { onConflict: 'id' })).error)
   const exerciseDbIds = new Map<string, string>()
   for (const exercise of exercises) {
@@ -79,6 +87,15 @@ export async function saveRemoteRoutine(userId: string, exercises: Exercise[], t
     check(error); if (data) templateDbIds.set(template.id, data.id)
   }
   const ids = [...templateDbIds.values()]
+  const { data: activeTemplates, error: obsoleteError } = await db.from('workout_templates')
+    .select('id, stable_key').eq('user_id', userId).eq('active', true)
+  check(obsoleteError)
+  const retainedKeys = new Set(templates.map((template) => template.id))
+  const obsoleteIds = (activeTemplates ?? []).filter((row) => !retainedKeys.has(row.stable_key)).map((row) => row.id)
+  if (obsoleteIds.length) {
+    check((await db.from('template_exercises').delete().eq('user_id', userId).in('template_id', obsoleteIds)).error)
+    check((await db.from('workout_templates').update({ active: false }).eq('user_id', userId).in('id', obsoleteIds)).error)
+  }
   if (ids.length) check((await db.from('template_exercises').delete().eq('user_id', userId).in('template_id', ids)).error)
   const rows = templates.flatMap((template) => template.exercises.map((item) => {
     const templateId = templateDbIds.get(template.id); const exerciseId = exerciseDbIds.get(item.exerciseId)
