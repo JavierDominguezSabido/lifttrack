@@ -7,11 +7,14 @@ import {
   HardDrive,
   X
 } from 'lucide-react'
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { createBackup } from '../../services/dataExport/backup'
 import { downloadTextFile } from '../../services/dataExport/download'
-import { parseWorkoutBackup } from '../../services/dataImport/json'
+import {
+  InvalidJsonFileError, UnexpectedBackupFormatError,
+  readWorkoutBackupFile
+} from '../../services/dataImport/file'
 import { rebuildImportRelationships } from '../../services/dataImport/relationships'
 import { createImportPreview } from '../../services/dataImport/preview'
 import type { ImportPayload, ImportPreview } from '../../services/dataImport/types'
@@ -144,7 +147,9 @@ export function DataSettings() {
     mergeDuplicateExercises
   } = useWorkouts()
   const jsonInput = useRef<HTMLInputElement>(null)
+  const previewElement = useRef<HTMLDivElement>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [importStatus, setImportStatus] = useState<'idle' | 'reading' | 'ready' | 'error'>('idle')
   const [importing, setImporting] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [reviewDuplicates, setReviewDuplicates] = useState(false)
@@ -157,6 +162,11 @@ export function DataSettings() {
     [exercises, exportableSessions, templates]
   )
 
+  useEffect(() => {
+    if (importStatus !== 'ready' || !preview) return
+    requestAnimationFrame(() => previewElement.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
+  }, [importStatus, preview])
+
   function filename() {
     return `lifttrack-${toLocalDateKey(new Date())}.json`
   }
@@ -168,30 +178,40 @@ export function DataSettings() {
     setError(null)
   }
 
-  async function selectFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget
+    const file = input.files?.[0]
     if (!file) return
 
     setMessage(null)
     setError(null)
-    if (file.size > MAX_FILE_SIZE) {
-      setError('El archivo supera el límite de 10 MB.')
-      setPreview(null)
-      return
-    }
-
+    setImportStatus('reading')
+    setPreview(null)
     try {
-      const text = await file.text()
-      const payload = parseWorkoutBackup(text, file.name)
-      setPreview(createImportPreview(
+      if (file.size > MAX_FILE_SIZE) {
+        setError('El archivo supera el límite de 10 MB.')
+        setImportStatus('error')
+        setPreview(null)
+        return
+      }
+
+      const payload = await readWorkoutBackupFile(file)
+      const nextPreview = createImportPreview(
         canonicalizeImportedPayload(payload, exercises, templates),
         exportableSessions
-      ))
+      )
+      setPreview(nextPreview)
+      setImportStatus('ready')
     } catch (readError) {
-      console.error('[import] No se pudo leer el archivo:', readError)
-      setError('No se pudo leer el archivo seleccionado.')
+      setImportStatus('error')
+      setError(readError instanceof InvalidJsonFileError
+        ? 'El archivo no contiene un JSON válido.'
+        : readError instanceof UnexpectedBackupFormatError
+          ? 'La copia no tiene el formato esperado por LiftTrack.'
+          : 'No se pudo leer el archivo seleccionado.')
       setPreview(null)
+    } finally {
+      input.value = ''
     }
   }
 
@@ -294,6 +314,8 @@ export function DataSettings() {
             {error}
           </p>
         )}
+        {importStatus === 'reading' && <p role="status" className="status-success">Leyendo archivo…</p>}
+        {importStatus === 'ready' && <p role="status" className="status-success">Archivo preparado para importar.</p>}
 
         <div>
           <p className="text-sm leading-6 text-secondary">
@@ -302,9 +324,9 @@ export function DataSettings() {
           <input
             ref={jsonInput}
             type="file"
-            accept=".json,application/json"
+            accept=".json,application/json,text/json,text/plain,application/octet-stream"
             className="sr-only"
-            onChange={(event) => void selectFile(event)}
+            onChange={(event) => void handleImportFile(event)}
           />
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <button type="button" onClick={exportJson} className="btn-secondary w-full">
@@ -319,12 +341,14 @@ export function DataSettings() {
         </div>
 
         {preview && (
-          <ImportPreviewCard
-            preview={preview}
-            importing={importing}
-            onConfirm={() => void confirmImport()}
-            onCancel={() => setPreview(null)}
-          />
+          <div ref={previewElement}>
+            <ImportPreviewCard
+              preview={preview}
+              importing={importing}
+              onConfirm={() => void confirmImport()}
+              onCancel={() => { setPreview(null); setImportStatus('idle') }}
+            />
+          </div>
         )}
 
         <div className="border-t border-line/70 pt-4">
