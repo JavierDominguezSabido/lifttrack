@@ -7,11 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: [
-        'icons/favicon-32.png',
-        'icons/favicon-48.png',
-        'icons/apple-touch-icon.png'
-      ],
+      includeAssets: ['icon.svg', 'pwa-192x192.svg', 'pwa-512x512.svg'],
       workbox: {
         cacheId: 'lifttrack',
         cleanupOutdatedCaches: true
@@ -19,37 +15,28 @@ export default defineConfig({
       manifest: {
         name: 'LiftTrack',
         short_name: 'LiftTrack',
-        description: 'Registro y seguimiento de entrenamientos de fuerza',
-        theme_color: '#0a0f1a',
-        background_color: '#0a0f1a',
+        description: 'Registra tus entrenamientos de fuerza y sigue tu progreso.',
+        theme_color: '#f6f7f9',
+        background_color: '#f6f7f9',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
-        scope: '/',
         icons: [
           {
-            src: '/icons/icon-192.png',
+            src: 'pwa-192x192.svg',
             sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any'
+            type: 'image/svg+xml'
           },
           {
-            src: '/icons/icon-512.png',
+            src: 'pwa-512x512.svg',
             sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any'
+            type: 'image/svg+xml'
           },
           {
-            src: '/icons/maskable-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'maskable'
-          },
-          {
-            src: '/icons/maskable-512.png',
+            src: 'pwa-512x512.svg',
             sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
           }
         ]
       }
