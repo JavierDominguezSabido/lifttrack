@@ -142,6 +142,8 @@ export function DataSettings() {
     exercises,
     templates,
     dataMode,
+    routineLoading,
+    routineError,
     saveSession,
     importRoutine,
     mergeDuplicateExercises
@@ -227,7 +229,7 @@ export function DataSettings() {
     setError(null)
     setMessage(null)
     try {
-      importRoutine(preview.exercises, preview.templates)
+      await importRoutine(preview.exercises, preview.templates)
       for (const session of preview.sessionsToImport) {
         await saveSession(session)
       }
@@ -236,8 +238,8 @@ export function DataSettings() {
       )
       setPreview(null)
     } catch (importError) {
-      console.error('[import] La importación no se completó:', importError)
-      setError('La importación no se completó. Puedes reintentar; las sesiones ya guardadas se detectarán por su ID.')
+      const detail = importError instanceof Error ? importError.message : String(importError)
+      setError(`La importación no se completó. La vista previa se conserva para reintentar.${import.meta.env.DEV ? ` ${detail}` : ''}`)
     } finally {
       setImporting(false)
     }
@@ -316,6 +318,8 @@ export function DataSettings() {
         )}
         {importStatus === 'reading' && <p role="status" className="status-success">Leyendo archivo…</p>}
         {importStatus === 'ready' && <p role="status" className="status-success">Archivo preparado para importar.</p>}
+        {preview && routineLoading && <p role="status" className="status-success">La sincronización todavía se está preparando. El archivo se ha leído, pero aún no puede confirmarse.</p>}
+        {preview && routineError && <p role="alert" className="status-error">No se pudieron comparar los ejercicios con tu cuenta. {routineError}</p>}
 
         <div>
           <p className="text-sm leading-6 text-secondary">
@@ -345,6 +349,7 @@ export function DataSettings() {
             <ImportPreviewCard
               preview={preview}
               importing={importing}
+              confirmationBlocked={routineLoading || Boolean(routineError)}
               onConfirm={() => void confirmImport()}
               onCancel={() => { setPreview(null); setImportStatus('idle') }}
             />
@@ -456,11 +461,13 @@ function DuplicateReview({
 function ImportPreviewCard({
   preview,
   importing,
+  confirmationBlocked,
   onConfirm,
   onCancel
 }: {
   preview: ImportPreview
   importing: boolean
+  confirmationBlocked: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -516,7 +523,7 @@ function ImportPreviewCard({
         <button type="button" onClick={onCancel} disabled={importing} className="btn-secondary w-full">
           Cancelar
         </button>
-        <button type="button" onClick={onConfirm} disabled={!canImport || importing} className="btn-primary w-full">
+        <button type="button" onClick={onConfirm} disabled={!canImport || importing || confirmationBlocked} className="btn-primary w-full">
           {importing ? 'Importando...' : 'Confirmar importación'}
         </button>
       </div>

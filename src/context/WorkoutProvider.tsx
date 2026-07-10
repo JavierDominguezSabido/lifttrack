@@ -29,6 +29,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<WorkoutSession[]>(getStoredSessions)
   const [sessionsLoading, setSessionsLoading] = useState(authLoading)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
+  const [routineLoading, setRoutineLoading] = useState(authLoading)
+  const [routineError, setRoutineError] = useState<string | null>(null)
   const [routine, setRoutine] = useState<RoutineState>(() => ({
     owner: 'local', exercises: getStoredExercises('local'), templates: getStoredTemplates('local'),
     customized: getHasCustomRoutine('local')
@@ -60,6 +62,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return
     let active = true
+    setRoutineLoading(true)
+    setRoutineError(null)
     setSessions([])
     void reloadSessions()
     void (async () => {
@@ -88,7 +92,10 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
         if (active) setRoutine({ owner: user.id, exercises, templates, customized: remote.templates.length > 0 })
       } catch (error) {
         console.error('[routine] No se pudo cargar la rutina:', error)
+        if (active) setRoutineError('No se pudo cargar la rutina sincronizada.')
         if (active) setRoutine({ owner, exercises: getStoredExercises(owner), templates: getStoredTemplates(owner), customized: getHasCustomRoutine(owner) })
+      } finally {
+        if (active) setRoutineLoading(false)
       }
     })()
     return () => { active = false }
@@ -112,6 +119,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     hasCustomRoutine: currentRoutine.customized,
     sessionsLoading,
     sessionsError,
+    routineLoading,
+    routineError,
     dataMode,
     saveSession: async (session) => {
       const saved = sessions.some((item) => item.id === session.id)
@@ -144,16 +153,28 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       const exercises = [...currentRoutine.exercises, ...imported.filter((exercise) => !ids.has(exercise.id)).map((exercise) => ({ ...exercise, active: exercise.active !== false }))]
       persist(exercises, currentRoutine.templates); setRoutine({ ...currentRoutine, exercises })
     },
-    importRoutine: (imported, templates) => {
+    importRoutine: async (imported, templates) => {
+      if (routineLoading || currentRoutine.owner !== owner) throw new Error('La sincronización de la rutina todavía se está preparando.')
       const ids = new Set(currentRoutine.exercises.map((exercise) => exercise.id))
       const exercises = [...currentRoutine.exercises, ...imported.filter((exercise) => !ids.has(exercise.id)).map((exercise) => ({ ...exercise, active: exercise.active !== false }))]
       const nextTemplates = templates?.length ? templates : currentRoutine.templates
-      persist(exercises, nextTemplates)
-      setRoutine({ ...currentRoutine, exercises, templates: nextTemplates, customized: templates?.length ? true : currentRoutine.customized })
+      let confirmedExercises = exercises
+      let confirmedTemplates = nextTemplates
+      if (user) {
+        await saveRemoteRoutine(user.id, exercises, nextTemplates)
+        const remote = await loadRemoteRoutine(user.id)
+        const byId = new Map(getExerciseCatalog().map((exercise) => [exercise.id, exercise]))
+        for (const exercise of remote.exercises) byId.set(exercise.id, exercise)
+        confirmedExercises = [...byId.values()]
+        confirmedTemplates = remote.templates
+      }
+      storeExercises(owner, confirmedExercises)
+      storeTemplates(owner, confirmedTemplates)
+      setRoutine({ ...currentRoutine, exercises: confirmedExercises, templates: confirmedTemplates, customized: templates?.length ? true : currentRoutine.customized })
     },
     mergeDuplicateExercises: async (canonicalId, duplicateIds) => { const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds); await reloadSessions(true); return count },
     reloadSessions
-  }), [activeRepository, currentRoutine, dataMode, persist, reloadSessions, sessions, sessionsError, sessionsLoading])
+  }), [activeRepository, currentRoutine, dataMode, owner, persist, reloadSessions, routineError, routineLoading, sessions, sessionsError, sessionsLoading, user])
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>
 }

@@ -13,6 +13,16 @@ function file(type: string, text = validText): ImportFileLike {
 }
 
 describe('lectura de archivos JSON en PWA', () => {
+  for (const scenario of [
+    'local + navegador',
+    'local + PWA standalone',
+    'autenticado + navegador',
+    'autenticado + PWA standalone'
+  ]) it(`prepara el mismo archivo en ${scenario} sin depender de autenticación`, async () => {
+    const payload = await readWorkoutBackupFile(file('application/json'))
+    expect(payload).toMatchObject({ source: 'json', filename: 'lifttrack.json', errors: [] })
+  })
+
   for (const type of mimeTypes) it(`acepta MIME "${type || 'vacío'}"`, async () => {
     await expect(readWorkoutBackupFile(file(type))).resolves.toMatchObject({ source: 'json', errors: [] })
   })
