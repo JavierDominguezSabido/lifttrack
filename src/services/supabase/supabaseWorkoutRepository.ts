@@ -118,7 +118,7 @@ async function persistSession(session: WorkoutSession) {
   const client = requireClient()
   const userId = await requireUserId(client)
   validateSessionSets(session, 'save:start')
-  const domainTemplate = getStoredTemplates().find((item) => item.id === session.templateId)
+  const domainTemplate = getStoredTemplates(userId).find((item) => item.id === session.templateId)
   let templateId: string | null = null
 
   const { error: profileError } = await client
@@ -144,7 +144,7 @@ async function persistSession(session: WorkoutSession) {
 
   const exerciseIds = new Map<string, string>()
   for (const log of session.exerciseLogs) {
-    const exercise = getStoredExercises().find((item) => item.id === log.exerciseId)
+    const exercise = getStoredExercises(userId).find((item) => item.id === log.exerciseId)
     const { data, error } = await client
       .from('exercises')
       .upsert({
@@ -337,7 +337,7 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
   async mergeExerciseIds(canonicalId, duplicateIds) {
     const client = requireClient()
     const userId = await requireUserId(client)
-    const storedExercises = getStoredExercises()
+    const storedExercises = getStoredExercises(userId)
     const canonicalExercise = storedExercises.find((item) => item.id === canonicalId)
 
     const { data: canonicalRow, error: canonicalError } = await client

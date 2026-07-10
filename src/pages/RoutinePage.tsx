@@ -23,6 +23,19 @@ export function RoutinePage() {
     orderedTemplates[0]?.id
   const [openTemplateId, setOpenTemplateId] = useState(initialOpenTemplateId)
 
+  if (!templates.some((template) => template.exercises.length > 0)) {
+    return (
+      <section className="card grid min-h-64 place-items-center p-6 text-center">
+        <div>
+          <Dumbbell className="mx-auto size-9 text-brand" aria-hidden="true" />
+          <h2 className="mt-3 text-xl font-extrabold text-ink">Todavía no tienes una rutina</h2>
+          <p className="mt-1 text-sm text-secondary">Crea tus días y elige ejercicios para empezar.</p>
+          <Link to="/configuracion" className="btn-primary mt-5">Crear mi rutina</Link>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <div className="space-y-4 md:space-y-5">
       <div className="grid gap-3 sm:flex sm:items-start sm:justify-between">

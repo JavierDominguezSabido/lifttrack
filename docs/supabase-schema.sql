@@ -29,11 +29,15 @@ create table if not exists public.exercises (
   muscle_group text not null,
   equipment text,
   notes text,
+  active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, stable_key),
   unique (id, user_id)
 );
+
+-- Migración aditiva para instalaciones creadas con una versión anterior.
+alter table public.exercises add column if not exists active boolean not null default true;
 
 create table if not exists public.workout_templates (
   id uuid primary key default gen_random_uuid(),

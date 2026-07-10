@@ -40,6 +40,7 @@ export interface Database {
           muscle_group: string
           equipment: string | null
           notes: string | null
+          active: boolean
         }
         Insert: {
           id?: string
@@ -49,6 +50,7 @@ export interface Database {
           muscle_group: string
           equipment?: string | null
           notes?: string | null
+          active?: boolean
           created_at?: string
           updated_at?: string
         }
