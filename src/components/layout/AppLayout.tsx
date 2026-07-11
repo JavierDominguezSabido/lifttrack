@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { getCurrentWeekSessions } from '../../utils/workout'
 import { ThemeToggle } from '../ui/ThemeToggle'
+import { shouldShowInitialWorkoutLoader } from '../../utils/workoutLifecycle'
 
 const navigation = [
   { label: 'Inicio', path: '/', icon: LayoutDashboard },
@@ -23,7 +24,23 @@ const pageTitles: Record<string, string> = {
 
 export function AppLayout() {
   const location = useLocation()
-  const { sessions, templates, dataMode, sessionsError, sessionsLoading } = useWorkouts()
+  const { sessions, templates, dataMode, sessionsError, initialLoading, backgroundRefreshing, ownerId } = useWorkouts()
+  const hasLocalWorkoutDraft = (() => {
+    try {
+      const userKey = ownerId === 'local' ? 'local' : `user:${ownerId}`
+      const prefix = `lifttrack.workoutDraft.${userKey}.`
+      return Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+        .some((key) => key?.startsWith(prefix))
+    } catch {
+      return false
+    }
+  })()
+  const showInitialLoader = shouldShowInitialWorkoutLoader({
+    initialLoading,
+    sessionCount: sessions.length,
+    templateCount: templates.length,
+    hasLocalDraft: hasLocalWorkoutDraft
+  })
   const activeTemplateCount = templates.filter((template) => template.exercises.length > 0).length
   const weeklySessionCount = getCurrentWeekSessions(sessions).length
   const weeklyProgress = activeTemplateCount
@@ -119,7 +136,7 @@ export function AppLayout() {
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
-          {sessionsLoading ? (
+          {showInitialLoader ? (
             <p role="status" className="mb-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-secondary">
               Cargando entrenamientos…
             </p>
@@ -127,6 +144,9 @@ export function AppLayout() {
             <>
               {sessionsError && (
                 <p role="alert" className="status-error mb-4">{sessionsError}</p>
+              )}
+              {backgroundRefreshing && (
+                <p role="status" className="mb-3 text-right text-xs font-bold text-secondary">Sincronizando…</p>
               )}
               <Outlet />
             </>

@@ -29,6 +29,7 @@ import {
   validateWorkoutDraft
 } from '../utils/workoutDraft'
 import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
+import { selectNewestDraft } from '../utils/workoutLifecycle'
 
 type WorkoutViewMode = 'full' | 'guided'
 type DraftSyncStatus = 'idle' | 'local' | 'pending' | 'synced'
@@ -109,12 +110,6 @@ function createStoredWorkoutDraft(
     viewMode,
     guidedPosition: normalizedGuidedPosition ?? undefined
   }
-}
-
-function getDraftUpdatedTime(draft: Pick<StoredWorkoutDraft, 'updatedAt'> | null | undefined) {
-  if (!draft) return 0
-  const updatedAt = new Date(draft.updatedAt).getTime()
-  return Number.isFinite(updatedAt) ? updatedAt : 0
 }
 
 function readWorkoutDraft(userKey: string, template: WorkoutTemplate): StoredWorkoutDraft | null {
@@ -257,8 +252,28 @@ export function WorkoutPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { sessions, saveSession, templates, exercises, getExerciseById } = useWorkouts()
-  const template = templates.find((item) => item.id === templateId) ?? getTodayTemplate(templates)
   const userKey = getDraftUserKey(user?.id)
+  const localDraftHint = readWorkoutDrafts(userKey).find((draft) =>
+    templateId ? draft.templateId === templateId : true
+  ) ?? null
+  const template = templates.find((item) => item.id === templateId) ??
+    getTodayTemplate(templates) ??
+    (localDraftHint ? {
+      id: localDraftHint.templateId,
+      name: `Entrenamiento día ${localDraftHint.dayOfWeek}`,
+      dayOfWeek: localDraftHint.dayOfWeek,
+      exercises: localDraftHint.logs.map((log) => ({
+        id: `recovered-${log.id}`,
+        templateId: localDraftHint.templateId,
+        exerciseId: log.exerciseId,
+        order: log.order,
+        targetSets: log.sets.length,
+        targetReps: log.sets[0]?.reps || '1',
+        restSeconds: 0
+      }))
+    } satisfies WorkoutTemplate : {
+      id: 'empty', name: 'Entrenamiento', dayOfWeek: new Date().getDay(), exercises: []
+    } satisfies WorkoutTemplate)
   const initialStateRef = useRef<{
     logs: DraftExerciseLog[]
     initialLogs: DraftExerciseLog[]
@@ -580,7 +595,8 @@ export function WorkoutPage() {
         }
         const currentLocalDraft = readWorkoutDraft(userKey, template)
         const localDraft = currentLocalDraft ?? localDraftAtStart
-        const remoteIsNewer = getDraftUpdatedTime(remotePayload) > getDraftUpdatedTime(localDraft)
+        const newestDraft = selectNewestDraft(localDraft, remotePayload)
+        const remoteIsNewer = newestDraft.source === 'remote'
 
         if (remoteIsNewer) {
           setInitialLogs(createExerciseLogs(template, sessions, exercises))

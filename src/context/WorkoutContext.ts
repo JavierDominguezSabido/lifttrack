@@ -8,6 +8,8 @@ export interface WorkoutContextValue {
   hasCustomRoutine: boolean
   sessionsLoading: boolean
   routineLoading: boolean
+  initialLoading: boolean
+  backgroundRefreshing: boolean
   routineError: string | null
   sessionsError: string | null
   dataMode: 'local' | 'cloud'
@@ -23,7 +25,7 @@ export interface WorkoutContextValue {
   mergeExercises: (exercises: Exercise[]) => void
   importRoutine: (exercises: Exercise[], templates?: WorkoutTemplate[]) => Promise<void>
   mergeDuplicateExercises: (canonicalId: string, duplicateIds: string[]) => Promise<number>
-  reloadSessions: (silent?: boolean) => Promise<void>
+  reloadSessions: (background?: boolean) => Promise<void>
 }
 
 export const WorkoutContext = createContext<WorkoutContextValue | null>(null)

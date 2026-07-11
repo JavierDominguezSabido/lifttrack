@@ -32,6 +32,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   const [sessionsError, setSessionsError] = useState<string | null>(null)
   const [routineLoading, setRoutineLoading] = useState(authLoading)
   const [routineError, setRoutineError] = useState<string | null>(null)
+  const [initialLoading, setInitialLoading] = useState(authLoading)
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false)
   const [routine, setRoutine] = useState<RoutineState>(() => ({
     owner: 'local', exercises: getStoredExercises('local'), templates: getStoredTemplates('local'),
     customized: getHasCustomRoutine('local')
@@ -43,30 +45,43 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     ? routine
     : { owner, exercises: getExerciseCatalog(), templates: [], customized: false }, [owner, routine])
 
-  const reloadSessions = useCallback(async (silent = false) => {
+  const reloadSessions = useCallback(async (background = true) => {
     if (authLoading) return
-    if (!silent) setSessionsLoading(true)
+    if (background) setBackgroundRefreshing(true)
+    else setSessionsLoading(true)
     setSessionsError(null)
     try {
       setSessions(await activeRepository.getWorkoutSessions())
     } catch (error) {
       console.error('[workout] No se pudo cargar el historial activo:', error)
-      setSessions([])
       setSessionsError(dataMode === 'cloud'
         ? 'No se pudo cargar el historial sincronizado. Revisa la conexión e inténtalo de nuevo.'
         : 'No se pudo cargar el historial guardado en este dispositivo.')
     } finally {
-      if (!silent) setSessionsLoading(false)
+      if (background) setBackgroundRefreshing(false)
+      else setSessionsLoading(false)
     }
   }, [activeRepository, authLoading, dataMode])
 
   useEffect(() => {
     if (authLoading) return
     let active = true
-    setRoutineLoading(true)
+    const cachedExercises = getStoredExercises(owner)
+    const cachedTemplates = getStoredTemplates(owner)
+    const hasUsableLocalState = cachedTemplates.length > 0
+    setInitialLoading(!hasUsableLocalState)
+    setSessionsLoading(!hasUsableLocalState)
+    setRoutineLoading(!hasUsableLocalState)
+    setBackgroundRefreshing(hasUsableLocalState)
     setRoutineError(null)
     setSessions([])
-    void reloadSessions()
+    setRoutine({
+      owner,
+      exercises: cachedExercises,
+      templates: cachedTemplates,
+      customized: getHasCustomRoutine(owner)
+    })
+    void reloadSessions(hasUsableLocalState)
     void (async () => {
       try {
         if (!userId) {
@@ -96,11 +111,42 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
         if (active) setRoutineError('No se pudo cargar la rutina sincronizada.')
         if (active) setRoutine({ owner, exercises: getStoredExercises(owner), templates: getStoredTemplates(owner), customized: getHasCustomRoutine(owner) })
       } finally {
-        if (active) setRoutineLoading(false)
+        if (active) {
+          setRoutineLoading(false)
+          setInitialLoading(false)
+          setBackgroundRefreshing(false)
+        }
       }
     })()
     return () => { active = false }
   }, [authLoading, owner, reloadSessions, userId])
+
+  useEffect(() => {
+    if (authLoading) return
+    let refreshQueued = false
+    const refreshInBackground = () => {
+      if (document.visibilityState === 'hidden' || refreshQueued) return
+      refreshQueued = true
+      window.queueMicrotask(() => {
+        refreshQueued = false
+        void reloadSessions(true)
+      })
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshInBackground()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', refreshInBackground)
+    window.addEventListener('pageshow', refreshInBackground)
+    window.addEventListener('online', refreshInBackground)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', refreshInBackground)
+      window.removeEventListener('pageshow', refreshInBackground)
+      window.removeEventListener('online', refreshInBackground)
+    }
+  }, [authLoading, reloadSessions])
 
   const persist = useCallback((exercises: Exercise[], templates: WorkoutTemplate[]) => {
     storeExercises(owner, exercises)
@@ -121,6 +167,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     sessionsLoading,
     sessionsError,
     routineLoading,
+    initialLoading,
+    backgroundRefreshing,
     routineError,
     dataMode,
     ownerId: owner,
@@ -176,7 +224,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     },
     mergeDuplicateExercises: async (canonicalId, duplicateIds) => { const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds); await reloadSessions(true); return count },
     reloadSessions
-  }), [activeRepository, currentRoutine, dataMode, owner, persist, reloadSessions, routineError, routineLoading, sessions, sessionsError, sessionsLoading, user])
+  }), [activeRepository, backgroundRefreshing, currentRoutine, dataMode, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, sessions, sessionsError, sessionsLoading, user])
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>
 }
