@@ -2,6 +2,32 @@ export interface TimestampedDraft {
   updatedAt: string
 }
 
+export function getDatedLocalDraftKey(userKey: string, localDate: string, templateId: string) {
+  return `lifttrack.workoutDraft.${userKey}.${localDate}.${templateId}`
+}
+
+export function getDatedRemoteDraftKey(localDate: string, templateId: string) {
+  return `${localDate}.${templateId}`
+}
+
+export function isActiveDraftForDate(
+  draft: { localDate?: string; status?: string } | null | undefined,
+  localDate: string
+) {
+  return draft?.localDate === localDate && draft.status === 'active'
+}
+
+export function hasCompletedSessionForDraft(
+  sessions: Array<{ templateId?: string; startedAt: string; completedAt?: string }>,
+  draft: { templateId: string; startedAt: string }
+) {
+  return sessions.some((session) =>
+    Boolean(session.completedAt) &&
+    session.templateId === draft.templateId &&
+    session.startedAt === draft.startedAt
+  )
+}
+
 export function getUpdatedTime(value: TimestampedDraft | null | undefined) {
   if (!value) return 0
   const timestamp = new Date(value.updatedAt).getTime()

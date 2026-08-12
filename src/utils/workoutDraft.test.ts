@@ -7,13 +7,13 @@ import {
   createExerciseLogs,
   createWorkoutSession,
   normalizeRepsInput,
+  reconcileUntouchedExerciseWeights,
   setAllSetsCompleted,
   validateWorkoutDraft,
   normalizeWeight,
   updateWorkoutSession
 } from './workoutDraft'
 import { getLastExercisePerformanceFromSessions } from './workoutHistory'
-import { getProgressionSuggestion } from './workout'
 
 const mondayTemplate = templates.find((template) => template.id === 'lunes')!
 
@@ -34,16 +34,27 @@ describe('historial y borrador de entrenamiento', () => {
     expect(benchPress.workingWeightKg).toBe(65)
     expect(benchPress.sets).toHaveLength(4)
     expect(benchPress.sets.every((set) => set.weightKg === 65)).toBe(true)
+    expect(benchPress.sets.every((set) => !set.completed)).toBe(true)
+    expect(benchPress.sets.every((set) => set.reps === mondayTemplate.exercises[0].targetReps)).toBe(true)
   })
 
-  it('sugiere subir solo si se completaron todas las series objetivo', () => {
-    const bench = mondayTemplate.exercises[0]
-    const incline = mondayTemplate.exercises[1]
-    const benchPerformance = getLastExercisePerformanceFromSessions(initialSessions, bench.exerciseId)!
-    const inclinePerformance = getLastExercisePerformanceFromSessions(initialSessions, incline.exerciseId)!
+  it('usa 67.5 kg del último rendimiento sin copiar series completadas', () => {
+    const latest = {
+      ...initialSessions[0],
+      id: 'latest-session',
+      startedAt: '2026-07-08T16:00:00.000Z',
+      completedAt: '2026-07-08T17:00:00.000Z',
+      exerciseLogs: initialSessions[0].exerciseLogs.map((log, index) => index === 0 ? {
+        ...log,
+        workingWeightKg: 67.5,
+        sets: log.sets.map((set) => ({ ...set, weightKg: 67.5, completed: true }))
+      } : log)
+    }
+    const [benchPress] = createExerciseLogs(mondayTemplate, [latest, ...initialSessions])
 
-    expect(getProgressionSuggestion(benchPerformance, bench)).toBe('repetir peso')
-    expect(getProgressionSuggestion(inclinePerformance, incline)).toBe('subir peso')
+    expect(benchPress.workingWeightKg).toBe(67.5)
+    expect(benchPress.sets.every((set) => set.weightKg === 67.5)).toBe(true)
+    expect(benchPress.sets.every((set) => !set.completed)).toBe(true)
   })
 
   it('prioriza una sesión local frente al registro inicial', () => {
@@ -206,5 +217,28 @@ describe('peso de trabajo', () => {
     expect(updated.exerciseLogs[0].sets.map((set) => set.completed)).toEqual([false, true])
     expect(updated.exerciseLogs[0].sets.every((set) => Number.isFinite(set.reps))).toBe(true)
     expect(updated.volumeKg).toBe(525)
+  })
+})
+
+describe('reconciliación de pesos cargados tarde', () => {
+  const provisional = createExerciseLogs(mondayTemplate, [])
+  const resolved = createExerciseLogs(mondayTemplate, initialSessions)
+
+  it('sustituye el cero provisional por el peso de caché/remoto', () => {
+    const result = reconcileUntouchedExerciseWeights(provisional, provisional, resolved)
+    expect(result[0].workingWeightKg).toBe(65)
+    expect(result[0].sets.every((set) => set.weightKg === 65)).toBe(true)
+  })
+
+  it('no sobrescribe un peso editado por el usuario', () => {
+    const edited = provisional.map((log, index) => index === 0 ? applyWorkingWeight(log, 62.5) : log)
+    const result = reconcileUntouchedExerciseWeights(edited, provisional, resolved)
+    expect(result[0].workingWeightKg).toBe(62.5)
+  })
+
+  it('conserva un cero real cuando el historial ya está resuelto', () => {
+    const zeroResolved = createExerciseLogs(mondayTemplate, [])
+    const result = reconcileUntouchedExerciseWeights(provisional, provisional, zeroResolved)
+    expect(result[0].workingWeightKg).toBe(0)
   })
 })

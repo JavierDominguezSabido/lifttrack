@@ -3,13 +3,9 @@ import {
   CheckCheck,
   Minus,
   Plus,
-  RotateCcw,
-  Sparkles
+  RotateCcw
 } from 'lucide-react'
-import {
-  formatRestSeconds,
-  getProgressionSuggestion
-} from '../../utils/workout'
+import { formatRestSeconds } from '../../utils/workout'
 import {
   applyWorkingWeight,
   getWorkingWeight,
@@ -46,9 +42,6 @@ export function ExerciseLogger({
   const workingWeight = getWorkingWeight(log)
   const completedSets = log.sets.filter((set) => set.completed).length
   const isCompleted = log.sets.length > 0 && completedSets === log.sets.length
-  const suggestion = previousPerformance
-    ? getProgressionSuggestion(previousPerformance, templateExercise)
-    : null
   const targetLabel = `${templateExercise.targetReps}x${templateExercise.targetSets}`
 
   function setWorkingWeight(value: number) {
@@ -122,12 +115,6 @@ export function ExerciseLogger({
                 ? ` con ${previousPerformance.weightKg} kg`
                 : ' sin peso añadido'}
             </p>
-            {suggestion && (
-              <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-brand">
-                <Sparkles className="size-3.5" aria-hidden="true" />
-                Sugerencia: {suggestion}
-              </p>
-            )}
           </div>
         )}
 

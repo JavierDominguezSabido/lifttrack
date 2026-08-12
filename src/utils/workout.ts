@@ -1,10 +1,5 @@
 import { exercises } from '../data/mockData'
-import type {
-  LastExercisePerformance,
-  WorkoutSession,
-  WorkoutTemplate,
-  WorkoutTemplateExercise
-} from '../types'
+import type { WorkoutSession, WorkoutTemplate } from '../types'
 import {
   getNextWeekStart,
   getSessionDate,
@@ -110,24 +105,6 @@ export function formatRestSeconds(seconds?: number) {
   if (!seconds) return '—'
   const minutes = Math.floor(seconds / 60)
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-export function completedTarget(
-  performance: LastExercisePerformance,
-  target: WorkoutTemplateExercise
-) {
-  const targetReps = Number.parseInt(target.targetReps, 10)
-  return performance.reps.length >= target.targetSets &&
-    performance.reps
-      .slice(0, target.targetSets)
-      .every((reps) => reps >= targetReps)
-}
-
-export function getProgressionSuggestion(
-  performance: LastExercisePerformance,
-  target: WorkoutTemplateExercise
-) {
-  return completedTarget(performance, target) ? 'subir peso' : 'repetir peso'
 }
 
 export function getSessionVolume(session: WorkoutSession) {

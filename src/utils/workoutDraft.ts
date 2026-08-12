@@ -84,6 +84,36 @@ export function createExerciseLogs(
   })
 }
 
+/** Reemplaza únicamente valores provisionales que el usuario no ha modificado. */
+export function reconcileUntouchedExerciseWeights(
+  current: DraftExerciseLog[],
+  provisional: DraftExerciseLog[],
+  resolved: DraftExerciseLog[]
+) {
+  const provisionalByExercise = new Map(provisional.map((log) => [log.exerciseId, log]))
+  const resolvedByExercise = new Map(resolved.map((log) => [log.exerciseId, log]))
+
+  return current.map((log) => {
+    const initial = provisionalByExercise.get(log.exerciseId)
+    const actual = resolvedByExercise.get(log.exerciseId)
+    if (!initial || !actual) return log
+    const untouched = log.workingWeightKg === initial.workingWeightKg &&
+      log.sets.length === initial.sets.length &&
+      log.sets.every((set, index) =>
+        set.weightKg === initial.sets[index]?.weightKg &&
+        set.weightOverrideKg === initial.sets[index]?.weightOverrideKg
+      )
+    return untouched ? {
+      ...log,
+      workingWeightKg: actual.workingWeightKg,
+      sets: log.sets.map((set) => ({
+        ...set,
+        weightKg: actual.workingWeightKg ?? actual.sets[0]?.weightKg ?? set.weightKg
+      }))
+    } : log
+  })
+}
+
 export function createDraftFromSession(session: WorkoutSession): DraftExerciseLog[] {
   return session.exerciseLogs.map((log) => ({
     ...log,

@@ -7,6 +7,12 @@ export interface WorkoutContextValue {
   templates: WorkoutTemplate[]
   hasCustomRoutine: boolean
   sessionsLoading: boolean
+  templatesLoaded: boolean
+  exercisesLoaded: boolean
+  historyLoaded: boolean
+  lastPerformanceLoaded: boolean
+  draftLoaded: boolean
+  syncReady: boolean
   routineLoading: boolean
   initialLoading: boolean
   backgroundRefreshing: boolean

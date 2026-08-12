@@ -9,6 +9,7 @@ import {
 } from '../services/routineStorage'
 import { loadRemoteRoutine, saveRemoteRoutine } from '../services/supabase/supabaseRoutineRepository'
 import { useAuth } from './AuthContext'
+import { readSessionCache, writeSessionCache } from '../services/workoutSessionCache'
 
 function createId() {
   return typeof globalThis.crypto?.randomUUID === 'function'
@@ -29,6 +30,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   const owner = userId ?? 'local'
   const [sessions, setSessions] = useState<WorkoutSession[]>(getStoredSessions)
   const [sessionsLoading, setSessionsLoading] = useState(authLoading)
+  const [historyLoaded, setHistoryLoaded] = useState(!authLoading)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
   const [routineLoading, setRoutineLoading] = useState(authLoading)
   const [routineError, setRoutineError] = useState<string | null>(null)
@@ -51,7 +53,10 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     else setSessionsLoading(true)
     setSessionsError(null)
     try {
-      setSessions(await activeRepository.getWorkoutSessions())
+      const remoteSessions = await activeRepository.getWorkoutSessions()
+      setSessions(remoteSessions)
+      writeSessionCache(owner, remoteSessions)
+      setHistoryLoaded(true)
     } catch (error) {
       console.error('[workout] No se pudo cargar el historial activo:', error)
       setSessionsError(dataMode === 'cloud'
@@ -61,20 +66,22 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       if (background) setBackgroundRefreshing(false)
       else setSessionsLoading(false)
     }
-  }, [activeRepository, authLoading, dataMode])
+  }, [activeRepository, authLoading, dataMode, owner])
 
   useEffect(() => {
     if (authLoading) return
     let active = true
     const cachedExercises = getStoredExercises(owner)
     const cachedTemplates = getStoredTemplates(owner)
+    const cachedHistory = userId ? readSessionCache(owner) : null
     const hasUsableLocalState = cachedTemplates.length > 0
     setInitialLoading(!hasUsableLocalState)
     setSessionsLoading(!hasUsableLocalState)
     setRoutineLoading(!hasUsableLocalState)
     setBackgroundRefreshing(hasUsableLocalState)
     setRoutineError(null)
-    setSessions([])
+    setSessions(userId ? cachedHistory?.sessions ?? [] : getStoredSessions())
+    setHistoryLoaded(!userId || Boolean(cachedHistory))
     setRoutine({
       owner,
       exercises: cachedExercises,
@@ -165,6 +172,12 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     templates: currentRoutine.templates,
     hasCustomRoutine: currentRoutine.customized,
     sessionsLoading,
+    templatesLoaded: currentRoutine.owner === owner && !routineLoading,
+    exercisesLoaded: currentRoutine.owner === owner && !routineLoading,
+    historyLoaded,
+    lastPerformanceLoaded: historyLoaded,
+    draftLoaded: true,
+    syncReady: currentRoutine.owner === owner && !routineLoading && historyLoaded,
     sessionsError,
     routineLoading,
     initialLoading,
@@ -176,9 +189,20 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       const saved = sessions.some((item) => item.id === session.id)
         ? await activeRepository.updateWorkoutSession(session)
         : await activeRepository.saveWorkoutSession(session)
-      setSessions((items) => [saved, ...items.filter((item) => item.id !== saved.id)])
+      setSessions((items) => {
+        const next = [saved, ...items.filter((item) => item.id !== saved.id)]
+        writeSessionCache(owner, next)
+        return next
+      })
     },
-    deleteSession: async (id) => { await activeRepository.deleteWorkoutSession(id); setSessions((items) => items.filter((item) => item.id !== id)) },
+    deleteSession: async (id) => {
+      await activeRepository.deleteWorkoutSession(id)
+      setSessions((items) => {
+        const next = items.filter((item) => item.id !== id)
+        writeSessionCache(owner, next)
+        return next
+      })
+    },
     clearLocalSessions: async () => { await localWorkoutRepository.clearWorkoutSessions(); if (dataMode === 'local') setSessions(getStoredSessions()) },
     createExercise: (exercise) => {
       const created = { ...exercise, id: createId(), active: true }
@@ -224,7 +248,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     },
     mergeDuplicateExercises: async (canonicalId, duplicateIds) => { const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds); await reloadSessions(true); return count },
     reloadSessions
-  }), [activeRepository, backgroundRefreshing, currentRoutine, dataMode, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, sessions, sessionsError, sessionsLoading, user])
+  }), [activeRepository, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, sessions, sessionsError, sessionsLoading, user])
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  getDatedLocalDraftKey,
+  getDatedRemoteDraftKey,
+  hasCompletedSessionForDraft,
+  isActiveDraftForDate,
   selectNewestDraft,
   shouldRefreshForLifecycleEvent,
   shouldShowInitialWorkoutLoader
@@ -60,5 +64,61 @@ describe('reanudacion no bloqueante del entrenamiento', () => {
   it('no reutiliza el borrador de otro usuario', () => {
     const localKeys = ['lifttrack.workoutDraft.user:ana.day-1']
     expect(localKeys.some((key) => key.startsWith('lifttrack.workoutDraft.user:luis.'))).toBe(false)
+  })
+
+  it('genera claves distintas para dos miércoles', () => {
+    expect(getDatedLocalDraftKey('user:ana', '2026-07-08', 'miercoles')).not.toBe(
+      getDatedLocalDraftKey('user:ana', '2026-07-15', 'miercoles')
+    )
+    expect(getDatedRemoteDraftKey('2026-07-08', 'miercoles')).not.toBe(
+      getDatedRemoteDraftKey('2026-07-15', 'miercoles')
+    )
+  })
+
+  it('ignora borradores antiguos y legacy aunque coincida el día semanal', () => {
+    expect(isActiveDraftForDate({ localDate: '2026-07-08', status: 'active' }, '2026-07-15')).toBe(false)
+    expect(isActiveDraftForDate({ status: 'active' }, '2026-07-15')).toBe(false)
+    expect(isActiveDraftForDate({ localDate: '2026-07-15', status: 'completed' }, '2026-07-15')).toBe(false)
+    expect(isActiveDraftForDate({ localDate: '2026-07-15', status: 'active' }, '2026-07-15')).toBe(true)
+  })
+
+  it('detecta un borrador que ya corresponde a una sesión completada', () => {
+    const draft = { templateId: 'miercoles', startedAt: '2026-07-15T16:00:00.000Z' }
+    expect(hasCompletedSessionForDraft([{
+      templateId: 'miercoles',
+      startedAt: draft.startedAt,
+      completedAt: '2026-07-15T17:00:00.000Z'
+    }], draft)).toBe(true)
+    expect(hasCompletedSessionForDraft([{
+      templateId: 'miercoles',
+      startedAt: '2026-07-08T16:00:00.000Z',
+      completedAt: '2026-07-08T17:00:00.000Z'
+    }], draft)).toBe(false)
+  })
+
+  it('conserva posición guiada, pesos, reps y pendientes del borrador remoto más reciente', () => {
+    const local = {
+      updatedAt: '2026-07-15T16:05:00.000Z',
+      guidedPosition: { exerciseId: 'sentadilla', setId: 'set-1' },
+      logs: [{ weightKg: 65, reps: ['8', '8', '8', '8'], completed: [true, false, false, false] }]
+    }
+    const remote = {
+      updatedAt: '2026-07-15T16:10:00.000Z',
+      guidedPosition: { exerciseId: 'sentadilla', setId: 'set-3' },
+      logs: [{ weightKg: 67.5, reps: ['8', '8', '8', '8'], completed: [true, true, false, false] }]
+    }
+
+    const selected = selectNewestDraft(local, remote)
+    expect(selected.source).toBe('remote')
+    expect(selected.draft).toEqual(remote)
+    expect(selected.draft?.logs[0].completed).toEqual([true, true, false, false])
+  })
+
+  it('sincronizar no transforma series pendientes en completadas', () => {
+    const draft = {
+      updatedAt: '2026-07-15T16:10:00.000Z',
+      completed: [true, false, false, false]
+    }
+    expect(selectNewestDraft(null, draft).draft?.completed).toEqual([true, false, false, false])
   })
 })

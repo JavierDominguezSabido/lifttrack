@@ -8,6 +8,7 @@ import {
   parseLocalDate,
   toLocalDateKey
 } from './date'
+import { getCurrentWeekSessions } from './workout'
 
 process.env.TZ = 'Europe/Madrid'
 
@@ -53,5 +54,23 @@ describe('local date helpers', () => {
     expect(getWeekKey(parseLocalDate('2026-07-09')!)).toBe('2026-07-06')
     expect(getWeekKey(parseLocalDate('2026-07-12')!)).toBe('2026-07-06')
     expect(getWeekKey(parseLocalDate('2026-07-13')!)).toBe('2026-07-13')
+  })
+
+  it('does not count completed sessions outside the current week', () => {
+    const previousWednesday = session({
+      id: 'previous',
+      startedAt: '2026-07-08T16:00:00.000Z',
+      completedAt: '2026-07-08T17:00:00.000Z'
+    })
+    const currentWednesday = session({
+      id: 'current',
+      startedAt: '2026-07-15T16:00:00.000Z',
+      completedAt: '2026-07-15T17:00:00.000Z'
+    })
+
+    expect(getCurrentWeekSessions(
+      [previousWednesday, currentWednesday],
+      parseLocalDate('2026-07-15')!
+    ).map((item) => item.id)).toEqual(['current'])
   })
 })
