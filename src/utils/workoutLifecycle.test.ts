@@ -5,6 +5,8 @@ import {
   hasCompletedSessionForDraft,
   isActiveDraftForDate,
   selectNewestDraft,
+  selectSafeWorkoutDraft,
+  shouldAutosaveWorkoutDraft,
   shouldRefreshForLifecycleEvent,
   shouldShowInitialWorkoutLoader
 } from './workoutLifecycle'
@@ -120,5 +122,39 @@ describe('reanudacion no bloqueante del entrenamiento', () => {
       completed: [true, false, false, false]
     }
     expect(selectNewestDraft(null, draft).draft?.completed).toEqual([true, false, false, false])
+  })
+
+  it('prioriza remoto con progreso frente a local pristine aunque el local sea más nuevo', () => {
+    const local = { updatedAt: '2026-08-12T12:01:00.000Z', completed: 0 }
+    const remote = { updatedAt: '2026-08-12T12:00:00.000Z', completed: 2 }
+    expect(selectSafeWorkoutDraft(local, remote, {
+      localPristine: true,
+      remoteHasProgress: true
+    })).toMatchObject({ source: 'remote', draft: remote })
+  })
+
+  it('permite ganar al local con cambios reales cuando es más reciente', () => {
+    const local = { updatedAt: '2026-08-12T12:01:00.000Z', completed: 3 }
+    const remote = { updatedAt: '2026-08-12T12:00:00.000Z', completed: 2 }
+    expect(selectSafeWorkoutDraft(local, remote, {
+      localPristine: false,
+      remoteHasProgress: true
+    })).toMatchObject({ source: 'local', draft: local })
+  })
+
+  it('no autosincroniza plantilla nueva ni hidratación local/remota', () => {
+    const unchanged = { userChangeRevision: 0, syncedUserChangeRevision: 0 }
+    expect(shouldAutosaveWorkoutDraft({ ...unchanged, hydrationReady: false })).toBe(false)
+    expect(shouldAutosaveWorkoutDraft({ ...unchanged, hydrationReady: true })).toBe(false)
+  })
+
+  it('autosincroniza tras una acción real o para subir un local válido', () => {
+    expect(shouldAutosaveWorkoutDraft({
+      hydrationReady: true, userChangeRevision: 1, syncedUserChangeRevision: 0
+    })).toBe(true)
+    expect(shouldAutosaveWorkoutDraft({
+      hydrationReady: true, userChangeRevision: 0, syncedUserChangeRevision: 0,
+      hydratedLocalNeedsUpload: true
+    })).toBe(true)
   })
 })

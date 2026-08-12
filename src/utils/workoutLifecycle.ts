@@ -45,6 +45,41 @@ export function selectNewestDraft<T extends TimestampedDraft>(
   return { source: 'remote', draft: remote }
 }
 
+export function selectSafeWorkoutDraft<T extends TimestampedDraft>(
+  local: T | null,
+  remote: T | null,
+  options: { localPristine: boolean; remoteHasProgress: boolean }
+) {
+  if (local && remote && options.localPristine && options.remoteHasProgress) {
+    return { source: 'remote' as const, draft: remote, reason: 'remote-progress-over-local-pristine' as const }
+  }
+  const selected = selectNewestDraft(local, remote)
+  return { ...selected, reason: 'newest-updated-at' as const }
+}
+
+export function countCompletedDraftSets(draft: { logs: Array<{ sets: Array<{ completed: boolean }> }> }) {
+  return draft.logs.reduce(
+    (total, log) => total + log.sets.filter((set) => set.completed).length,
+    0
+  )
+}
+
+export function shouldAutosaveWorkoutDraft({
+  hydrationReady,
+  userChangeRevision,
+  syncedUserChangeRevision,
+  hydratedLocalNeedsUpload = false
+}: {
+  hydrationReady: boolean
+  userChangeRevision: number
+  syncedUserChangeRevision: number
+  hydratedLocalNeedsUpload?: boolean
+}) {
+  return hydrationReady && (
+    userChangeRevision > syncedUserChangeRevision || hydratedLocalNeedsUpload
+  )
+}
+
 export function shouldShowInitialWorkoutLoader({
   initialLoading,
   sessionCount,
