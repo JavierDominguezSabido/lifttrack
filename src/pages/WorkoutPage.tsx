@@ -678,11 +678,9 @@ export function WorkoutPage() {
     const previousTemplate = previousTemplateRef.current
     if (previousTemplate.id === template.id && previousTemplate.dayOfWeek === template.dayOfWeek) return
 
-    let previousDraft: StoredWorkoutDraft | null = null
     const shouldStorePreviousDraft = draftActive || hasDraftState
     if (shouldStorePreviousDraft) {
       writeWorkoutDraft(userKey, previousTemplate, startedAt, logs, viewMode, guidedPosition, localDate)
-      previousDraft = readWorkoutDraft(userKey, localDate, previousTemplate)
     }
     clearFullScrollPosition()
 
@@ -693,14 +691,11 @@ export function WorkoutPage() {
       : null
     draftToContinueRef.current = null
     const draftToRestore = forcedDraft ?? nextDraft
-    const draftToAsk = draftToRestore
-      ? null
-      : null
     previousTemplateRef.current = template
     setInitialLogs(nextInitialLogs)
     setLogs(draftToRestore?.logs ?? nextInitialLogs)
     setStartedAt(draftToRestore?.startedAt ?? new Date().toISOString())
-    setPendingDraft(draftToAsk)
+    setPendingDraft(null)
     setDraftActive(Boolean(draftToRestore))
     setViewMode(draftToRestore?.viewMode ?? 'full')
     setGuidedPosition(draftToRestore?.guidedPosition ?? null)
