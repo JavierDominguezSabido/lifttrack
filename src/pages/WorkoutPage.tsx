@@ -39,7 +39,7 @@ import {
 import { toLocalDateKey } from '../utils/date'
 
 type WorkoutViewMode = 'full' | 'guided'
-type DraftSyncStatus = 'idle' | 'local' | 'pending' | 'synced'
+type DraftSyncStatus = 'idle' | 'local' | 'pending' | 'syncing' | 'synced' | 'error'
 
 interface GuidedPosition {
   exerciseId?: string
@@ -252,6 +252,11 @@ function logsAreEqual(left: DraftExerciseLog[], right: DraftExerciseLog[]) {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
+function getDraftSyncErrorMessage(error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error)
+  return `No se pudo sincronizar el borrador con Supabase: ${detail}`
+}
+
 function createFreshWorkoutLogs(
   template: WorkoutTemplate,
   sessions: Parameters<typeof createExerciseLogs>[1],
@@ -329,6 +334,7 @@ export function WorkoutPage() {
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [draftSyncError, setDraftSyncError] = useState<string | null>(null)
   const previousTemplateRef = useRef(template)
   const draftToContinueRef = useRef<StoredWorkoutDraft | null>(null)
   const guidedFeedbackTimeoutRef = useRef<number | null>(null)
@@ -465,7 +471,30 @@ export function WorkoutPage() {
   const draftStatusLabel =
     draftSyncStatus === 'synced'
       ? 'Borrador sincronizado'
-      : 'Pendiente de sincronizar'
+      : draftSyncStatus === 'syncing'
+        ? 'Sincronizando borrador…'
+        : draftSyncStatus === 'error'
+          ? 'Error al sincronizar'
+          : draftSyncStatus === 'local'
+            ? 'Guardado en este dispositivo'
+            : 'Pendiente de sincronizar'
+
+  const confirmRemoteSync = useCallback((sentDraft: StoredWorkoutDraft, remoteUpdatedAt: string) => {
+    lastSyncedDraftUpdatedAtRef.current = remoteUpdatedAt
+    if (lastLocalDraftRef.current?.updatedAt !== sentDraft.updatedAt) {
+      setDraftSyncStatus('pending')
+      return
+    }
+    const normalized = writeWorkoutDraft(
+      userKey, template, sentDraft.startedAt, sentDraft.logs,
+      sentDraft.viewMode ?? 'full', sentDraft.guidedPosition ?? null,
+      localDate, remoteUpdatedAt
+    )
+    if (normalized) lastLocalDraftRef.current = normalized
+    lastSyncedDraftUpdatedAtRef.current = normalized?.updatedAt ?? remoteUpdatedAt
+    setDraftSyncError(null)
+    setDraftSyncStatus('synced')
+  }, [localDate, template, userKey])
 
   useLayoutEffect(() => {
     if (viewMode !== 'full') return
@@ -596,6 +625,7 @@ export function WorkoutPage() {
     void getRemoteWorkoutDraft<StoredWorkoutDraft>(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template))
       .then((remoteDraft) => {
         if (remoteRestoreRequestRef.current !== requestId) return
+        setDraftSyncError(null)
         if (!remoteDraft || !isValidWorkoutDraftPayload(remoteDraft.payload, userKey, localDate, template)) {
           if (localDraftAtStart) {
             setInitialLogs(createExerciseLogs(template, sessions, exercises))
@@ -607,9 +637,6 @@ export function WorkoutPage() {
             setGuidedPosition(localDraftAtStart.guidedPosition ?? null)
             lastLocalDraftRef.current = localDraftAtStart
             setDraftSyncStatus('pending')
-          } else if (localDraftAtStart) {
-            setPendingDraft(localDraftAtStart)
-            setDraftSyncStatus('local')
           }
           return
         }
@@ -660,9 +687,6 @@ export function WorkoutPage() {
           setGuidedPosition(localDraft.guidedPosition ?? null)
           lastLocalDraftRef.current = localDraft
           setDraftSyncStatus('pending')
-        } else if (localDraft) {
-          setPendingDraft(localDraft)
-          setDraftSyncStatus('local')
         } else {
           setDraftSyncStatus('idle')
         }
@@ -670,7 +694,8 @@ export function WorkoutPage() {
       .catch((error) => {
         if (remoteRestoreRequestRef.current !== requestId) return
         console.error('[workout] No se pudo recuperar el borrador sincronizado:', error)
-        if (localDraftAtStart) setDraftSyncStatus('pending')
+        setDraftSyncError(getDraftSyncErrorMessage(error))
+        setDraftSyncStatus('error')
       })
   }, [exercises, localDate, sessions, template, user, userKey])
 
@@ -710,6 +735,7 @@ export function WorkoutPage() {
       lastLocalDraftRef.current = storedDraft
       if (user) {
         if (lastSyncedDraftUpdatedAtRef.current !== storedDraft.updatedAt) {
+          setDraftSyncError(null)
           setDraftSyncStatus('pending')
         }
       } else {
@@ -726,6 +752,7 @@ export function WorkoutPage() {
     if (!draftToSync || lastSyncedDraftUpdatedAtRef.current === draftToSync.updatedAt) return
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setDraftSyncError(null)
       setDraftSyncStatus('pending')
       return
     }
@@ -735,18 +762,20 @@ export function WorkoutPage() {
     }
 
     remoteSyncTimeoutRef.current = window.setTimeout(() => {
+      setDraftSyncError(null)
+      setDraftSyncStatus('syncing')
       void upsertRemoteWorkoutDraft(
         template.dayOfWeek,
         getWorkoutRemoteDraftKey(localDate, template),
         draftToSync
       )
         .then((remoteDraft) => {
-          lastSyncedDraftUpdatedAtRef.current = remoteDraft.updatedAt
-          setDraftSyncStatus('synced')
+          confirmRemoteSync(draftToSync, remoteDraft.updatedAt)
         })
         .catch((error) => {
           console.error('[workout] No se pudo sincronizar el borrador:', error)
-          setDraftSyncStatus('pending')
+          setDraftSyncError(getDraftSyncErrorMessage(error))
+          setDraftSyncStatus('error')
         })
     }, 2500)
 
@@ -755,32 +784,34 @@ export function WorkoutPage() {
         window.clearTimeout(remoteSyncTimeoutRef.current)
       }
     }
-  }, [draftActive, guidedPosition, hasDraftState, localDate, logs, pendingDraft, startedAt, template, user, userKey, viewMode])
+  }, [confirmRemoteSync, draftActive, guidedPosition, hasDraftState, localDate, logs, pendingDraft, startedAt, template, user, userKey, viewMode])
 
   useEffect(() => {
-    if (!user || draftSyncStatus !== 'pending') return
+    if (!user || (draftSyncStatus !== 'pending' && draftSyncStatus !== 'error')) return
 
     function syncPendingDraft() {
       const draftToSync = lastLocalDraftRef.current ?? readWorkoutDraft(userKey, localDate, template)
       if (!draftToSync) return
+      setDraftSyncError(null)
+      setDraftSyncStatus('syncing')
       void upsertRemoteWorkoutDraft(
         template.dayOfWeek,
         getWorkoutRemoteDraftKey(localDate, template),
         draftToSync
       )
         .then((remoteDraft) => {
-          lastSyncedDraftUpdatedAtRef.current = remoteDraft.updatedAt
-          setDraftSyncStatus('synced')
+          confirmRemoteSync(draftToSync, remoteDraft.updatedAt)
         })
         .catch((error) => {
           console.error('[workout] No se pudo sincronizar el borrador pendiente:', error)
-          setDraftSyncStatus('pending')
+          setDraftSyncError(getDraftSyncErrorMessage(error))
+          setDraftSyncStatus('error')
         })
     }
 
     window.addEventListener('online', syncPendingDraft)
     return () => window.removeEventListener('online', syncPendingDraft)
-  }, [draftSyncStatus, localDate, template, user, userKey])
+  }, [confirmRemoteSync, draftSyncStatus, localDate, template, user, userKey])
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setLogs((current) => current.map((log) => log.id === updatedLog.id ? updatedLog : log))
@@ -1070,6 +1101,13 @@ export function WorkoutPage() {
           </div>
         )}
       </section>
+
+      {draftSyncError && (
+        <p role="alert" className="status-error">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>{draftSyncError}</span>
+        </p>
+      )}
 
       {pendingDraft && (
         <section className="rounded-xl border border-brand/25 bg-brand-soft/70 px-3 py-2">

@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 
 type DbClient = SupabaseClient<Database>
 type WorkoutDraftRow = Database['public']['Tables']['workout_drafts']['Row']
+export const WORKOUT_DRAFT_CONFLICT_COLUMNS = 'user_id,draft_key'
 
 export interface RemoteWorkoutDraft<TPayload> {
   dayOfWeek: number
@@ -39,6 +40,22 @@ function mapRow<TPayload>(row: WorkoutDraftRow): RemoteWorkoutDraft<TPayload> {
   }
 }
 
+export function createWorkoutDraftUpsert(
+  userId: string,
+  dayOfWeek: number,
+  draftKey: string,
+  payload: object
+): Database['public']['Tables']['workout_drafts']['Insert'] {
+  if (!userId) throw new Error('No se puede sincronizar un borrador sin usuario autenticado.')
+  return {
+    user_id: userId,
+    day_of_week: dayOfWeek,
+    draft_key: draftKey,
+    payload: payload as unknown as Json,
+    updated_at: new Date().toISOString()
+  }
+}
+
 export async function getRemoteWorkoutDraft<TPayload>(
   dayOfWeek: number,
   draftKey: string
@@ -71,12 +88,10 @@ export async function upsertRemoteWorkoutDraft<TPayload extends object>(
 
   const { data, error } = await client
     .from('workout_drafts')
-    .upsert({
-      user_id: userId,
-      day_of_week: dayOfWeek,
-      draft_key: draftKey,
-      payload: payload as unknown as Json
-    }, { onConflict: 'user_id,draft_key' })
+    .upsert(
+      createWorkoutDraftUpsert(userId, dayOfWeek, draftKey, payload),
+      { onConflict: WORKOUT_DRAFT_CONFLICT_COLUMNS }
+    )
     .select('*')
     .single()
   throwIfError(error)
