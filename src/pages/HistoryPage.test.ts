@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkoutSession } from '../types'
-import { filterSessions, getHistorySummary, getProgressEntryWeight } from './HistoryPage'
+import { filterSessions, getHistorySummary, getProgressEntryWeight, getSessionDeletionMessage } from './HistoryPage'
 
 function session(id: string, date: string, volumeKg: number): WorkoutSession {
   return {
@@ -48,6 +48,7 @@ describe('resumen compacto del historial', () => {
     expect(filterSessions({
       sessions: [saved],
       exercises: [{ id: 'press-banca', name: 'Press banca', active: true }],
+      templates: [],
       canonicalExerciseIds: new Map(),
       filterExerciseId: 'all',
       filterDay: String(new Date(saved.startedAt).getDay()),
@@ -64,5 +65,29 @@ describe('resumen compacto del historial', () => {
       sets: [{ id: 'set-chart', exerciseLogId: 'log-chart', setNumber: 1, reps: 8, weightKg: 75, completed: true }]
     }
     expect(getProgressEntryWeight({ session: saved, log })).toBe(80)
+  })
+
+  it('filtra por el día de rutina y no por el día registrado', () => {
+    const saved = session('pull', '2026-07-29T00:15:00.000Z', 4300)
+    saved.dayOfWeek = 2
+    saved.templateId = 'pull-template'
+    const templates = [{ id: 'pull-template', name: 'Tirón', dayOfWeek: 2, exercises: [] }]
+    const options = {
+      sessions: [saved], exercises: [], templates, canonicalExerciseIds: new Map<string, string>(),
+      filterExerciseId: 'all', rangeFilter: 'all' as const, search: ''
+    }
+    expect(filterSessions({ ...options, filterDay: '2' })).toEqual([saved])
+    expect(filterSessions({ ...options, filterDay: '3' })).toEqual([])
+  })
+
+  it('la confirmación de borrado diferencia rutina y fecha registrada', () => {
+    const saved = session('pull', '2026-07-29T00:15:00.000Z', 4300)
+    saved.dayOfWeek = 2
+    saved.templateId = 'pull-template'
+    const message = getSessionDeletionMessage(saved, [
+      { id: 'pull-template', name: 'Tirón', dayOfWeek: 2, exercises: [] }
+    ])
+    expect(message).toContain('Martes · Tirón')
+    expect(message).toContain('Fecha registrada: miércoles')
   })
 })

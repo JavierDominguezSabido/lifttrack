@@ -4,7 +4,8 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { DraftExerciseLog } from '../types'
-import { formatDate, getSessionDateObject, isInitialSession } from '../utils/workout'
+import { dayNames, formatDate, getSessionDateObject, isInitialSession } from '../utils/workout'
+import { getSessionRoutineIdentity, updateSessionRoutineDay } from '../utils/historySession'
 import {
   createDraftFromSession,
   updateWorkoutSession,
@@ -16,8 +17,9 @@ export function EditSessionPage() {
   const navigate = useNavigate()
   const { sessions, saveSession, templates, getExerciseById } = useWorkouts()
   const session = sessions.find((item) => item.id === sessionId)
+  const storedTemplate = templates.find((item) => item.id === session?.templateId)
   const template =
-    templates.find((item) => item.id === session?.templateId) ??
+    storedTemplate ??
     templates.find((item) =>
       session?.exerciseLogs.some((log) =>
         item.exercises.some((exercise) => exercise.exerciseId === log.exerciseId)
@@ -26,6 +28,11 @@ export function EditSessionPage() {
   const [logs, setLogs] = useState<DraftExerciseLog[]>(
     () => session ? createDraftFromSession(session) : []
   )
+  const [routineDay, setRoutineDay] = useState(() => {
+    if (!session) return 0
+    const registeredDay = getSessionDateObject(session).getDay()
+    return getSessionRoutineIdentity(session, templates, registeredDay).dayOfWeek
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -51,7 +58,10 @@ export function EditSessionPage() {
 
     setSaving(true)
     try {
-      const updatedSession = updateWorkoutSession(session!, logs)
+      const updatedSession = updateSessionRoutineDay(
+        updateWorkoutSession(session!, logs),
+        routineDay
+      )
       console.info('[workout] Sesión local actualizada:', updatedSession)
       await saveSession(updatedSession)
       navigate('/historial', { state: { sessionUpdated: true } })
@@ -76,13 +86,27 @@ export function EditSessionPage() {
         <p className="eyebrow mt-3">Editar entrenamiento</p>
         <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{session.name}</h2>
         <p className="mt-1 text-sm font-medium text-secondary">
-          {formatDate(getSessionDateObject(session), {
+          Fecha registrada: {formatDate(getSessionDateObject(session), {
             weekday: 'long',
             day: 'numeric',
             month: 'long',
-            year: 'numeric'
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
           })}
         </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label>
+            <span className="mb-1 block text-xs font-bold text-secondary">Día de rutina</span>
+            <select className="input !text-left" value={routineDay} onChange={(event) => setRoutineDay(Number(event.target.value))}>
+              {dayNames.map((day, index) => <option key={day} value={index}>{day}</option>)}
+            </select>
+          </label>
+          <div className="rounded-xl bg-muted px-3 py-2.5">
+            <p className="text-xs font-bold text-secondary">Plantilla usada</p>
+            <p className="mt-1 font-extrabold text-ink">{storedTemplate?.name ?? session.name ?? 'No disponible'}</p>
+          </div>
+        </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">

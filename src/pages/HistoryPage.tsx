@@ -18,11 +18,12 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
-import type { Exercise, ExerciseLog, SetLog, WorkoutSession } from '../types'
+import type { Exercise, ExerciseLog, SetLog, WorkoutSession, WorkoutTemplate } from '../types'
 import {
   createCanonicalExerciseIdMap,
   getEquivalentExerciseIds
 } from '../utils/exerciseIdentity'
+import { getSessionRoutineIdentity } from '../utils/historySession'
 import {
   calculateWeeklyStreak,
   dayNames,
@@ -154,13 +155,14 @@ export function HistoryPage() {
     () => filterSessions({
       sessions: realSessions,
       exercises,
+      templates,
       canonicalExerciseIds,
       filterExerciseId,
       filterDay,
       rangeFilter,
       search
     }),
-    [canonicalExerciseIds, exercises, filterDay, filterExerciseId, rangeFilter, realSessions, search]
+    [canonicalExerciseIds, exercises, filterDay, filterExerciseId, rangeFilter, realSessions, search, templates]
   )
   const visibleSessions = filteredSessions.slice(0, visibleCount)
   const historySummary = useMemo(() => getHistorySummary(realSessions), [realSessions])
@@ -196,14 +198,9 @@ export function HistoryPage() {
   }, [historyTab])
 
   async function removeSession(session: WorkoutSession) {
-    const sessionDate = getSessionDateObject(session)
-    const label = `${dayNames[sessionDate.getDay()]}, ${formatDate(sessionDate, {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })}`
+    const label = getSessionDeletionMessage(session, templates)
 
-    if (!window.confirm(`Vas a borrar esta sesión: ${label}. Esta acción no se puede deshacer. ¿Continuar?`)) {
+    if (!window.confirm(label)) {
       return
     }
 
@@ -563,6 +560,7 @@ export function HistoryPage() {
                 )}
                 onDelete={() => void removeSession(session)}
                 getExerciseById={getExerciseById}
+                templates={templates}
               />
             ))}
             {visibleCount < filteredSessions.length && (
@@ -596,13 +594,15 @@ function SessionCard({
   expanded,
   onToggle,
   onDelete,
-  getExerciseById
+  getExerciseById,
+  templates
 }: {
   session: WorkoutSession
   expanded: boolean
   onToggle: () => void
   onDelete: () => void
   getExerciseById: (exerciseId: string) => Exercise | undefined
+  templates: WorkoutTemplate[]
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const completedSets = session.exerciseLogs.reduce(
@@ -613,6 +613,7 @@ function SessionCard({
   const volume = session.volumeKg ?? getSessionVolume(session)
   const status = completedSets >= totalSets ? 'Completada' : 'Parcial'
   const sessionDate = getSessionDateObject(session)
+  const routine = getSessionRoutineIdentity(session, templates, sessionDate.getDay())
 
   return (
     <article className="card overflow-hidden">
@@ -621,9 +622,11 @@ function SessionCard({
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand">
               <CalendarDays className="size-3.5" aria-hidden="true" />
-              {dayNames[sessionDate.getDay()]}
+              {routine.dayIsExplicit ? dayNames[routine.dayOfWeek] : 'Día de rutina sin confirmar'}
+              {routine.template?.name && <span>· {routine.template.name}</span>}
             </p>
             <h3 className="mt-0.5 break-words text-base font-extrabold leading-snug text-ink sm:text-lg">
+              <span className="font-semibold text-secondary">Fecha registrada: </span>
               {formatDate(sessionDate, {
                 weekday: 'long',
                 day: 'numeric',
@@ -699,6 +702,11 @@ function SessionCard({
 
       {expanded && (
         <div className="border-t border-line bg-muted/30 px-4 sm:px-5">
+          <dl className="grid gap-2 border-b border-line py-3 text-xs sm:grid-cols-2">
+            <div><dt className="font-semibold text-secondary">Día de rutina</dt><dd className="mt-0.5 font-extrabold text-ink">{routine.dayIsExplicit ? dayNames[routine.dayOfWeek] : 'Sin confirmar'}</dd></div>
+            <div><dt className="font-semibold text-secondary">Fecha registrada</dt><dd className="mt-0.5 font-extrabold text-ink">{formatDate(sessionDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</dd></div>
+            <div><dt className="font-semibold text-secondary">Plantilla usada</dt><dd className="mt-0.5 font-extrabold text-ink">{routine.template?.name ?? session.name ?? 'No disponible'}</dd></div>
+          </dl>
           <div className="divide-y divide-line">
             {session.exerciseLogs.map((log) => {
               const loggedExercise = getExerciseById(log.exerciseId)
@@ -1010,6 +1018,23 @@ function countCompletedSets(session: WorkoutSession) {
   )
 }
 
+export function getSessionDeletionMessage(session: WorkoutSession, templates: WorkoutTemplate[]) {
+  const sessionDate = getSessionDateObject(session)
+  const routine = getSessionRoutineIdentity(session, templates, sessionDate.getDay())
+  const registeredDate = formatDate(sessionDate, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  })
+  const routineLabel = `${routine.dayIsExplicit ? dayNames[routine.dayOfWeek] : 'Día de rutina sin confirmar'}${routine.template?.name ? ` · ${routine.template.name}` : ''}`
+  return [
+    'Vas a eliminar:',
+    routineLabel,
+    `Fecha registrada: ${registeredDate}`,
+    `${session.exerciseLogs.length} ejercicios · ${countCompletedSets(session)} series · ${formatCompactNumber(session.volumeKg ?? getSessionVolume(session))} kg`,
+    '',
+    'Esta acción no se puede deshacer. ¿Continuar?'
+  ].join('\n')
+}
+
 export function getHistorySummary(sessions: WorkoutSession[]) {
   const weekStarts = [...new Set(sessions.map((session) => {
     const weekStart = getWeekStart(getSessionDateObject(session))
@@ -1131,6 +1156,7 @@ function getProgressEntries(
 export function filterSessions({
   sessions,
   exercises,
+  templates,
   canonicalExerciseIds,
   filterExerciseId,
   filterDay,
@@ -1139,6 +1165,7 @@ export function filterSessions({
 }: {
   sessions: WorkoutSession[]
   exercises: Exercise[]
+  templates: WorkoutTemplate[]
   canonicalExerciseIds: Map<string, string>
   filterExerciseId: string
   filterDay: string
@@ -1156,7 +1183,8 @@ export function filterSessions({
     const sessionDate = getSessionDateObject(session)
     if (rangeFilter === 'week' && (sessionDate < weekStart || sessionDate >= nextWeekStart)) return false
     if (rangeFilter === 'month' && (sessionDate < monthStart || sessionDate >= nextMonthStart)) return false
-    if (filterDay !== 'all' && sessionDate.getDay() !== Number(filterDay)) return false
+    const routine = getSessionRoutineIdentity(session, templates, sessionDate.getDay())
+    if (filterDay !== 'all' && routine.dayOfWeek !== Number(filterDay)) return false
 
     if (filterExerciseId !== 'all') {
       const canonicalFilterId = canonicalExerciseIds.get(filterExerciseId) ?? filterExerciseId
