@@ -8,6 +8,8 @@ import {
   Dumbbell,
   Edit3,
   Filter,
+  Flame,
+  MoreHorizontal,
   Search,
   Trash2,
   Trophy,
@@ -22,6 +24,7 @@ import {
   getEquivalentExerciseIds
 } from '../utils/exerciseIdentity'
 import {
+  calculateWeeklyStreak,
   dayNames,
   formatCompactNumber,
   formatDate,
@@ -38,7 +41,7 @@ const INITIAL_VISIBLE_SESSIONS = 10
 type RangeFilter = 'week' | 'month' | 'all'
 type HistoryTab = 'progress' | 'sessions'
 
-interface ProgressEntry {
+export interface ProgressEntry {
   session: WorkoutSession
   log: ExerciseLog
   bestSet?: SetLog
@@ -63,7 +66,7 @@ function formatSetReps(sets: SetLog[]) {
     .join('-')
 }
 
-function getProgressEntryWeight(entry: ProgressEntry) {
+export function getProgressEntryWeight(entry: ProgressEntry) {
   const completed = entry.log.sets
     .filter((set) => set.completed)
     .sort((a, b) => a.setNumber - b.setNumber)
@@ -75,6 +78,7 @@ export function HistoryPage() {
   const location = useLocation()
   const {
     sessions,
+    sessionsError,
     deleteSession,
     exercises,
     templates,
@@ -82,7 +86,7 @@ export function HistoryPage() {
   } = useWorkouts()
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [historyTab, setHistoryTab] = useState<HistoryTab>('progress')
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('sessions')
   const [selectedProgressId, setSelectedProgressId] = useState<string | undefined>(exerciseId)
   const [filterExerciseId, setFilterExerciseId] = useState('all')
   const [filterDay, setFilterDay] = useState('all')
@@ -159,6 +163,7 @@ export function HistoryPage() {
     [canonicalExerciseIds, exercises, filterDay, filterExerciseId, rangeFilter, realSessions, search]
   )
   const visibleSessions = filteredSessions.slice(0, visibleCount)
+  const historySummary = useMemo(() => getHistorySummary(realSessions), [realSessions])
   const activeFilterCount = [
     filterExerciseId !== 'all',
     filterDay !== 'all',
@@ -177,6 +182,14 @@ export function HistoryPage() {
           : null,
         search.trim() ? `"${search.trim()}"` : null
       ].filter(Boolean).join(' · ')
+
+  function resetFilters() {
+    setFilterExerciseId('all')
+    setFilterDay('all')
+    setRangeFilter('all')
+    setSearch('')
+    setVisibleCount(INITIAL_VISIBLE_SESSIONS)
+  }
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -213,7 +226,7 @@ export function HistoryPage() {
       : actionMessage
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="mx-auto max-w-5xl space-y-4 md:space-y-5">
       {successMessage && (
         <p role="status" className="status-success">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -227,10 +240,34 @@ export function HistoryPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
+      <header className="rounded-2xl border border-line/80 bg-surface/95 px-4 py-4 shadow-card sm:px-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="eyebrow">Actividad</p>
+            <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-ink">Historial</h1>
+            <p className="mt-1 text-sm font-bold text-secondary">
+              {historySummary.sessionCount} sesiones · {historySummary.activeWeeks} semanas · {formatCompactNumber(historySummary.totalVolume)} kg
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand">
+            <Flame className="size-4" aria-hidden="true" />
+            {historySummary.streakWeeks} {historySummary.streakWeeks === 1 ? 'semana' : 'semanas'} de racha
+          </span>
+        </div>
+        {historySummary.latestSession && (
+          <p className="mt-3 border-t border-line/70 pt-3 text-xs font-semibold text-secondary sm:text-sm">
+            <span className="font-extrabold text-ink">Última sesión:</span>{' '}
+            {formatDate(getSessionDateObject(historySummary.latestSession), {
+              weekday: 'long', day: 'numeric', month: 'long'
+            })} · {historySummary.latestSession.exerciseLogs.length} ejercicios · {countCompletedSets(historySummary.latestSession)} series
+          </p>
+        )}
+      </header>
+
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1 sm:max-w-sm">
         {([
-          ['progress', 'Progreso'],
-          ['sessions', 'Sesiones']
+          ['sessions', 'Sesiones'],
+          ['progress', 'Progreso']
         ] as const).map(([value, label]) => (
           <button
             key={value}
@@ -247,18 +284,18 @@ export function HistoryPage() {
 
       {historyTab === 'progress' && (
       <section aria-labelledby="exercise-progress-title" className="card overflow-hidden">
-        <div className="border-b border-line/70 p-4 md:p-5">
+        <div className="border-b border-line/70 px-4 py-3 md:px-5">
           <p className="eyebrow">Progreso por ejercicio</p>
           <h2 id="exercise-progress-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
             Evolución
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">
+          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-secondary">
             Busca un ejercicio y revisa cómo evoluciona su peso de trabajo sesión a sesión.
           </p>
         </div>
 
         {selectedExercise && selectedSummary ? (
-          <div className="space-y-4 p-4 md:p-5">
+          <div className="space-y-4 p-3.5 sm:p-5">
             <div>
               <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
                 Ejercicio seleccionado
@@ -266,7 +303,7 @@ export function HistoryPage() {
               <button
                 type="button"
                 onClick={() => setProgressSelectorOpen(true)}
-                className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-control bg-raised px-3 py-2.5 text-left text-base font-extrabold text-ink outline-none transition hover:bg-muted focus-visible:ring-4 focus-visible:ring-brand-soft sm:max-w-xl"
+                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-control bg-raised px-3 py-2 text-left text-sm font-extrabold text-ink outline-none transition hover:bg-muted focus-visible:ring-4 focus-visible:ring-brand-soft sm:max-w-md"
                 aria-haspopup="dialog"
                 aria-expanded={progressSelectorOpen}
               >
@@ -276,11 +313,11 @@ export function HistoryPage() {
             </div>
 
             <div className="min-w-0 space-y-5">
-              <div className="rounded-xl bg-muted/45 p-3.5">
+              <div className="rounded-xl bg-muted/45 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="eyebrow">{selectedExercise.muscleGroup ?? 'Ejercicio'}</p>
-                    <h3 className="mt-1 text-2xl font-extrabold text-ink">{selectedExercise.name}</h3>
+                    <h3 className="mt-1 text-xl font-extrabold text-ink">{selectedExercise.name}</h3>
                     <p className="mt-1 text-sm font-medium text-secondary">
                       Última sesión: {latestProgressSession
                         ? formatDate(getSessionDateObject(latestProgressSession), {
@@ -299,15 +336,22 @@ export function HistoryPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
                   <HistoryStat icon={Trophy} label="Mejor peso" value={`${bestWeight} kg`} compact />
+                  <HistoryStat
+                    icon={CalendarDays}
+                    label="Última vez"
+                    value={latestProgressSession
+                      ? formatDate(getSessionDateObject(latestProgressSession), { day: '2-digit', month: '2-digit' })
+                      : '—'}
+                    compact
+                  />
                   <HistoryStat icon={Dumbbell} label="Sesiones" value={String(selectedSummary.sessionCount)} compact />
                   <HistoryStat
                     icon={BarChart3}
                     label="Volumen acumulado"
                     value={`${formatCompactNumber(accumulatedVolume)} kg`}
                     compact
-                    wide
                   />
                 </div>
               </div>
@@ -381,11 +425,11 @@ export function HistoryPage() {
       {historyTab === 'sessions' && (
       <>
       <section aria-labelledby="history-filters-title" className="card p-3.5 md:p-4">
-        <div className="flex items-center justify-between gap-3 md:mb-3">
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => setFiltersOpen((current) => !current)}
-            className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg text-left md:pointer-events-none"
+            className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg text-left"
             aria-expanded={filtersOpen}
             aria-controls="history-filters-panel"
           >
@@ -400,15 +444,15 @@ export function HistoryPage() {
               </span>
             )}
             {filtersOpen ? (
-              <ChevronUp className="size-4 shrink-0 text-secondary md:hidden" aria-hidden="true" />
+              <ChevronUp className="size-4 shrink-0 text-secondary" aria-hidden="true" />
             ) : (
-              <ChevronDown className="size-4 shrink-0 text-secondary md:hidden" aria-hidden="true" />
+              <ChevronDown className="size-4 shrink-0 text-secondary" aria-hidden="true" />
             )}
           </button>
         </div>
         <div
           id="history-filters-panel"
-          className={`${filtersOpen ? 'grid' : 'hidden'} mt-3 gap-2.5 sm:grid-cols-2 md:grid xl:grid-cols-4`}
+          className={`${filtersOpen ? 'grid' : 'hidden'} mt-3 gap-2.5 sm:grid-cols-2 xl:grid-cols-4`}
         >
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Ejercicio</span>
@@ -473,6 +517,19 @@ export function HistoryPage() {
             </span>
           </label>
         </div>
+        {!filtersOpen && activeFilterCount > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {filterExerciseId !== 'all' && (
+              <FilterChip label={exerciseOptions.find((item) => item.id === filterExerciseId)?.name ?? 'Ejercicio'} onRemove={() => setFilterExerciseId('all')} />
+            )}
+            {filterDay !== 'all' && <FilterChip label={dayNames[Number(filterDay)]} onRemove={() => setFilterDay('all')} />}
+            {rangeFilter !== 'all' && <FilterChip label={rangeFilter === 'week' ? 'Esta semana' : 'Este mes'} onRemove={() => setRangeFilter('all')} />}
+            {search.trim() && <FilterChip label={`“${search.trim()}”`} onRemove={() => setSearch('')} />}
+            <button type="button" onClick={resetFilters} className="px-2 text-xs font-bold text-secondary hover:text-ink">
+              Limpiar
+            </button>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="saved-workouts-title">
@@ -513,7 +570,13 @@ export function HistoryPage() {
             )}
           </div>
         ) : (
-          <EmptyHistoryState />
+          <EmptyHistoryState
+            title={realSessions.length === 0 ? 'Todavía no hay sesiones' : 'No hay sesiones para estos filtros'}
+            message={realSessions.length === 0
+              ? 'Completa tu primer entrenamiento para empezar a construir el historial.'
+              : 'Prueba a quitar algún filtro o cambia el texto de búsqueda.'}
+            showAction={realSessions.length === 0}
+          />
         )}
       </section>
       </>
@@ -535,6 +598,7 @@ function SessionCard({
   onDelete: () => void
   getExerciseById: (exerciseId: string) => Exercise | undefined
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const completedSets = session.exerciseLogs.reduce(
     (sum, log) => sum + log.sets.filter((set) => set.completed).length,
     0
@@ -546,7 +610,7 @@ function SessionCard({
 
   return (
     <article className="card overflow-hidden">
-      <header className="p-3.5 sm:p-5">
+      <header className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand">
@@ -569,7 +633,7 @@ function SessionCard({
               <span className="whitespace-nowrap">{formatCompactNumber(volume)} kg</span>
             </p>
           </div>
-          <span className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold ${
+          <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${
             status === 'Completada'
               ? 'bg-success-soft text-success-text'
               : 'bg-warning-soft text-warning-text'
@@ -578,19 +642,19 @@ function SessionCard({
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
             onClick={onToggle}
-            className="btn-secondary !min-h-10 !px-2 !py-2 text-xs sm:!min-h-11 sm:text-sm"
+            className="btn-secondary !min-h-9 flex-1 !px-3 !py-1.5 text-xs sm:flex-none"
             aria-expanded={expanded}
           >
             {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            {expanded ? 'Ocultar' : 'Ver detalle'}
+            {expanded ? 'Ocultar' : 'Ver'}
           </button>
           <Link
             to={`/historial/sesion/${session.id}/editar`}
-            className="btn-secondary !min-h-10 !px-2 !py-2 text-xs sm:!min-h-11 sm:text-sm"
+            className="hidden min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-secondary hover:bg-muted hover:text-ink sm:inline-flex"
           >
             <Edit3 className="size-4" aria-hidden="true" />
             Editar
@@ -598,11 +662,32 @@ function SessionCard({
           <button
             type="button"
             onClick={onDelete}
-            className="inline-flex min-h-10 w-11 items-center justify-center rounded-xl border border-line bg-transparent text-subtle transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger-text active:scale-[0.98] sm:min-h-11"
+            className="hidden size-9 items-center justify-center rounded-lg text-subtle transition hover:bg-danger-soft hover:text-danger-text sm:inline-flex"
             aria-label="Borrar sesión"
           >
             <Trash2 className="size-4" aria-hidden="true" />
           </button>
+          <div className="relative ml-auto sm:hidden">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((current) => !current)}
+              className="grid size-9 place-items-center rounded-lg border border-line text-secondary"
+              aria-label="Más acciones"
+              aria-expanded={menuOpen}
+            >
+              <MoreHorizontal className="size-5" aria-hidden="true" />
+            </button>
+            {menuOpen && (
+              <div className="absolute bottom-11 right-0 z-10 min-w-36 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-card">
+                <Link to={`/historial/sesion/${session.id}/editar`} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold text-ink hover:bg-muted">
+                  <Edit3 className="size-4" aria-hidden="true" /> Editar
+                </Link>
+                <button type="button" onClick={() => { setMenuOpen(false); onDelete() }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-bold text-danger-text hover:bg-danger-soft">
+                  <Trash2 className="size-4" aria-hidden="true" /> Eliminar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -751,6 +836,7 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   const minWeight = Math.min(...weights)
   const maxWeight = Math.max(...weights)
   const range = Math.max(1, maxWeight - minWeight)
+  const maintainedWeight = minWeight === maxWeight && entries.length > 1
   const pointTop = 18
   const pointBottom = 78
   const points = entries.map((entry, index) => {
@@ -783,8 +869,23 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
         <p className="rounded-md bg-muted px-2 py-1 text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
       </div>
 
-      <div className="relative mt-4 h-48 overflow-visible" role="img" aria-label="Evolucion del peso de trabajo por fecha">
+      {maintainedWeight && (
+        <p className="mb-1 rounded-lg bg-brand-soft px-3 py-2 text-xs font-bold text-brand">
+          Peso mantenido en {minWeight} kg durante {entries.length} sesiones.
+        </p>
+      )}
+      {!actionError && sessionsError && (
+        <p role="alert" className="status-error">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>No se pudo cargar el historial. {sessionsError}</span>
+        </p>
+      )}
+
+      <div className="relative mt-2 h-56 overflow-visible sm:h-64" role="img" aria-label="Evolucion del peso de trabajo por fecha">
         <div className="absolute inset-x-1 top-12 bottom-10 sm:inset-x-2">
+          <span className="absolute inset-x-0 top-1/4 border-t border-dashed border-line" aria-hidden="true" />
+          <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-line" aria-hidden="true" />
+          <span className="absolute inset-x-0 top-3/4 border-t border-dashed border-line" aria-hidden="true" />
           <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <path
               d={path}
@@ -820,7 +921,9 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
                 >
                   {label}
                 </span>
-                <span className="block size-3.5 rounded-full border-[2.5px] border-brand bg-surface shadow-sm" />
+                <span className={`block rounded-full border-[2.5px] border-brand bg-surface shadow-sm ${
+                  entry.session.id === entries[entries.length - 1]?.session.id ? 'size-5' : 'size-3.5'
+                }`} />
                 <span className="absolute left-1/2 top-1/2 block size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand" />
                 <span
                   className="absolute left-1/2 top-7 whitespace-nowrap text-[10px] font-bold leading-none text-secondary"
@@ -888,6 +991,42 @@ function EmptyHistoryState({
       )}
     </div>
   )
+}
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-brand-soft pl-2.5 pr-1 text-xs font-bold text-brand">
+      {label}
+      <button type="button" onClick={onRemove} className="grid size-6 place-items-center rounded-full hover:bg-brand/10" aria-label={`Quitar filtro ${label}`}>
+        <X className="size-3.5" aria-hidden="true" />
+      </button>
+    </span>
+  )
+}
+
+function countCompletedSets(session: WorkoutSession) {
+  return session.exerciseLogs.reduce(
+    (total, log) => total + log.sets.filter((set) => set.completed).length,
+    0
+  )
+}
+
+export function getHistorySummary(sessions: WorkoutSession[]) {
+  const weekStarts = [...new Set(sessions.map((session) => {
+    const weekStart = getWeekStart(getSessionDateObject(session))
+    return `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`
+  }))].map((key) => {
+    const [year, month, day] = key.split('-').map(Number)
+    return new Date(year, month, day)
+  }).sort((a, b) => b.getTime() - a.getTime())
+
+  return {
+    sessionCount: sessions.length,
+    activeWeeks: weekStarts.length,
+    streakWeeks: calculateWeeklyStreak(sessions),
+    totalVolume: sessions.reduce((total, session) => total + (session.volumeKg ?? getSessionVolume(session)), 0),
+    latestSession: sessions[0]
+  }
 }
 
 function getExerciseOptions(
@@ -990,7 +1129,7 @@ function getProgressEntries(
   })
 }
 
-function filterSessions({
+export function filterSessions({
   sessions,
   exercises,
   canonicalExerciseIds,
