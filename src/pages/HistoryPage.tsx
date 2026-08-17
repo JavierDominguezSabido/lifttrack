@@ -239,6 +239,12 @@ export function HistoryPage() {
           <span>{actionError}</span>
         </p>
       )}
+      {!actionError && sessionsError && (
+        <p role="alert" className="status-error">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>No se pudo cargar el historial. {sessionsError}</span>
+        </p>
+      )}
 
       <header className="rounded-2xl border border-line/80 bg-surface/95 px-4 py-4 shadow-card sm:px-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -874,13 +880,6 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
           Peso mantenido en {minWeight} kg durante {entries.length} sesiones.
         </p>
       )}
-      {!actionError && sessionsError && (
-        <p role="alert" className="status-error">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>No se pudo cargar el historial. {sessionsError}</span>
-        </p>
-      )}
-
       <div className="relative mt-2 h-56 overflow-visible sm:h-64" role="img" aria-label="Evolucion del peso de trabajo por fecha">
         <div className="absolute inset-x-1 top-12 bottom-10 sm:inset-x-2">
           <span className="absolute inset-x-0 top-1/4 border-t border-dashed border-line" aria-hidden="true" />
