@@ -39,6 +39,7 @@ import {
   shouldAutosaveWorkoutDraft
 } from '../utils/workoutLifecycle'
 import { toLocalDateKey } from '../utils/date'
+import { resolvePendingGuidedIndex } from '../utils/guidedWorkout'
 
 type WorkoutViewMode = 'full' | 'guided'
 type DraftSyncStatus = 'idle' | 'local' | 'pending' | 'syncing' | 'synced' | 'error'
@@ -67,7 +68,13 @@ function normalizeGuidedPosition(
   )
   const set = log?.sets.find((item) => item.id === guidedPosition.setId)
   if (!log || !set) return null
-  return { exerciseId: log.exerciseId, setId: set.id }
+  const steps = logs.flatMap((entry) => entry.sets.map((item) => ({ log: entry, set: item })))
+  const currentIndex = steps.findIndex((step) => step.log.id === log.id && step.set.id === set.id)
+  const resolvedIndex = resolvePendingGuidedIndex(steps.map((step) => step.set.completed), currentIndex)
+  const resolvedStep = steps[resolvedIndex]
+  return resolvedStep
+    ? { exerciseId: resolvedStep.log.exerciseId, setId: resolvedStep.set.id }
+    : null
 }
 
 const WORKOUT_DRAFT_VERSION = 2
@@ -344,6 +351,7 @@ export function WorkoutPage() {
   const previousTemplateRef = useRef(template)
   const draftToContinueRef = useRef<StoredWorkoutDraft | null>(null)
   const guidedFeedbackTimeoutRef = useRef<number | null>(null)
+  const reviewingCompletedGuidedStepRef = useRef(false)
   const remoteRestoreRequestRef = useRef(0)
   const remoteSyncTimeoutRef = useRef<number | null>(null)
   const lastSyncedDraftUpdatedAtRef = useRef<string | null>(null)
@@ -439,7 +447,16 @@ export function WorkoutPage() {
     )
   ) ?? null
   const guidedIsComplete = guidedSteps.length > 0 && guidedSteps.every((step) => step.set.completed)
-  const currentGuidedStep = selectedGuidedStep ?? (!guidedPosition && !guidedIsComplete ? fallbackGuidedStep : null)
+  const selectedGuidedIndex = selectedGuidedStep ? guidedSteps.indexOf(selectedGuidedStep) : -1
+  const resolvedPendingIndex = resolvePendingGuidedIndex(
+    guidedSteps.map((step) => step.set.completed),
+    selectedGuidedIndex,
+    reviewingCompletedGuidedStepRef.current
+  )
+  const resolvedSelectedGuidedStep = guidedSteps[resolvedPendingIndex] ?? null
+  const currentGuidedStep = selectedGuidedStep
+    ? resolvedSelectedGuidedStep
+    : !guidedPosition && !guidedIsComplete ? fallbackGuidedStep : null
   const currentGuidedIndex = currentGuidedStep
     ? guidedSteps.findIndex((step) =>
         step.log.id === currentGuidedStep.log.id && step.set.id === currentGuidedStep.set.id
@@ -593,6 +610,16 @@ export function WorkoutPage() {
     ) ?? null
 
     if (selectedStep) {
+      if (selectedStep.set.completed && !reviewingCompletedGuidedStepRef.current) {
+        const selectedIndex = guidedSteps.findIndex((step) => step === selectedStep)
+        const pendingIndex = resolvePendingGuidedIndex(
+          guidedSteps.map((step) => step.set.completed),
+          selectedIndex
+        )
+        const pendingStep = guidedSteps[pendingIndex]
+        setGuidedPosition(pendingStep ? getGuidedPositionFromStep(pendingStep) : null)
+        return
+      }
       if (!guidedPosition?.exerciseId) {
         setGuidedPosition(getGuidedPositionFromStep(selectedStep))
       }
@@ -909,6 +936,7 @@ export function WorkoutPage() {
 
   function goToPreviousGuidedStep() {
     if (currentGuidedIndex <= 0) return
+    reviewingCompletedGuidedStepRef.current = true
     goToGuidedStep(currentGuidedIndex - 1)
   }
 
@@ -929,6 +957,7 @@ export function WorkoutPage() {
     }
 
     setUserChangeRevision((current) => current + 1)
+    reviewingCompletedGuidedStepRef.current = false
     setSaveError(null)
     const nextStep = findNextGuidedStep(currentGuidedIndex)
     if (!currentGuidedStep.set.completed) {
@@ -970,10 +999,17 @@ export function WorkoutPage() {
   function enterGuidedMode() {
     setUserChangeRevision((current) => current + 1)
     saveFullScrollPosition()
-    if (selectedGuidedStep) {
-      setGuidedPosition(getGuidedPositionFromStep(selectedGuidedStep))
-    } else if (firstPendingStep) {
-      setGuidedPosition(getGuidedPositionFromStep(firstPendingStep))
+    reviewingCompletedGuidedStepRef.current = false
+    const selectedIndex = selectedGuidedStep
+      ? guidedSteps.findIndex((step) => step === selectedGuidedStep)
+      : -1
+    const pendingIndex = resolvePendingGuidedIndex(
+      guidedSteps.map((step) => step.set.completed),
+      selectedIndex
+    )
+    const pendingStep = guidedSteps[pendingIndex]
+    if (pendingStep) {
+      setGuidedPosition(getGuidedPositionFromStep(pendingStep))
     } else {
       setGuidedPosition(null)
     }
