@@ -42,7 +42,7 @@ import { toLocalDateKey } from '../utils/date'
 import { resolvePendingGuidedIndex } from '../utils/guidedWorkout'
 
 type WorkoutViewMode = 'full' | 'guided'
-type DraftSyncStatus = 'idle' | 'local' | 'pending' | 'syncing' | 'synced' | 'error'
+type DraftSyncStatus = 'local-error' | 'idle' | 'local' | 'pending' | 'syncing' | 'synced' | 'error'
 type DraftHydrationStatus = 'hydrating' | 'ready' | 'error'
 
 interface GuidedPosition {
@@ -240,20 +240,6 @@ function removeWorkoutDraftByKey(userKey: string, localDate: string, templateId:
   }
 }
 
-function removeRemoteWorkoutDraftByKeyIfAvailable(user: { id: string } | null, draft: StoredWorkoutDraft) {
-  if (!user) return
-  void deleteRemoteWorkoutDraft(draft.dayOfWeek, `${draft.localDate}.${draft.templateId}`)
-    .catch((error) => {
-      console.error('[workout] No se pudo borrar el borrador sincronizado:', error)
-    })
-}
-
-function removeRemoteWorkoutDraftIfAvailable(user: { id: string } | null, localDate: string, template: WorkoutTemplate) {
-  if (!user) return
-  void deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template))
-    .catch((error) => console.error('[workout] No se pudo borrar el borrador sincronizado:', error))
-}
-
 function scrollToPageTop() {
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
 }
@@ -276,6 +262,12 @@ function createFreshWorkoutLogs(
 }
 
 export function WorkoutPage() {
+  const { ownerId } = useWorkouts()
+  const { templateId } = useParams()
+  return <WorkoutPageContent key={JSON.stringify([ownerId, templateId])} />
+}
+
+function WorkoutPageContent() {
   const { templateId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -344,10 +336,16 @@ export function WorkoutPage() {
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [localSaveError, setLocalSaveError] = useState<string | null>(null)
   const [draftSyncError, setDraftSyncError] = useState<string | null>(null)
   const [draftHydrationStatus, setDraftHydrationStatus] = useState<DraftHydrationStatus>(user ? 'hydrating' : 'ready')
   const [userChangeRevision, setUserChangeRevision] = useState(0)
   const [hydratedLocalNeedsUpload, setHydratedLocalNeedsUpload] = useState(false)
+  const userChangeRevisionRef = useRef(userChangeRevision)
+  userChangeRevisionRef.current = userChangeRevision
+  const draftMutationBlocked = useRef(false)
+  const syncGeneration = useRef(0)
+  const [hydrationRetry, setHydrationRetry] = useState(0)
   const previousTemplateRef = useRef(template)
   const draftToContinueRef = useRef<StoredWorkoutDraft | null>(null)
   const guidedFeedbackTimeoutRef = useRef<number | null>(null)
@@ -492,18 +490,23 @@ export function WorkoutPage() {
   }, [exercises, initialLogs, sessions, syncReady, template])
   const hasDraftChanges = !logsAreEqual(logs, initialLogs)
   const hasDraftState = hasDraftChanges || viewMode !== 'full' || Boolean(guidedPosition)
-  const draftStatusLabel =
-    draftHydrationStatus === 'hydrating'
+  const draftStatusLabel = localSaveError
+    ? 'No se pudo guardar en este dispositivo'
+    : draftSyncError
+      ? 'Guardado en este dispositivo · nube pendiente'
+      : !user && draftActive
+        ? 'Guardado en este dispositivo'
+        : draftHydrationStatus === 'hydrating'
       ? 'Comprobando borrador sincronizado…'
       : draftSyncStatus === 'synced'
       ? 'Borrador sincronizado'
       : draftSyncStatus === 'syncing'
         ? 'Sincronizando borrador…'
         : draftSyncStatus === 'error'
-          ? 'Error al sincronizar'
+          ? 'Guardado en este dispositivo · nube pendiente'
           : draftSyncStatus === 'local'
             ? 'Guardado en este dispositivo'
-            : 'Pendiente de sincronizar'
+            : 'Guardado en este dispositivo · nube pendiente'
 
   const confirmRemoteSync = useCallback((
     sentDraft: StoredWorkoutDraft,
@@ -511,7 +514,7 @@ export function WorkoutPage() {
     sentUserChangeRevision: number
   ) => {
     lastSyncedDraftUpdatedAtRef.current = remoteUpdatedAt
-    if (lastLocalDraftRef.current?.updatedAt !== sentDraft.updatedAt) {
+    if (lastLocalDraftRef.current !== sentDraft || userChangeRevisionRef.current !== sentUserChangeRevision) {
       setDraftSyncStatus('pending')
       return
     }
@@ -521,6 +524,7 @@ export function WorkoutPage() {
       localDate, remoteUpdatedAt
     )
     if (normalized) lastLocalDraftRef.current = normalized
+    else setLocalSaveError('No se pudo actualizar la copia local. No cierres esta pantalla hasta resolverlo.')
     lastSyncedDraftUpdatedAtRef.current = normalized?.updatedAt ?? remoteUpdatedAt
     syncedUserChangeRevisionRef.current = sentUserChangeRevision
     setHydratedLocalNeedsUpload(false)
@@ -651,6 +655,8 @@ export function WorkoutPage() {
     if (remoteSyncTimeoutRef.current) {
       window.clearTimeout(remoteSyncTimeoutRef.current)
     }
+    syncGeneration.current += 1
+    remoteRestoreRequestRef.current += 1
   }, [])
 
   useEffect(() => {
@@ -662,15 +668,24 @@ export function WorkoutPage() {
       return
     }
 
+    if (draftMutationBlocked.current) return
+    const revisionAtStart = userChangeRevisionRef.current
     const requestId = remoteRestoreRequestRef.current + 1
     remoteRestoreRequestRef.current = requestId
     setDraftHydrationStatus('hydrating')
     const localDraftAtStart = readWorkoutDraft(userKey, localDate, template)
 
-    void getRemoteWorkoutDraft<StoredWorkoutDraft>(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template))
+    void getRemoteWorkoutDraft<StoredWorkoutDraft>(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template), user.id)
       .then((remoteDraft) => {
         if (remoteRestoreRequestRef.current !== requestId) return
+        if (draftMutationBlocked.current) return
         setDraftSyncError(null)
+        // La lectura tardía nunca sustituye una edición realizada mientras esperaba.
+        if (userChangeRevisionRef.current !== revisionAtStart ||
+          userChangeRevisionRef.current > syncedUserChangeRevisionRef.current) {
+          setDraftHydrationStatus('ready')
+          return
+        }
         if (!remoteDraft || !isValidWorkoutDraftPayload(remoteDraft.payload, userKey, localDate, template)) {
           if (localDraftAtStart) {
             setInitialLogs(createExerciseLogs(template, sessions, exercises))
@@ -693,10 +708,27 @@ export function WorkoutPage() {
           updatedAt: remoteDraft.updatedAt
         }
         if (hasCompletedSessionForDraft(sessions, remotePayload)) {
-          removeWorkoutDraft(userKey, localDate, template)
-          void deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template))
-          setDraftSyncStatus('idle')
-          setHydratedLocalNeedsUpload(false)
+          const local = lastLocalDraftRef.current
+          const completedLocal = local && hasCompletedSessionForDraft(sessions, local)
+          if (completedLocal) {
+            removeWorkoutDraft(userKey, localDate, template)
+            lastLocalDraftRef.current = null
+            const freshLogs = createExerciseLogs(template, sessions, exercises)
+            setInitialLogs(freshLogs)
+            setLogs(freshLogs)
+            setStartedAt(new Date().toISOString())
+            setDraftActive(false)
+            setViewMode('full')
+            setGuidedPosition(null)
+          }
+          void deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template), user.id).catch((error) => setDraftSyncError(getDraftSyncErrorMessage(error)))
+          const needsUpload = Boolean(local && !completedLocal)
+          setDraftSyncStatus(needsUpload ? 'pending' : 'idle')
+          setHydratedLocalNeedsUpload(needsUpload)
+          setDraftHydrationStatus('ready')
+          return
+        }
+        if (userChangeRevisionRef.current > syncedUserChangeRevisionRef.current) {
           setDraftHydrationStatus('ready')
           return
         }
@@ -727,7 +759,7 @@ export function WorkoutPage() {
           lastLocalDraftRef.current = remotePayload
           lastSyncedDraftUpdatedAtRef.current = remotePayload.updatedAt
           setHydratedLocalNeedsUpload(false)
-          writeWorkoutDraft(
+          const restored = writeWorkoutDraft(
             userKey,
             template,
             remotePayload.startedAt,
@@ -737,6 +769,8 @@ export function WorkoutPage() {
             localDate,
             remotePayload.updatedAt
           )
+          draftWeightsAreAuthoritativeRef.current = true
+          if (!restored) setLocalSaveError('El borrador está en la nube, pero no se pudo guardar su copia local. Reintenta antes de continuar.')
           setDraftSyncStatus('synced')
         } else if (localDraft) {
           setInitialLogs(createExerciseLogs(template, sessions, exercises))
@@ -762,7 +796,8 @@ export function WorkoutPage() {
         setHydratedLocalNeedsUpload(false)
         setDraftHydrationStatus('error')
       })
-  }, [exercises, localDate, sessions, template, user, userKey])
+    return () => { remoteRestoreRequestRef.current += 1 }
+  }, [exercises, hydrationRetry, localDate, sessions, template, user, userKey])
 
   useEffect(() => {
     const previousTemplate = previousTemplateRef.current
@@ -794,30 +829,28 @@ export function WorkoutPage() {
     setSaveError(null)
   }, [clearFullScrollPosition, draftActive, draftHydrationStatus, exercises, guidedPosition, hasDraftState, localDate, logs, sessions, startedAt, template, userChangeRevision, userKey, viewMode])
 
-  useEffect(() => {
-    if (pendingDraft || draftHydrationStatus !== 'ready') return
-    if (!shouldAutosaveWorkoutDraft({
-      hydrationReady: draftHydrationStatus === 'ready',
-      userChangeRevision,
-      syncedUserChangeRevision: syncedUserChangeRevisionRef.current
-    })) return
+  // Guardado local antes de pintar; no depende de Supabase ni de su hidratación.
+  useLayoutEffect(() => {
+    if (pendingDraft || draftMutationBlocked.current || (userChangeRevision === 0 && !localSaveError)) return
+    const previous = lastLocalDraftRef.current
+    if (!localSaveError && previous && previous.startedAt === startedAt && previous.templateId === template.id &&
+      previous.localDate === localDate && logsAreEqual(previous.logs, logs) &&
+      previous.viewMode === viewMode &&
+      JSON.stringify(previous.guidedPosition ?? null) === JSON.stringify(normalizeGuidedPosition(logs, guidedPosition))) return
     const storedDraft = writeWorkoutDraft(userKey, template, startedAt, logs, viewMode, guidedPosition, localDate)
-    if (storedDraft) {
-      lastLocalDraftRef.current = storedDraft
-      if (user) {
-        if (lastSyncedDraftUpdatedAtRef.current !== storedDraft.updatedAt) {
-          setDraftSyncError(null)
-          setDraftSyncStatus('pending')
-        }
-      } else {
-        setDraftSyncStatus('local')
-      }
+    if (!storedDraft) {
+      setLocalSaveError('No se pudo guardar el borrador en este dispositivo. No cierres esta pantalla; libera espacio o reintenta el guardado.')
+      setDraftSyncStatus('local-error')
+      return
     }
+    lastLocalDraftRef.current = storedDraft
+    setLocalSaveError(null)
+    setDraftSyncStatus(user ? 'pending' : 'local')
     setDraftActive(true)
-  }, [draftHydrationStatus, guidedPosition, localDate, logs, pendingDraft, startedAt, template, user, userChangeRevision, userKey, viewMode])
+  }, [guidedPosition, hydrationRetry, localDate, localSaveError, logs, pendingDraft, startedAt, template, user, userChangeRevision, userKey, viewMode])
 
   useEffect(() => {
-    if (!user || pendingDraft || draftHydrationStatus !== 'ready') return
+    if (!user || pendingDraft || localSaveError || draftMutationBlocked.current || draftHydrationStatus !== 'ready') return
     if (!shouldAutosaveWorkoutDraft({
       hydrationReady: draftHydrationStatus === 'ready',
       userChangeRevision,
@@ -825,8 +858,9 @@ export function WorkoutPage() {
       hydratedLocalNeedsUpload
     })) return
 
+    const generation = syncGeneration.current
     const draftToSync = lastLocalDraftRef.current
-    if (!draftToSync || lastSyncedDraftUpdatedAtRef.current === draftToSync.updatedAt) return
+    if (!draftToSync) return
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setDraftSyncError(null)
@@ -839,18 +873,21 @@ export function WorkoutPage() {
     }
 
     remoteSyncTimeoutRef.current = window.setTimeout(() => {
+      if (draftMutationBlocked.current || generation !== syncGeneration.current) return
       const sentUserChangeRevision = userChangeRevision
       setDraftSyncError(null)
       setDraftSyncStatus('syncing')
       void upsertRemoteWorkoutDraft(
         template.dayOfWeek,
         getWorkoutRemoteDraftKey(localDate, template),
-        draftToSync
+        draftToSync,
+        user.id
       )
         .then((remoteDraft) => {
-          confirmRemoteSync(draftToSync, remoteDraft.updatedAt, sentUserChangeRevision)
+          if (generation === syncGeneration.current && !draftMutationBlocked.current) confirmRemoteSync(draftToSync, remoteDraft.updatedAt, sentUserChangeRevision)
         })
         .catch((error) => {
+          if (generation !== syncGeneration.current || draftMutationBlocked.current) return
           console.error('[workout] No se pudo sincronizar el borrador:', error)
           setDraftSyncError(getDraftSyncErrorMessage(error))
           setDraftSyncStatus('error')
@@ -862,35 +899,14 @@ export function WorkoutPage() {
         window.clearTimeout(remoteSyncTimeoutRef.current)
       }
     }
-  }, [confirmRemoteSync, draftHydrationStatus, guidedPosition, hydratedLocalNeedsUpload, localDate, logs, pendingDraft, startedAt, template, user, userChangeRevision, userKey, viewMode])
+  }, [confirmRemoteSync, draftHydrationStatus, guidedPosition, hydratedLocalNeedsUpload, localDate, localSaveError, logs, pendingDraft, startedAt, template, user, userChangeRevision, userKey, viewMode])
 
   useEffect(() => {
-    if (!user || (draftSyncStatus !== 'pending' && draftSyncStatus !== 'error')) return
-
-    function syncPendingDraft() {
-      if (draftHydrationStatus !== 'ready') return
-      const draftToSync = lastLocalDraftRef.current ?? readWorkoutDraft(userKey, localDate, template)
-      if (!draftToSync) return
-      setDraftSyncError(null)
-      setDraftSyncStatus('syncing')
-      void upsertRemoteWorkoutDraft(
-        template.dayOfWeek,
-        getWorkoutRemoteDraftKey(localDate, template),
-        draftToSync
-      )
-        .then((remoteDraft) => {
-          confirmRemoteSync(draftToSync, remoteDraft.updatedAt, userChangeRevision)
-        })
-        .catch((error) => {
-          console.error('[workout] No se pudo sincronizar el borrador pendiente:', error)
-          setDraftSyncError(getDraftSyncErrorMessage(error))
-          setDraftSyncStatus('error')
-        })
-    }
-
-    window.addEventListener('online', syncPendingDraft)
-    return () => window.removeEventListener('online', syncPendingDraft)
-  }, [confirmRemoteSync, draftHydrationStatus, draftSyncStatus, localDate, template, user, userChangeRevision, userKey])
+    if (!user) return
+    const retry = () => setHydrationRetry((current) => current + 1)
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [user])
 
   function updateLog(updatedLog: DraftExerciseLog) {
     setUserChangeRevision((current) => current + 1)
@@ -1046,38 +1062,55 @@ export function WorkoutPage() {
     restoreDraft(pendingDraft)
   }
 
-  function discardDraft() {
-    if (!window.confirm('¿Seguro que quieres descartar el entrenamiento en curso?')) {
-      return
+  async function discardDraft() {
+    if (draftMutationBlocked.current || !window.confirm('¿Seguro que quieres descartar el entrenamiento en curso?')) return
+    draftMutationBlocked.current = true
+    syncGeneration.current += 1
+    const generation = syncGeneration.current
+    remoteRestoreRequestRef.current += 1
+    if (remoteSyncTimeoutRef.current) window.clearTimeout(remoteSyncTimeoutRef.current)
+    setSaving(true)
+    try {
+      if (user) {
+        const day = pendingDraft?.dayOfWeek ?? template.dayOfWeek
+        const key = pendingDraft
+          ? getDatedRemoteDraftKey(pendingDraft.localDate, pendingDraft.templateId)
+          : getWorkoutRemoteDraftKey(localDate, template)
+        await deleteRemoteWorkoutDraft(day, key, user.id)
+      }
+      if (generation !== syncGeneration.current) return
+      if (pendingDraft) removeWorkoutDraftByKey(userKey, pendingDraft.localDate, pendingDraft.templateId)
+      else removeWorkoutDraft(userKey, localDate, template)
+      lastLocalDraftRef.current = null
+      lastSyncedDraftUpdatedAtRef.current = null
+      clearFullScrollPosition()
+      const nextLogs = createExerciseLogs(template, sessions, exercises)
+      draftWeightsAreAuthoritativeRef.current = false
+      setInitialLogs(nextLogs)
+      setLogs(nextLogs)
+      setStartedAt(new Date().toISOString())
+      setPendingDraft(null)
+      setDraftActive(false)
+      setDraftSyncStatus('idle')
+      syncedUserChangeRevisionRef.current = 0
+      setUserChangeRevision(0)
+      setHydratedLocalNeedsUpload(false)
+      setViewMode('full')
+      setGuidedPosition(null)
+      setSaveError(null)
+      setLocalSaveError(null)
+      setDraftSyncError(null)
+    } catch {
+      setSaveError('No se pudo confirmar el descarte en la nube. El borrador se conserva; vuelve a intentarlo cuando tengas conexión.')
+    } finally {
+      draftMutationBlocked.current = false
+      setSaving(false)
+      setHydrationRetry((current) => current + 1)
     }
-
-    if (pendingDraft) {
-      removeWorkoutDraftByKey(userKey, pendingDraft.localDate, pendingDraft.templateId)
-      removeRemoteWorkoutDraftByKeyIfAvailable(user, pendingDraft)
-    } else {
-      removeWorkoutDraft(userKey, localDate, template)
-      removeRemoteWorkoutDraftIfAvailable(user, localDate, template)
-    }
-    lastLocalDraftRef.current = null
-    lastSyncedDraftUpdatedAtRef.current = null
-    clearFullScrollPosition()
-    const nextLogs = createExerciseLogs(template, sessions, exercises)
-    draftWeightsAreAuthoritativeRef.current = false
-    setInitialLogs(nextLogs)
-    setLogs(nextLogs)
-    setStartedAt(new Date().toISOString())
-    setPendingDraft(null)
-    setDraftActive(false)
-    setDraftSyncStatus('idle')
-    syncedUserChangeRevisionRef.current = 0
-    setUserChangeRevision(0)
-    setHydratedLocalNeedsUpload(false)
-    setViewMode('full')
-    setGuidedPosition(null)
-    setSaveError(null)
   }
 
   async function finishWorkout() {
+    if (draftMutationBlocked.current) return
     setSaveError(null)
     const validationError = validateWorkoutDraft(logs)[0]
     if (validationError) {
@@ -1089,16 +1122,30 @@ export function WorkoutPage() {
       return
     }
 
+    // El snapshot se conserva también si la respuesta del servidor se pierde.
+    const savedDraft = writeWorkoutDraft(userKey, template, startedAt, logs, viewMode, guidedPosition, localDate)
+    if (!savedDraft) {
+      setLocalSaveError('No se pudo conservar el borrador. Libera espacio y reintenta antes de cerrar esta pantalla.')
+      return
+    }
+    lastLocalDraftRef.current = savedDraft
+    setLocalSaveError(null)
+    draftMutationBlocked.current = true
+    syncGeneration.current += 1
+    const generation = syncGeneration.current
+    remoteRestoreRequestRef.current += 1
+    if (remoteSyncTimeoutRef.current) window.clearTimeout(remoteSyncTimeoutRef.current)
     setSaving(true)
+    let completed = false
     try {
       const session = createWorkoutSession({ template, logs, startedAt })
-      console.info('[workout] Payload que se intenta guardar:', session)
       await saveSession(session)
+      if (generation !== syncGeneration.current) return
       removeWorkoutDraft(userKey, localDate, template)
       clearFullScrollPosition()
       if (user) {
         try {
-          await deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template))
+          await deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template), user.id)
         } catch (draftError) {
           console.error('[workout] No se pudo borrar el borrador sincronizado tras guardar:', draftError)
         }
@@ -1110,11 +1157,16 @@ export function WorkoutPage() {
       setDraftSyncStatus('idle')
       setViewMode('full')
       setGuidedPosition(null)
-      navigate('/historial', { state: { workoutSaved: true } })
+      completed = true
+      if (generation === syncGeneration.current) navigate('/historial', { state: { workoutSaved: true } })
     } catch (error) {
       console.error('[workout] Error exacto al guardar el entrenamiento:', error)
-      setSaveError('No se pudo guardar el entrenamiento. Inténtalo de nuevo.')
+      setSaveError(error instanceof Error ? error.message : 'No se pudo confirmar el guardado. Tu borrador está en este dispositivo; puedes reintentar sin duplicar la sesión.')
     } finally {
+      if (!completed) {
+        draftMutationBlocked.current = false
+        setHydrationRetry((current) => current + 1)
+      }
       setSaving(false)
     }
   }
@@ -1126,7 +1178,7 @@ export function WorkoutPage() {
         <p className="mt-3 font-extrabold text-ink">Preparando pesos del entrenamiento…</p>
       </div>
     ) : (
-    <div className="space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
+    <fieldset disabled={saving} className="min-w-0 space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
       <div
         className="pointer-events-none fixed inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] z-40 flex justify-center lg:left-[calc(232px+1rem)] lg:top-20"
         aria-live="polite"
@@ -1192,17 +1244,19 @@ export function WorkoutPage() {
         </div>
         {(draftActive || (hasDraftState && !pendingDraft)) && (
           <div className="mt-2 flex items-center">
-            <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-extrabold leading-none text-secondary">
+            <span role="status" aria-live="polite" className="rounded-full bg-muted px-2 py-1 text-[11px] font-extrabold leading-none text-secondary">
               {draftStatusLabel}
             </span>
           </div>
         )}
       </section>
 
-      {draftSyncError && (
+      {localSaveError && <p role="alert" className="status-error">{localSaveError}</p>}
+      {(draftSyncError || localSaveError) && (
         <p role="alert" className="status-error">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{draftSyncError}</span>
+          <span>{draftSyncError ?? 'El guardado local requiere atención.'}</span>
+          <button type="button" className="underline" onClick={() => setHydrationRetry((current) => current + 1)}>Reintentar</button>
         </p>
       )}
 
@@ -1508,7 +1562,7 @@ export function WorkoutPage() {
           </div>
         </div>
       )}
-    </div>
+    </fieldset>
     )
   )
 }

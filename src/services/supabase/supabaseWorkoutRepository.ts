@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '../../types/database'
+import type { Database, Json } from '../../types/database'
 import type { WorkoutSession } from '../../types'
 import { getLastExercisePerformanceFromSessions } from '../../utils/workoutHistory'
 import type { WorkoutRepository } from '../workoutRepository'
@@ -114,125 +114,28 @@ async function fetchSetLogsForExerciseLogs(
   return rows
 }
 
-async function persistSession(session: WorkoutSession) {
+async function persistSession(session: WorkoutSession, expectedUserId?: string) {
   const client = requireClient()
   const userId = await requireUserId(client)
+  if (expectedUserId && userId !== expectedUserId) throw new Error('La cuenta ha cambiado. Vuelve a abrir el entrenamiento.')
   validateSessionSets(session, 'save:start')
   const domainTemplate = getStoredTemplates(userId).find((item) => item.id === session.templateId)
-  let templateId: string | null = null
-
-  const { error: profileError } = await client
-    .from('profiles')
-    .upsert({ id: userId }, { onConflict: 'id' })
-  throwIfError(profileError)
-
-  if (session.templateId) {
-    const { data, error } = await client
-      .from('workout_templates')
-      .upsert({
-        user_id: userId,
-        stable_key: session.templateId,
-        name: domainTemplate?.name ?? session.name,
-        day_of_week: domainTemplate?.dayOfWeek ?? session.dayOfWeek,
-        notes: domainTemplate?.notes ?? null
-      }, { onConflict: 'user_id,stable_key' })
-      .select('id')
-      .single()
-    throwIfError(error)
-    templateId = data?.id ?? null
+  const exerciseIds = new Set(session.exerciseLogs.map((log) => log.exerciseId))
+  const exercises = getStoredExercises(userId).filter((exercise) => exerciseIds.has(exercise.id))
+  const { data, error } = await client.rpc('save_workout_session', {
+    p_user_id: userId,
+    p_session: session as unknown as Json,
+    p_exercises: exercises as unknown as Json,
+    p_template: (domainTemplate ?? null) as unknown as Json
+  })
+  if (error?.code === 'PGRST202' || error?.code === '42883') {
+    throw new Error('El servidor necesita actualizarse para guardar sesiones de forma segura. Tu borrador se conserva en este dispositivo.')
   }
-
-  const exerciseIds = new Map<string, string>()
-  for (const log of session.exerciseLogs) {
-    const exercise = getStoredExercises(userId).find((item) => item.id === log.exerciseId)
-    const { data, error } = await client
-      .from('exercises')
-      .upsert({
-        user_id: userId,
-        stable_key: log.exerciseId,
-        name: exercise?.name ?? log.exerciseId,
-        muscle_group: exercise?.muscleGroup ?? 'Sin grupo',
-        equipment: exercise?.equipment ?? null,
-        notes: exercise?.notes ?? null
-      }, { onConflict: 'user_id,stable_key' })
-      .select('id')
-      .single()
-    throwIfError(error)
-    if (!data) throw new Error(`No se pudo preparar el ejercicio ${log.exerciseId}.`)
-    exerciseIds.set(log.exerciseId, data.id)
+  throwIfError(error)
+  if (!data || typeof data !== 'object' || Array.isArray(data) || data.id !== session.id) {
+    throw new Error('No se ha recibido confirmación del guardado. Puedes reintentarlo sin crear otra sesión.')
   }
-
-  const { data: storedSession, error: sessionError } = await client
-    .from('workout_sessions')
-    .upsert({
-      user_id: userId,
-      client_id: session.id,
-      template_id: templateId,
-      name: session.name,
-      day_of_week: session.dayOfWeek,
-      started_at: session.startedAt,
-      completed_at: session.completedAt ?? null,
-      duration_minutes: session.durationMinutes ?? null,
-      volume_kg: session.volumeKg ?? null,
-      notes: session.notes ?? null
-    }, { onConflict: 'user_id,client_id' })
-    .select('id')
-    .single()
-  throwIfError(sessionError)
-  if (!storedSession) throw new Error('No se pudo guardar la sesión.')
-
-  const { error: deleteLogsError } = await client
-    .from('exercise_logs')
-    .delete()
-    .eq('session_id', storedSession.id)
-    .eq('user_id', userId)
-  throwIfError(deleteLogsError)
-
-  for (const log of session.exerciseLogs) {
-    const exerciseId = exerciseIds.get(log.exerciseId)
-    if (!exerciseId) continue
-
-    const { data: storedLog, error: logError } = await client
-      .from('exercise_logs')
-      .insert({
-        user_id: userId,
-        client_id: log.id,
-        session_id: storedSession.id,
-        exercise_id: exerciseId,
-        position: log.order,
-        working_weight_kg: log.workingWeightKg ?? null,
-        notes: log.notes ?? null
-      })
-      .select('id')
-      .single()
-    throwIfError(logError)
-    if (!storedLog) throw new Error(`No se pudo guardar ${log.exerciseId}.`)
-
-    if (log.sets.length > 0) {
-      const { data: insertedSets, error: setsError } = await client
-        .from('set_logs')
-        .insert(log.sets.map((set) => ({
-          user_id: userId,
-          client_id: set.id,
-          exercise_log_id: storedLog.id,
-          set_number: set.setNumber,
-          reps: set.reps > 0 ? set.reps : null,
-          weight_kg: set.weightKg,
-          weight_override_kg: set.weightOverrideKg ?? null,
-          completed: set.completed,
-          is_warmup: set.isWarmup ?? false
-        })))
-        .select('set_number')
-      throwIfError(setsError)
-      if ((insertedSets?.length ?? 0) !== log.sets.length) {
-        console.error(
-          `[workout:save] ${session.id} / ${log.exerciseId}: se intentaron guardar ${log.sets.length} series y Supabase confirmó ${insertedSets?.length ?? 0}.`
-        )
-      }
-    }
-  }
-
-  return session
+  return { ...session, volumeKg: typeof data.volumeKg === 'number' ? data.volumeKg : session.volumeKg }
 }
 
 export const supabaseWorkoutRepository: WorkoutRepository = {

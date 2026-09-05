@@ -24,7 +24,8 @@ export function hasCompletedSessionForDraft(
   return sessions.some((session) =>
     Boolean(session.completedAt) &&
     session.templateId === draft.templateId &&
-    session.startedAt === draft.startedAt
+    Number.isFinite(new Date(draft.startedAt).getTime()) &&
+    new Date(session.startedAt).getTime() === new Date(draft.startedAt).getTime()
   )
 }
 

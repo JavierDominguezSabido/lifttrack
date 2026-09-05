@@ -151,12 +151,11 @@ export function validateWorkoutDraft(logs: DraftExerciseLog[]) {
   return errors
 }
 
-function createSafeId() {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID()
-  }
-
-  return `workout-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+/** La identidad sobrevive a reintentos, recargas y restauraciones del borrador. */
+export function getWorkoutSessionId(templateId: string, startedAt: string) {
+  const timestamp = new Date(startedAt).getTime()
+  if (!Number.isFinite(timestamp)) throw new Error('La fecha de inicio del entrenamiento no es válida.')
+  return `workout:${encodeURIComponent(templateId)}:${timestamp}`
 }
 
 interface CreateWorkoutSessionOptions {
@@ -172,19 +171,19 @@ export function createWorkoutSession({
   logs,
   startedAt,
   completedAt = new Date(),
-  createId = createSafeId
+  createId
 }: CreateWorkoutSessionOptions): WorkoutSession {
   const validationErrors = validateWorkoutDraft(logs)
   if (validationErrors.length > 0) {
     throw new Error(validationErrors[0].message)
   }
 
-  const sessionId = createId()
+  const sessionId = createId?.() ?? getWorkoutSessionId(template.id, startedAt)
   const exerciseLogs = logs.flatMap((log) => {
     const completedSets = log.sets.filter((set) => set.completed)
     if (completedSets.length === 0) return []
 
-    const exerciseLogId = createId()
+    const exerciseLogId = createId?.() ?? `${sessionId}:log:${encodeURIComponent(log.id)}`
     const workingWeightKg = getWorkingWeight(log)
     return [{
       ...log,
@@ -193,7 +192,7 @@ export function createWorkoutSession({
       workingWeightKg,
       sets: completedSets.map((set): SetLog => ({
         ...set,
-        id: createId(),
+        id: createId?.() ?? `${exerciseLogId}:set:${encodeURIComponent(set.id)}`,
         exerciseLogId,
         reps: Number(set.reps),
         weightKg: normalizeWeight(set.weightOverrideKg ?? workingWeightKg),

@@ -219,7 +219,12 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      save_workout_session: {
+        Args: { p_user_id: string; p_session: Json; p_exercises: Json; p_template?: Json }
+        Returns: Json
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }

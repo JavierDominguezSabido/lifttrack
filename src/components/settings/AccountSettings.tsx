@@ -1,3 +1,4 @@
+import { syncStatusLabels } from '../../utils/syncStatus'
 import { Cloud, CloudUpload, HardDrive, LogIn, LogOut, UserPlus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../../context/AuthContext'
@@ -7,7 +8,7 @@ import { supabaseWorkoutRepository } from '../../services/supabase/supabaseWorko
 
 export function AccountSettings() {
   const { user, loading, configured, signIn, signUp, signOut } = useAuth()
-  const { dataMode, reloadSessions } = useWorkouts()
+  const { dataMode, reloadSessions, syncStatus } = useWorkouts()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -111,14 +112,14 @@ export function AccountSettings() {
           {user?.email && <p className="mt-1 break-all text-sm font-semibold text-secondary">{user.email}</p>}
         </div>
         <span className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-extrabold ${
-          dataMode === 'cloud'
-            ? 'bg-success-soft text-success-text'
+          syncStatus === 'error' || syncStatus === 'offline'
+            ? 'bg-danger-soft text-danger-text'
             : 'bg-muted text-secondary'
         }`}>
           {dataMode === 'cloud'
             ? <Cloud className="size-4" aria-hidden="true" />
             : <HardDrive className="size-4" aria-hidden="true" />}
-          {dataMode === 'cloud' ? 'Sincronizado' : 'Local'}
+          {syncStatusLabels[syncStatus]}
         </span>
       </div>
 

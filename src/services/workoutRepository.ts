@@ -6,8 +6,8 @@ import type { LastExercisePerformance, WorkoutSession } from '../types'
  */
 export interface WorkoutRepository {
   getWorkoutSessions(): Promise<WorkoutSession[]>
-  saveWorkoutSession(session: WorkoutSession): Promise<WorkoutSession>
-  updateWorkoutSession(session: WorkoutSession): Promise<WorkoutSession>
+  saveWorkoutSession(session: WorkoutSession, expectedUserId?: string): Promise<WorkoutSession>
+  updateWorkoutSession(session: WorkoutSession, expectedUserId?: string): Promise<WorkoutSession>
   deleteWorkoutSession(sessionId: string): Promise<void>
   clearWorkoutSessions(): Promise<void>
   mergeExerciseIds(canonicalId: string, duplicateIds: string[]): Promise<number>

@@ -152,7 +152,7 @@ export function SettingsPage() {
   function persistRoutine() {
     setError(null)
     saveTemplates(drafts)
-    setMessage('Rutina semanal guardada.')
+    setMessage('Rutina guardada en este dispositivo. Consulta el estado de la nube en la cabecera.')
   }
 
   function openOverview() {

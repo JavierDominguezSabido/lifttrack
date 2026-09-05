@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '../../types/database'
 import { supabase } from './supabaseClient'
+import { enqueueDraftWrite } from './draftWriteQueue'
 
 type DbClient = SupabaseClient<Database>
 type WorkoutDraftRow = Database['public']['Tables']['workout_drafts']['Row']
@@ -20,10 +21,11 @@ function requireClient(): DbClient {
   return supabase
 }
 
-async function requireUserId(client: DbClient) {
+async function requireUserId(client: DbClient, expectedUserId: string) {
   const { data, error } = await client.auth.getUser()
   if (error) throw error
   if (!data.user) throw new Error('Se necesita una sesion autenticada para sincronizar borradores.')
+  if (data.user.id !== expectedUserId) throw new Error('La cuenta ha cambiado. Vuelve a abrir el entrenamiento.')
   return data.user.id
 }
 
@@ -58,10 +60,11 @@ export function createWorkoutDraftUpsert(
 
 export async function getRemoteWorkoutDraft<TPayload>(
   dayOfWeek: number,
-  draftKey: string
+  draftKey: string,
+  expectedUserId: string
 ): Promise<RemoteWorkoutDraft<TPayload> | null> {
   const client = requireClient()
-  const userId = await requireUserId(client)
+  const userId = await requireUserId(client, expectedUserId)
   const { data, error } = await client
     .from('workout_drafts')
     .select('*')
@@ -76,40 +79,46 @@ export async function getRemoteWorkoutDraft<TPayload>(
 export async function upsertRemoteWorkoutDraft<TPayload extends object>(
   dayOfWeek: number,
   draftKey: string,
-  payload: TPayload
+  payload: TPayload,
+  expectedUserId: string
 ): Promise<RemoteWorkoutDraft<TPayload>> {
-  const client = requireClient()
-  const userId = await requireUserId(client)
+  return enqueueDraftWrite(expectedUserId, draftKey, async () => {
+    const client = requireClient()
+    const userId = await requireUserId(client, expectedUserId)
 
-  const { error: profileError } = await client
-    .from('profiles')
-    .upsert({ id: userId }, { onConflict: 'id' })
-  throwIfError(profileError)
+    const { error: profileError } = await client
+      .from('profiles')
+      .upsert({ id: userId }, { onConflict: 'id' })
+    throwIfError(profileError)
 
-  const { data, error } = await client
-    .from('workout_drafts')
-    .upsert(
-      createWorkoutDraftUpsert(userId, dayOfWeek, draftKey, payload),
-      { onConflict: WORKOUT_DRAFT_CONFLICT_COLUMNS }
-    )
-    .select('*')
-    .single()
-  throwIfError(error)
-  if (!data) throw new Error('No se pudo sincronizar el borrador.')
-  return mapRow<TPayload>(data)
+    const { data, error } = await client
+      .from('workout_drafts')
+      .upsert(
+        createWorkoutDraftUpsert(userId, dayOfWeek, draftKey, payload),
+        { onConflict: WORKOUT_DRAFT_CONFLICT_COLUMNS }
+      )
+      .select('*')
+      .single()
+    throwIfError(error)
+    if (!data) throw new Error('No se pudo sincronizar el borrador.')
+    return mapRow<TPayload>(data)
+  })
 }
 
 export async function deleteRemoteWorkoutDraft(
   dayOfWeek: number,
-  draftKey: string
+  draftKey: string,
+  expectedUserId: string
 ) {
-  const client = requireClient()
-  const userId = await requireUserId(client)
-  const { error } = await client
-    .from('workout_drafts')
-    .delete()
-    .eq('user_id', userId)
-    .eq('day_of_week', dayOfWeek)
-    .eq('draft_key', draftKey)
-  throwIfError(error)
+  return enqueueDraftWrite(expectedUserId, draftKey, async () => {
+    const client = requireClient()
+    const userId = await requireUserId(client, expectedUserId)
+    const { error } = await client
+      .from('workout_drafts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('day_of_week', dayOfWeek)
+      .eq('draft_key', draftKey)
+    throwIfError(error)
+  })
 }

@@ -10,6 +10,7 @@ import {
 import { loadRemoteRoutine, saveRemoteRoutine } from '../services/supabase/supabaseRoutineRepository'
 import { useAuth } from './AuthContext'
 import { readSessionCache, writeSessionCache } from '../services/workoutSessionCache'
+import { getSyncStatus } from '../utils/syncStatus'
 
 function createId() {
   return typeof globalThis.crypto?.randomUUID === 'function'
@@ -28,11 +29,27 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const userId = user?.id
   const owner = userId ?? 'local'
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+  const requestRevision = useRef(0)
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  const [pendingWrites, setPendingWrites] = useState(0)
+  const [writeError, setWriteError] = useState<string | null>(null)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
   const [sessions, setSessions] = useState<WorkoutSession[]>(getStoredSessions)
   const [sessionsLoading, setSessionsLoading] = useState(authLoading)
   const [historyLoaded, setHistoryLoaded] = useState(!authLoading)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
   const [routineLoading, setRoutineLoading] = useState(authLoading)
+  const [routineRefreshing, setRoutineRefreshing] = useState(false)
   const [routineError, setRoutineError] = useState<string | null>(null)
   const [initialLoading, setInitialLoading] = useState(authLoading)
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false)
@@ -49,28 +66,36 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
 
   const reloadSessions = useCallback(async (background = true) => {
     if (authLoading) return
+    const revision = ++requestRevision.current
+    const isCurrent = () => ownerRef.current === owner && requestRevision.current === revision
     if (background) setBackgroundRefreshing(true)
     else setSessionsLoading(true)
     setSessionsError(null)
     try {
       const remoteSessions = await activeRepository.getWorkoutSessions()
+      if (!isCurrent()) return
       setSessions(remoteSessions)
       writeSessionCache(owner, remoteSessions)
       setHistoryLoaded(true)
     } catch (error) {
+      if (!isCurrent()) return
       console.error('[workout] No se pudo cargar el historial activo:', error)
       setSessionsError(dataMode === 'cloud'
         ? 'No se pudo cargar el historial sincronizado. Revisa la conexión e inténtalo de nuevo.'
         : 'No se pudo cargar el historial guardado en este dispositivo.')
     } finally {
-      if (background) setBackgroundRefreshing(false)
-      else setSessionsLoading(false)
+      if (isCurrent()) {
+        setBackgroundRefreshing(false)
+        setSessionsLoading(false)
+      }
     }
   }, [activeRepository, authLoading, dataMode, owner])
 
   useEffect(() => {
     if (authLoading) return
     let active = true
+    setPendingWrites(0)
+    setWriteError(null)
     const cachedExercises = getStoredExercises(owner)
     const cachedTemplates = getStoredTemplates(owner)
     const cachedHistory = userId ? readSessionCache(owner) : null
@@ -78,6 +103,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     setInitialLoading(!hasUsableLocalState)
     setSessionsLoading(!hasUsableLocalState)
     setRoutineLoading(!hasUsableLocalState)
+    setRoutineRefreshing(true)
     setBackgroundRefreshing(hasUsableLocalState)
     setRoutineError(null)
     setSessions(userId ? cachedHistory?.sessions ?? [] : getStoredSessions())
@@ -97,6 +123,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
           return
         }
         let remote = await loadRemoteRoutine(userId)
+        if (!active) return
         // Solo una cuenta con datos remotos previos puede reclamar la antigua rutina global.
         if (!remote.hasCompleteRoutine && remote.hasSessions) {
           copyLegacyRoutine(userId, true)
@@ -105,6 +132,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
           await saveRemoteRoutine(userId, migratedExercises, migratedTemplates)
           remote = await loadRemoteRoutine(userId)
         }
+        if (!active) return
         const catalog = getExerciseCatalog()
         const byId = new Map(catalog.map((exercise) => [exercise.id, exercise]))
         for (const exercise of remote.exercises) byId.set(exercise.id, exercise)
@@ -120,8 +148,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       } finally {
         if (active) {
           setRoutineLoading(false)
+          setRoutineRefreshing(false)
           setInitialLoading(false)
-          setBackgroundRefreshing(false)
         }
       }
     })()
@@ -159,10 +187,20 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     storeExercises(owner, exercises)
     storeTemplates(owner, templates)
     if (user) {
+      setPendingWrites((count) => count + 1)
+      setRoutineError(null)
       routineSyncQueue.current = routineSyncQueue.current
         .catch(() => undefined)
-        .then(() => saveRemoteRoutine(user.id, exercises, templates))
-        .catch((error) => { console.error('[routine] No se pudo sincronizar:', error) })
+        .then(async () => {
+          if (ownerRef.current !== owner) return
+          await saveRemoteRoutine(user.id, exercises, templates)
+          if (ownerRef.current === owner) setRoutineError(null)
+        })
+        .catch((error) => {
+          console.error('[routine] No se pudo sincronizar:', error)
+          if (ownerRef.current === owner) setRoutineError('La rutina está guardada en este dispositivo, pero no se ha confirmado en la nube. Reintenta Guardar cambios.')
+        })
+        .finally(() => { if (ownerRef.current === owner) setPendingWrites((count) => Math.max(0, count - 1)) })
     }
   }, [owner, user])
 
@@ -177,31 +215,67 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     historyLoaded,
     lastPerformanceLoaded: historyLoaded,
     draftLoaded: true,
-    syncReady: currentRoutine.owner === owner && !routineLoading && historyLoaded,
+    syncReady: !authLoading && currentRoutine.owner === owner && !routineLoading && (historyLoaded || Boolean(sessionsError)),
     sessionsError,
     routineLoading,
     initialLoading,
     backgroundRefreshing,
     routineError,
     dataMode,
+    syncStatus: getSyncStatus({ cloud: dataMode === 'cloud', online,
+      pending: pendingWrites > 0 || backgroundRefreshing || sessionsLoading || routineRefreshing,
+      error: Boolean(writeError || routineError || sessionsError) }),
+    syncError: writeError ?? routineError ?? sessionsError,
     ownerId: owner,
     saveSession: async (session) => {
-      const saved = sessions.some((item) => item.id === session.id)
-        ? await activeRepository.updateWorkoutSession(session)
-        : await activeRepository.saveWorkoutSession(session)
-      setSessions((items) => {
-        const next = [saved, ...items.filter((item) => item.id !== saved.id)]
-        writeSessionCache(owner, next)
-        return next
-      })
+      requestRevision.current += 1
+      setPendingWrites((count) => count + 1)
+      setWriteError(null)
+      try {
+        const saved = sessions.some((item) => item.id === session.id)
+          ? await activeRepository.updateWorkoutSession(session, userId)
+          : await activeRepository.saveWorkoutSession(session, userId)
+        if (ownerRef.current !== owner) return
+        requestRevision.current += 1
+        setSessions((items) => {
+          const next = [saved, ...items.filter((item) => item.id !== saved.id)]
+          writeSessionCache(owner, next)
+          return next
+        })
+      } catch (error) {
+        if (ownerRef.current === owner) setWriteError('No se ha confirmado el guardado de la sesión. Reinténtalo desde el entrenamiento.')
+        throw error
+      } finally {
+        if (ownerRef.current === owner) {
+          setPendingWrites((count) => Math.max(0, count - 1))
+          setBackgroundRefreshing(false)
+          setSessionsLoading(false)
+        }
+      }
     },
     deleteSession: async (id) => {
-      await activeRepository.deleteWorkoutSession(id)
-      setSessions((items) => {
-        const next = items.filter((item) => item.id !== id)
-        writeSessionCache(owner, next)
-        return next
-      })
+      requestRevision.current += 1
+      setPendingWrites((count) => count + 1)
+      setWriteError(null)
+      try {
+        await activeRepository.deleteWorkoutSession(id)
+        if (ownerRef.current !== owner) return
+        requestRevision.current += 1
+        setSessions((items) => {
+          const next = items.filter((item) => item.id !== id)
+          writeSessionCache(owner, next)
+          return next
+        })
+      } catch (error) {
+        if (ownerRef.current === owner) setWriteError('No se ha confirmado el borrado. Reinténtalo desde el historial.')
+        throw error
+      } finally {
+        if (ownerRef.current === owner) {
+          setPendingWrites((count) => Math.max(0, count - 1))
+          setBackgroundRefreshing(false)
+          setSessionsLoading(false)
+        }
+      }
     },
     clearLocalSessions: async () => { await localWorkoutRepository.clearWorkoutSessions(); if (dataMode === 'local') setSessions(getStoredSessions()) },
     createExercise: (exercise) => {
@@ -248,7 +322,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     },
     mergeDuplicateExercises: async (canonicalId, duplicateIds) => { const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds); await reloadSessions(true); return count },
     reloadSessions
-  }), [activeRepository, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, sessions, sessionsError, sessionsLoading, user])
+  }), [activeRepository, authLoading, online, pendingWrites, writeError, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, routineRefreshing, sessions, sessionsError, sessionsLoading, user, userId])
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>
 }

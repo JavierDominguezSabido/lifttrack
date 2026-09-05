@@ -1,3 +1,4 @@
+import { syncStatusLabels } from '../../utils/syncStatus'
 import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, Dumbbell, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
@@ -24,7 +25,7 @@ const pageTitles: Record<string, string> = {
 
 export function AppLayout() {
   const location = useLocation()
-  const { sessions, templates, dataMode, sessionsError, initialLoading, backgroundRefreshing, ownerId } = useWorkouts()
+  const { sessions, templates, dataMode, sessionsError, initialLoading, backgroundRefreshing, ownerId, syncStatus, syncError } = useWorkouts()
   const hasLocalWorkoutDraft = (() => {
     try {
       const userKey = ownerId === 'local' ? 'local' : `user:${ownerId}`
@@ -115,17 +116,19 @@ export function AppLayout() {
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <span
               className={`inline-flex min-h-9 items-center gap-1 rounded-md px-1.5 text-xs font-extrabold sm:px-2 ${
-                dataMode === 'cloud'
-                  ? 'bg-success-soft/70 text-success-text'
+                syncStatus === 'error' || syncStatus === 'offline'
+                  ? 'bg-danger-soft text-danger-text'
                   : 'bg-transparent text-secondary'
               }`}
-              title={dataMode === 'cloud' ? 'Modo sincronizado en la nube' : 'Modo local'}
+              title={syncError ?? syncStatusLabels[syncStatus]}
+              role="status"
+              aria-label={syncStatusLabels[syncStatus]}
             >
               {dataMode === 'cloud'
                 ? <Cloud className="size-4" aria-hidden="true" />
                 : <HardDrive className="size-4" aria-hidden="true" />}
-              <span className="hidden sm:inline">
-                {dataMode === 'cloud' ? 'Sincronizado' : 'Local'}
+              <span className="max-w-32 truncate sm:max-w-none">
+                {syncStatusLabels[syncStatus]}
               </span>
             </span>
             <ThemeToggle />
@@ -142,8 +145,8 @@ export function AppLayout() {
             </p>
           ) : (
             <>
-              {sessionsError && (
-                <p role="alert" className="status-error mb-4">{sessionsError}</p>
+              {(syncError || sessionsError) && (
+                <p role="alert" className="status-error mb-4">{syncError ?? sessionsError}</p>
               )}
               {backgroundRefreshing && (
                 <p role="status" className="mb-3 text-right text-xs font-bold text-secondary">Sincronizando…</p>
