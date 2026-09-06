@@ -1,95 +1,42 @@
 import type { Exercise, WorkoutSession, WorkoutTemplate } from '../../types'
 import type { ImportPayload } from './types'
 
+import { amount, boolean, day, integer, optional, string, text as nonempty, unique, validDate } from './validation'
+
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
-
-function validateExercise(value: unknown): value is Exercise {
-  return isRecord(value) &&
-    typeof value.id === 'string' &&
-    value.id.length > 0 &&
-    typeof value.name === 'string' &&
-    value.name.length > 0
+const notes = (v: Record<string, unknown>) => optional(v.notes, string) && optional(v.syncRevision, nonempty)
+function validateExercise(v: unknown): v is Exercise {
+  return isRecord(v) && nonempty(v.id) && nonempty(v.name) && notes(v) &&
+    optional(v.active, boolean) && optional(v.equipment, string) && optional(v.dayOfWeek, day) &&
+    optional(v.muscleGroup, x => ['Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Core'].includes(x as string)) &&
+    optional(v.targetSets, x => integer(x, 1)) && optional(v.targetReps, nonempty) &&
+    optional(v.restSeconds, integer) && optional(v.lastWeightKg, amount) &&
+    optional(v.lastReps, x => Array.isArray(x) && x.every(n => integer(n)))
 }
-
-function validateSession(value: unknown): value is WorkoutSession {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    value.id.trim().length === 0 ||
-    typeof value.name !== 'string' ||
-    value.name.trim().length === 0 ||
-    typeof value.dayOfWeek !== 'number' ||
-    !Number.isInteger(value.dayOfWeek) ||
-    value.dayOfWeek < 0 ||
-    value.dayOfWeek > 6 ||
-    typeof value.startedAt !== 'string' ||
-    Number.isNaN(new Date(value.startedAt).getTime()) ||
-    !Array.isArray(value.exerciseLogs)
-  ) return false
-
-  return value.exerciseLogs.every((log) =>
-    isRecord(log) &&
-    typeof log.id === 'string' &&
-    log.id.length > 0 &&
-    typeof log.exerciseId === 'string' &&
-    log.exerciseId.length > 0 &&
-    typeof log.order === 'number' &&
-    Number.isInteger(log.order) &&
-    log.order > 0 &&
-    Array.isArray(log.sets) &&
-    log.sets.every((set) =>
-      isRecord(set) &&
-      typeof set.id === 'string' &&
-      typeof set.setNumber === 'number' &&
-      Number.isInteger(set.setNumber) &&
-      set.setNumber > 0 &&
-      typeof set.reps === 'number' &&
-      Number.isInteger(set.reps) &&
-      set.reps >= 0 &&
-      typeof set.weightKg === 'number' &&
-      Number.isFinite(set.weightKg) &&
-      set.weightKg >= 0 &&
-      typeof set.completed === 'boolean' &&
-      (!set.completed || set.reps > 0)
-    )
-  )
+function validateSession(v: unknown): v is WorkoutSession {
+  if (!isRecord(v) || !nonempty(v.id) || !nonempty(v.name) || !day(v.dayOfWeek) || !notes(v) ||
+    !optional(v.templateId, nonempty) || !validDate(v.startedAt) || !optional(v.completedAt, validDate) ||
+    (typeof v.completedAt === 'string' && Date.parse(v.completedAt) < Date.parse(v.startedAt)) ||
+    !optional(v.durationMinutes, integer) || !optional(v.volumeKg, x => amount(x, 999999999999.99)) ||
+    !Array.isArray(v.exerciseLogs)) return false
+  return v.exerciseLogs.every(log => isRecord(log) && nonempty(log.id) && nonempty(log.exerciseId) &&
+    optional(log.sessionId, x => x === v.id) && integer(log.order, 1) && notes(log) &&
+    optional(log.workingWeightKg, amount) && Array.isArray(log.sets) &&
+    log.sets.every(set => isRecord(set) && nonempty(set.id) && optional(set.exerciseLogId, x => x === log.id) &&
+      integer(set.setNumber, 1) && integer(set.reps) && amount(set.weightKg) &&
+      optional(set.weightOverrideKg, amount) && optional(set.isWarmup, boolean) && boolean(set.completed) &&
+      (!set.completed || set.reps > 0)) && unique(log.sets.map(set => set.setNumber))) &&
+    unique(v.exerciseLogs.map(log => log.order)) &&
+    amount(v.exerciseLogs.reduce((sum, log) => sum + log.sets.reduce((total: number, set: { completed: boolean; reps: number; weightKg: number; weightOverrideKg?: number }) => total + (set.completed ? set.reps * (set.weightOverrideKg ?? set.weightKg) : 0), 0), 0), 999999999999.99)
 }
-
-function validateTemplate(value: unknown): value is WorkoutTemplate {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    value.id.trim().length === 0 ||
-    typeof value.name !== 'string' ||
-    value.name.trim().length === 0 ||
-    typeof value.dayOfWeek !== 'number' ||
-    !Number.isInteger(value.dayOfWeek) ||
-    value.dayOfWeek < 0 ||
-    value.dayOfWeek > 6 ||
-    !Array.isArray(value.exercises)
-  ) return false
-
-  return value.exercises.every((item) =>
-    isRecord(item) &&
-    typeof item.id === 'string' &&
-    item.id.length > 0 &&
-    typeof item.templateId === 'string' &&
-    item.templateId.length > 0 &&
-    typeof item.exerciseId === 'string' &&
-    item.exerciseId.length > 0 &&
-    typeof item.order === 'number' &&
-    Number.isInteger(item.order) &&
-    item.order > 0 &&
-    typeof item.targetSets === 'number' &&
-    Number.isInteger(item.targetSets) &&
-    item.targetSets > 0 &&
-    typeof item.targetReps === 'string' &&
-    item.targetReps.trim().length > 0 &&
-    (item.restSeconds === undefined ||
-      (typeof item.restSeconds === 'number' && Number.isFinite(item.restSeconds) && item.restSeconds >= 0))
-  )
+function validateTemplate(v: unknown): v is WorkoutTemplate {
+  return isRecord(v) && nonempty(v.id) && nonempty(v.name) && day(v.dayOfWeek) && notes(v) &&
+    Array.isArray(v.exercises) && v.exercises.every(item => isRecord(item) && nonempty(item.id) &&
+      item.templateId === v.id && nonempty(item.exerciseId) && integer(item.order, 1) &&
+      integer(item.targetSets, 1) && nonempty(item.targetReps) && optional(item.restSeconds, integer) && notes(item)) &&
+    unique(v.exercises.map(item => item.order)) && unique(v.exercises.map(item => item.exerciseId))
 }
 
 export function parseWorkoutBackup(text: string, filename: string): ImportPayload {
@@ -99,6 +46,8 @@ export function parseWorkoutBackup(text: string, filename: string): ImportPayloa
       !isRecord(parsed) ||
       parsed.format !== 'lifttrack-backup' ||
       parsed.version !== 1 ||
+      !optional(parsed.exportedAt, validDate) ||
+      !optional(parsed.dataMode, x => x === 'local' || x === 'cloud') ||
       !Array.isArray(parsed.sessions) ||
       !Array.isArray(parsed.exercises) ||
       (parsed.templates !== undefined && !Array.isArray(parsed.templates))
@@ -122,10 +71,18 @@ export function parseWorkoutBackup(text: string, filename: string): ImportPayloa
     if (invalidExercises) errors.push(`${invalidExercises} ejercicios tienen un formato no válido.`)
     if (invalidTemplates) errors.push(`${invalidTemplates} rutinas tienen un formato no válido.`)
 
+    const sessions = parsed.sessions.filter(validateSession)
+    const templates = rawTemplates.filter(validateTemplate)
+    const exercises = parsed.exercises.filter(validateExercise)
+    const groups = [sessions, templates, exercises, templates.flatMap(t => t.exercises),
+      sessions.flatMap(s => s.exerciseLogs), sessions.flatMap(s => s.exerciseLogs.flatMap(l => l.sets))]
+    if (groups.some(group => !unique(group.map(item => item.id)))) errors.push('El archivo contiene identificadores duplicados.')
+    if (errors.length) return { source: 'json', filename, sessions: [], templates: [], exercises: [], errors }
+
     return {
       source: 'json',
       filename,
-      sessions: parsed.sessions.filter(validateSession).map((session) => ({
+      sessions: sessions.map((session) => ({
         ...session,
         exerciseLogs: session.exerciseLogs.map((log) => ({
           ...log,
@@ -136,10 +93,9 @@ export function parseWorkoutBackup(text: string, filename: string): ImportPayloa
           }))
         }))
       })),
-      exercises: parsed.exercises
-        .filter(validateExercise)
+      exercises: exercises
         .map((exercise) => ({ ...exercise, active: exercise.active !== false })),
-      templates: rawTemplates.filter(validateTemplate),
+      templates,
       errors
     }
   } catch {

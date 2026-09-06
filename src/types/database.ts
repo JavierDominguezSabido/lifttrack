@@ -220,6 +220,12 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
+      sync_revision: { Args: { p_user_id: string; p_resource: string }; Returns: string }
+      sync_session_versions: { Args: { p_user_id: string }; Returns: Json }
+      apply_sync_operation: {
+        Args: { p_user_id: string; p_operation_id: string; p_resource: string; p_expected: string; p_payload: Json }
+        Returns: Json
+      }
       save_workout_session: {
         Args: { p_user_id: string; p_session: Json; p_exercises: Json; p_template?: Json }
         Returns: Json

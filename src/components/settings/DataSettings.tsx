@@ -144,6 +144,7 @@ export function DataSettings() {
     exercises,
     templates,
     dataMode,
+    syncStatus,
     ownerId,
     routineLoading,
     routineError,
@@ -418,9 +419,9 @@ export function DataSettings() {
         <div className="border-t border-line/70 pt-4">
           <h3 className="font-extrabold text-ink">Estado de sincronización</h3>
           <p className="mt-1 text-sm leading-6 text-secondary">
-            {dataMode === 'cloud'
+            {dataMode === 'cloud' && syncStatus === 'synced'
               ? `${exportableSessions.length} entrenamientos sincronizados.`
-              : `${exportableSessions.length} entrenamientos guardados en este dispositivo.`}
+              : `${exportableSessions.length} entrenamientos disponibles en este dispositivo. ${dataMode === 'cloud' ? 'Consulta los pendientes y conflictos en la cabecera.' : ''}`}
           </p>
         </div>
       </div>

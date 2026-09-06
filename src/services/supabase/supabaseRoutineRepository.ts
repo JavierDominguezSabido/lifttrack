@@ -3,6 +3,7 @@ import type { Database } from '../../types/database'
 import type { Exercise, WorkoutTemplate } from '../../types'
 import { supabase } from './supabaseClient'
 import { assertUniqueTemplateExercises, normalizeWeeklyTemplates } from '../templateImport'
+import { enqueueSyncOperation, getSyncBase, pendingOperations, readSyncRevision, rememberSyncRevision } from '../syncOutbox'
 
 type DbClient = SupabaseClient<Database>
 
@@ -17,6 +18,7 @@ function check(error: { message: string } | null) {
 
 export async function loadRemoteRoutine(userId: string) {
   const db = client()
+  const before = await readSyncRevision(userId, 'routine')
   const [exerciseResult, templateResult, itemResult, sessionResult] = await Promise.all([
     db.from('exercises').select('*').eq('user_id', userId),
     db.from('workout_templates').select('*').eq('user_id', userId).eq('active', true),
@@ -24,9 +26,13 @@ export async function loadRemoteRoutine(userId: string) {
     db.from('workout_sessions').select('id', { count: 'exact', head: true }).eq('user_id', userId)
   ])
   check(exerciseResult.error); check(templateResult.error); check(itemResult.error); check(sessionResult.error)
+  const after = await readSyncRevision(userId, 'routine')
+  if (before !== after) throw new Error('La rutina cambió durante la lectura. Reintenta la sincronización.')
+  rememberSyncRevision(userId, 'routine', after)
 
   const exerciseKeys = new Map((exerciseResult.data ?? []).map((row) => [row.id, row.stable_key]))
   const exercises: Exercise[] = (exerciseResult.data ?? []).map((row) => ({
+    syncRevision: after,
     id: row.stable_key,
     name: row.name,
     muscleGroup: row.muscle_group as Exercise['muscleGroup'],
@@ -35,6 +41,7 @@ export async function loadRemoteRoutine(userId: string) {
     active: row.active
   }))
   const loadedTemplates: WorkoutTemplate[] = (templateResult.data ?? []).map((row) => ({
+    syncRevision: after,
     id: row.stable_key,
     name: row.name,
     dayOfWeek: row.day_of_week,
@@ -53,58 +60,26 @@ export async function loadRemoteRoutine(userId: string) {
   const normalized = normalizeWeeklyTemplates(loadedTemplates)
   if (normalized.conflicts.length) console.error('[routine] Conflictos semanales:', normalized.conflicts)
   const templates = normalized.templates
-  if (templates.length !== loadedTemplates.length) await saveRemoteRoutine(userId, exercises, templates)
+  const pending = pendingOperations(userId, 'routine').slice(-1)[0]
   return {
-    exercises,
-    templates,
+    exercises: pending?.payload.exercises ?? exercises,
+    templates: pending?.payload.templates ?? templates,
     hasRemoteData: exercises.length > 0 || templates.length > 0,
     hasCompleteRoutine: (itemResult.data?.length ?? 0) > 0,
     hasSessions: (sessionResult.count ?? 0) > 0
   }
 }
 
-export async function saveRemoteRoutine(userId: string, exercises: Exercise[], templates: WorkoutTemplate[]) {
+export function queueRemoteRoutine(userId: string, exercises: Exercise[], templates: WorkoutTemplate[]) {
   assertUniqueTemplateExercises(templates)
-  const db = client()
   const normalized = normalizeWeeklyTemplates(templates)
   if (normalized.conflicts.length) throw new Error(normalized.conflicts.join(' '))
-  templates = normalized.templates
-  check((await db.from('profiles').upsert({ id: userId }, { onConflict: 'id' })).error)
-  const exerciseDbIds = new Map<string, string>()
-  for (const exercise of exercises) {
-    const { data, error } = await db.from('exercises').upsert({
-      user_id: userId, stable_key: exercise.id, name: exercise.name,
-      muscle_group: exercise.muscleGroup ?? 'Sin grupo', equipment: exercise.equipment ?? null,
-      notes: exercise.notes ?? null, active: exercise.active
-    }, { onConflict: 'user_id,stable_key' }).select('id').single()
-    check(error); if (data) exerciseDbIds.set(exercise.id, data.id)
-  }
-  const templateDbIds = new Map<string, string>()
-  for (const template of templates) {
-    const { data, error } = await db.from('workout_templates').upsert({
-      user_id: userId, stable_key: template.id, name: template.name,
-      day_of_week: template.dayOfWeek, notes: template.notes ?? null, active: true
-    }, { onConflict: 'user_id,stable_key' }).select('id').single()
-    check(error); if (data) templateDbIds.set(template.id, data.id)
-  }
-  const ids = [...templateDbIds.values()]
-  const { data: activeTemplates, error: obsoleteError } = await db.from('workout_templates')
-    .select('id, stable_key').eq('user_id', userId).eq('active', true)
-  check(obsoleteError)
-  const retainedKeys = new Set(templates.map((template) => template.id))
-  const obsoleteIds = (activeTemplates ?? []).filter((row) => !retainedKeys.has(row.stable_key)).map((row) => row.id)
-  if (obsoleteIds.length) {
-    check((await db.from('template_exercises').delete().eq('user_id', userId).in('template_id', obsoleteIds)).error)
-    check((await db.from('workout_templates').update({ active: false }).eq('user_id', userId).in('id', obsoleteIds)).error)
-  }
-  if (ids.length) check((await db.from('template_exercises').delete().eq('user_id', userId).in('template_id', ids)).error)
-  const rows = templates.flatMap((template) => template.exercises.map((item) => {
-    const templateId = templateDbIds.get(template.id); const exerciseId = exerciseDbIds.get(item.exerciseId)
-    return templateId && exerciseId ? {
-      user_id: userId, template_id: templateId, exercise_id: exerciseId, position: item.order,
-      target_sets: item.targetSets, target_reps: item.targetReps,
-      rest_seconds: item.restSeconds ?? null, notes: item.notes ?? null
-    } : null
-  })).filter((row): row is NonNullable<typeof row> => Boolean(row))
-  if (rows.length) check((await db.from('template_exercises').insert(rows)).error)
+  // Una edición abierta conserva su versión aunque otra lectura refresque la caché.
+  const base = getSyncBase(userId, 'routine')
+  const stale = [...exercises, ...templates].map(item => item.syncRevision).find(revision => revision && revision !== base)
+  return enqueueSyncOperation(userId, 'routine', { exercises, templates: normalized.templates }, stale)
+}
+
+export async function saveRemoteRoutine(userId: string, exercises: Exercise[], templates: WorkoutTemplate[]) {
+  queueRemoteRoutine(userId, exercises, templates)
 }

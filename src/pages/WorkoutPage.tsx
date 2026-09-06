@@ -40,6 +40,7 @@ import {
 } from '../utils/workoutLifecycle'
 import { toLocalDateKey } from '../utils/date'
 import { resolvePendingGuidedIndex } from '../utils/guidedWorkout'
+import { enqueueSyncOperation, pendingOperations } from '../services/syncOutbox'
 
 type WorkoutViewMode = 'full' | 'guided'
 type DraftSyncStatus = 'local-error' | 'idle' | 'local' | 'pending' | 'syncing' | 'synced' | 'error'
@@ -82,6 +83,7 @@ const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
 const WORKOUT_FULL_SCROLL_PREFIX = 'lifttrack.workoutFullScroll'
 
 interface StoredWorkoutDraft {
+  confirmed?: true
   version: number
   userKey: string
   templateId: string
@@ -194,10 +196,12 @@ function writeWorkoutDraft(
   viewMode: WorkoutViewMode,
   guidedPosition: GuidedPosition | null,
   localDate: string,
-  updatedAt?: string
+  updatedAt?: string,
+  confirmed = false
 ) {
   try {
     const draft = createStoredWorkoutDraft(userKey, template, startedAt, logs, viewMode, guidedPosition, localDate, updatedAt)
+    if (confirmed) draft.confirmed = true
     window.localStorage.setItem(getWorkoutDraftKey(userKey, localDate, template), JSON.stringify(draft))
     return draft
   } catch (error) {
@@ -264,7 +268,19 @@ function createFreshWorkoutLogs(
 export function WorkoutPage() {
   const { ownerId } = useWorkouts()
   const { templateId } = useParams()
-  return <WorkoutPageContent key={JSON.stringify([ownerId, templateId])} />
+  const [resolved, setResolved] = useState(0)
+  useEffect(() => {
+    const resolve = (event: Event) => {
+      if (!(event instanceof CustomEvent) || event.detail.owner !== ownerId || event.detail.keepLocal || !event.detail.resource.startsWith('draft:')) return
+      const draftKey = event.detail.resource.slice(6)
+      // Retirar solo la copia de este borrador; la nube se leerá al remontar.
+      window.localStorage.removeItem(`lifttrack.workoutDraft.user:${ownerId}.${draftKey}`)
+      setResolved(value => value + 1)
+    }
+    window.addEventListener('lifttrack-sync-resolved', resolve)
+    return () => window.removeEventListener('lifttrack-sync-resolved', resolve)
+  }, [ownerId])
+  return <WorkoutPageContent key={JSON.stringify([ownerId, templateId, resolved])} />
 }
 
 function WorkoutPageContent() {
@@ -521,7 +537,7 @@ function WorkoutPageContent() {
     const normalized = writeWorkoutDraft(
       userKey, template, sentDraft.startedAt, sentDraft.logs,
       sentDraft.viewMode ?? 'full', sentDraft.guidedPosition ?? null,
-      localDate, remoteUpdatedAt
+      localDate, remoteUpdatedAt, true
     )
     if (normalized) lastLocalDraftRef.current = normalized
     else setLocalSaveError('No se pudo actualizar la copia local. No cierres esta pantalla hasta resolverlo.')
@@ -531,6 +547,19 @@ function WorkoutPageContent() {
     setDraftSyncError(null)
     setDraftSyncStatus('synced')
   }, [localDate, template, userKey])
+
+  useEffect(() => {
+    const confirmed = (event: Event) => {
+      if (!user || !(event instanceof CustomEvent) || event.detail.owner !== user.id ||
+        event.detail.resource !== `draft:${getWorkoutRemoteDraftKey(localDate, template)}` || draftMutationBlocked.current) return
+      const local = lastLocalDraftRef.current
+      if (local && JSON.stringify(local) === JSON.stringify(event.detail.payload.draft) && !pendingOperations(user.id, event.detail.resource).length) {
+        confirmRemoteSync(local, event.detail.saved?.updatedAt ?? local.updatedAt, userChangeRevisionRef.current)
+      }
+    }
+    window.addEventListener('lifttrack-sync-confirmed', confirmed)
+    return () => window.removeEventListener('lifttrack-sync-confirmed', confirmed)
+  }, [confirmRemoteSync, localDate, template, user])
 
   useLayoutEffect(() => {
     if (viewMode !== 'full') return
@@ -674,6 +703,15 @@ function WorkoutPageContent() {
     remoteRestoreRequestRef.current = requestId
     setDraftHydrationStatus('hydrating')
     const localDraftAtStart = readWorkoutDraft(userKey, localDate, template)
+    // Un borrador recuperado puede contener cambios anteriores a una recarga.
+    // Registrar la intención antes de leer la nube conserva su versión base.
+    if (localDraftAtStart && !localDraftAtStart.confirmed && !pendingOperations(user.id, `draft:${getWorkoutRemoteDraftKey(localDate, template)}`).length) {
+      try {
+        enqueueSyncOperation(user.id, `draft:${getWorkoutRemoteDraftKey(localDate, template)}`, { action: 'save', dayOfWeek: template.dayOfWeek, draft: localDraftAtStart })
+      } catch {
+        setLocalSaveError('No se pudo registrar la sincronización pendiente. Conserva esta pantalla abierta.')
+      }
+    }
 
     void getRemoteWorkoutDraft<StoredWorkoutDraft>(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template), user.id)
       .then((remoteDraft) => {
@@ -746,7 +784,7 @@ function WorkoutPageContent() {
             (remotePayload.viewMode ?? 'full') !== 'full' ||
             Boolean(remotePayload.guidedPosition)
         })
-        const remoteIsNewer = newestDraft.source === 'remote'
+        const remoteIsNewer = newestDraft.source === 'remote' || Boolean(localDraft?.confirmed && localDraft.updatedAt === remotePayload.updatedAt)
 
         if (remoteIsNewer) {
           setInitialLogs(createExerciseLogs(template, sessions, exercises))
@@ -767,11 +805,12 @@ function WorkoutPageContent() {
             remotePayload.viewMode ?? 'full',
             remotePayload.guidedPosition ?? null,
             localDate,
-            remotePayload.updatedAt
+            remotePayload.updatedAt,
+            !remoteDraft.pending
           )
           draftWeightsAreAuthoritativeRef.current = true
           if (!restored) setLocalSaveError('El borrador está en la nube, pero no se pudo guardar su copia local. Reintenta antes de continuar.')
-          setDraftSyncStatus('synced')
+          setDraftSyncStatus(remoteDraft.pending ? 'pending' : 'synced')
         } else if (localDraft) {
           setInitialLogs(createExerciseLogs(template, sessions, exercises))
           setLogs(localDraft.logs)
@@ -844,6 +883,14 @@ function WorkoutPageContent() {
       return
     }
     lastLocalDraftRef.current = storedDraft
+    if (user) {
+      try {
+        enqueueSyncOperation(user.id, `draft:${getWorkoutRemoteDraftKey(localDate, template)}`, { action: 'save', dayOfWeek: template.dayOfWeek, draft: storedDraft })
+      } catch {
+        setLocalSaveError('El borrador está guardado localmente, pero no se pudo registrar la operación pendiente. Libera espacio y reintenta.')
+        return
+      }
+    }
     setLocalSaveError(null)
     setDraftSyncStatus(user ? 'pending' : 'local')
     setDraftActive(true)
@@ -884,7 +931,10 @@ function WorkoutPageContent() {
         user.id
       )
         .then((remoteDraft) => {
-          if (generation === syncGeneration.current && !draftMutationBlocked.current) confirmRemoteSync(draftToSync, remoteDraft.updatedAt, sentUserChangeRevision)
+          if (generation === syncGeneration.current && !draftMutationBlocked.current) {
+            if (remoteDraft.pending) setDraftSyncStatus('pending')
+            else confirmRemoteSync(draftToSync, remoteDraft.updatedAt, sentUserChangeRevision)
+          }
         })
         .catch((error) => {
           if (generation !== syncGeneration.current || draftMutationBlocked.current) return

@@ -1,6 +1,6 @@
 import { syncStatusLabels } from '../../utils/syncStatus'
 import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, Dumbbell, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { getCurrentWeekSessions } from '../../utils/workout'
@@ -25,7 +25,23 @@ const pageTitles: Record<string, string> = {
 
 export function AppLayout() {
   const location = useLocation()
-  const { sessions, templates, dataMode, sessionsError, initialLoading, backgroundRefreshing, ownerId, syncStatus, syncError } = useWorkouts()
+  const { sessions, templates, dataMode, sessionsError, initialLoading, backgroundRefreshing, ownerId, syncStatus, syncError, syncOperations, retrySync, resolveConflict } = useWorkouts()
+  const [syncActionError, setSyncActionError] = useState<string | null>(null)
+  const [resolving, setResolving] = useState(false)
+  const conflicted = syncOperations.find(op => op.status === 'conflict')
+  const latestConflict = conflicted ? syncOperations.filter(op => op.resource === conflicted.resource).slice(-1)[0] : undefined
+  const conflictLabel = latestConflict?.resource === 'routine' ? 'la rutina' : latestConflict?.resource.startsWith('draft:') ? 'el entrenamiento en curso' : 'la sesión'
+  useEffect(() => { setSyncActionError(null); setResolving(false) }, [ownerId])
+  async function resolve(keepLocal: boolean) {
+    if (!latestConflict || !window.confirm(keepLocal
+      ? `¿Aplicar tu versión local de ${conflictLabel}, incluido cualquier borrado pendiente, sobre la versión de la nube?`
+      : `¿Descartar los cambios locales pendientes de ${conflictLabel} y conservar la nube?`)) return
+    setResolving(true)
+    setSyncActionError(null)
+    try { await resolveConflict(latestConflict.id, keepLocal) }
+    catch (error) { setSyncActionError(error instanceof Error ? error.message : 'No se pudo resolver el conflicto.') }
+    finally { setResolving(false) }
+  }
   const hasLocalWorkoutDraft = (() => {
     try {
       const userKey = ownerId === 'local' ? 'local' : `user:${ownerId}`
@@ -116,7 +132,7 @@ export function AppLayout() {
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <span
               className={`inline-flex min-h-9 items-center gap-1 rounded-md px-1.5 text-xs font-extrabold sm:px-2 ${
-                syncStatus === 'error' || syncStatus === 'offline'
+                syncStatus === 'error' || syncStatus === 'offline' || syncStatus === 'conflict'
                   ? 'bg-danger-soft text-danger-text'
                   : 'bg-transparent text-secondary'
               }`}
@@ -139,6 +155,19 @@ export function AppLayout() {
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
+          {syncOperations.length > 0 && (
+            <section aria-label="Operaciones pendientes de sincronización" className="card mb-4 space-y-2 p-3">
+              <p role="status" className="text-sm">Guardado en este dispositivo · {syncOperations.length} operaciones pendientes de confirmar en la nube.</p>
+              {latestConflict ? <>
+                <p role="alert" className="text-sm">Hay cambios distintos en {conflictLabel}. La cola está pausada y tu copia local se conserva.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button disabled={resolving} className="btn-secondary" onClick={() => void resolve(true)}>Conservar versión local</button>
+                  <button disabled={resolving} className="btn-secondary" onClick={() => void resolve(false)}>Usar versión de la nube</button>
+                </div>
+              </> : <button className="btn-secondary" onClick={() => void retrySync().catch(error => setSyncActionError(String(error)))}>Reintentar sincronización</button>}
+              {syncActionError && <p role="alert" className="status-error">{syncActionError}</p>}
+            </section>
+          )}
           {showInitialLoader ? (
             <p role="status" className="mb-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-secondary">
               Cargando entrenamientos…

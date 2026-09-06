@@ -2,6 +2,7 @@ import type { Exercise, ExerciseLog, SetLog, WorkoutSession } from '../../types'
 import { dayNames } from '../../utils/workout'
 import { parseLocalDate, toLocalDateKey } from '../../utils/date'
 import type { ImportPayload } from './types'
+import { amount, integer, unique, validDate } from './validation'
 
 const REQUIRED_COLUMNS = [
   'fecha',
@@ -52,6 +53,7 @@ function parseCsvRows(text: string) {
 }
 
 function parseNumber(value: string) {
+  if (!value.trim()) return null
   const parsed = Number(value.trim().replace(',', '.'))
   return Number.isFinite(parsed) ? parsed : null
 }
@@ -68,6 +70,7 @@ function normalizeText(value: string) {
 }
 
 function parseDay(value: string) {
+  if (!value.trim()) return -1
   const numeric = Number(value)
   if (Number.isInteger(numeric) && numeric >= 0 && numeric <= 6) return numeric
   const normalized = normalizeText(value)
@@ -75,6 +78,7 @@ function parseDay(value: string) {
 }
 
 function safeDate(value: string) {
+  if (!validDate(value.trim())) return null
   const date = parseLocalDate(value)
   return date && !Number.isNaN(date.getTime()) ? date : null
 }
@@ -122,13 +126,13 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
 
   const headers = rows[0].map((header) => header.trim().toLowerCase())
   const missing = REQUIRED_COLUMNS.filter((column) => !headers.includes(column))
-  if (missing.length > 0) {
+  if (missing.length > 0 || !unique(headers)) {
     return {
       source: 'csv',
       filename,
       sessions: [],
       exercises: [],
-      errors: [`Faltan columnas obligatorias: ${missing.join(', ')}.`]
+      errors: [!unique(headers) ? 'Hay columnas duplicadas.' : `Faltan columnas obligatorias: ${missing.join(', ')}.`]
     }
   }
 
@@ -143,6 +147,7 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
 
   rows.slice(1).forEach((row, rowIndex) => {
     const line = rowIndex + 2
+    const previousErrors = errors.length
     const date = safeDate(value(row, 'fecha'))
     const dayOfWeek = parseDay(value(row, 'dia'))
     const exerciseId = value(row, 'exercise_id').trim()
@@ -157,17 +162,27 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
     if (dayOfWeek < 0) errors.push(`Fila ${line}: día no válido.`)
     if (!exerciseId) errors.push(`Fila ${line}: exercise_id es obligatorio.`)
     if (!exerciseName) errors.push(`Fila ${line}: ejercicio es obligatorio.`)
-    if (!setNumber || !Number.isInteger(setNumber) || setNumber < 1) {
+    if (!integer(setNumber, 1)) {
       errors.push(`Fila ${line}: serie debe ser un entero mayor que 0.`)
     }
-    if (reps === null || reps < 0 || !Number.isInteger(reps)) {
+    if (!integer(reps)) {
       errors.push(`Fila ${line}: reps debe ser un entero igual o mayor que 0.`)
     }
     if (completed === true && reps === 0) {
       errors.push(`Fila ${line}: una serie hecha debe tener al menos una repetición.`)
     }
-    if (weight === null || weight < 0) errors.push(`Fila ${line}: peso no válido.`)
+    if (!amount(weight)) errors.push(`Fila ${line}: peso no válido.`)
     if (completed === null) errors.push(`Fila ${line}: hecha debe ser true o false.`)
+    const workingWeightText = value(row, 'peso_trabajo').trim()
+    const workingWeight = workingWeightText ? parseNumber(workingWeightText) : null
+    if (workingWeightText && !amount(workingWeight)) errors.push(`Fila ${line}: peso_trabajo no válido.`)
+    const volumeText = value(row, 'volumen').trim()
+    if (volumeText && !amount(parseNumber(volumeText), 999999999999.99)) errors.push(`Fila ${line}: volumen no válido.`)
+    const target = value(row, 'objetivo').trim()
+    if (target && !integer(targetSetCount, 1)) errors.push(`Fila ${line}: objetivo no válido.`)
+    const rest = value(row, 'descanso').trim()
+    if (rest && (!/^\d+:[0-5]\d$/.test(rest) || !integer(Number(rest.split(':')[0]) * 60 + Number(rest.split(':')[1])))) errors.push(`Fila ${line}: descanso no válido.`)
+    if (errors.length !== previousErrors) return
     if (
       !date ||
       dayOfWeek < 0 ||
@@ -198,9 +213,16 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
       builders.set(sessionKey, builder)
     }
 
+    if (toLocalDateKey(builder.session.startedAt) !== dateKey || builder.session.dayOfWeek !== dayOfWeek) {
+      errors.push(`Fila ${line}: session_id reutilizado con otra fecha o día.`)
+      return
+    }
+    if (exerciseMap.has(exerciseId) && exerciseMap.get(exerciseId)!.name !== exerciseName) {
+      errors.push(`Fila ${line}: exercise_id reutilizado con otro nombre.`)
+      return
+    }
     let log = builder.logs.get(exerciseId)
     if (!log) {
-      const workingWeight = parseNumber(value(row, 'peso_trabajo'))
       log = {
         id: `${sessionKey}-${exerciseId}`,
         sessionId: sessionKey,
@@ -266,6 +288,12 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
     }
   }
 
+  if (sessions.some(session => !amount(session.volumeKg, 999999999999.99)) ||
+    !unique(sessions.flatMap(session => session.exerciseLogs.map(log => log.id))) ||
+    !unique(sessions.flatMap(session => session.exerciseLogs.flatMap(log => log.sets.map(set => set.id))))) {
+    errors.push('Volumen fuera de rango o identificadores generados duplicados.')
+  }
+  if (errors.length) return { source: 'csv', filename, sessions: [], exercises: [], errors }
   logCsvDiagnostics(sessions, exerciseMap)
 
   return {

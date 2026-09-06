@@ -8,6 +8,7 @@ export type MuscleGroup =
   | 'Core'
 
 export interface Exercise {
+  syncRevision?: string
   id: string
   name: string
   muscleGroup?: MuscleGroup
@@ -23,6 +24,7 @@ export interface Exercise {
 }
 
 export interface WorkoutTemplate {
+  syncRevision?: string
   id: string
   name: string
   dayOfWeek: number
@@ -42,6 +44,7 @@ export interface WorkoutTemplateExercise {
 }
 
 export interface WorkoutSession {
+  syncRevision?: string
   id: string
   templateId?: string
   name: string

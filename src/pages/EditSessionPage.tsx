@@ -14,29 +14,27 @@ import {
 
 export function EditSessionPage() {
   const { sessionId } = useParams()
+  const { ownerId } = useWorkouts()
+  return <EditSessionContent key={JSON.stringify([ownerId, sessionId])} />
+}
+
+function EditSessionContent() {
+  const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { sessions, saveSession, templates, getExerciseById } = useWorkouts()
-  const session = sessions.find((item) => item.id === sessionId)
-  const storedTemplate = templates.find((item) => item.id === session?.templateId)
-  const template =
-    storedTemplate ??
-    templates.find((item) =>
-      session?.exerciseLogs.some((log) =>
-        item.exercises.some((exercise) => exercise.exerciseId === log.exerciseId)
-      )
-    )
+  const { sessions, saveSession, getExerciseById } = useWorkouts()
+  const [session] = useState(() => sessions.find((item) => item.id === sessionId))
   const [logs, setLogs] = useState<DraftExerciseLog[]>(
     () => session ? createDraftFromSession(session) : []
   )
   const [routineDay, setRoutineDay] = useState(() => {
     if (!session) return 0
     const registeredDay = getSessionDateObject(session).getDay()
-    return getSessionRoutineIdentity(session, templates, registeredDay).dayOfWeek
+    return getSessionRoutineIdentity(session, [], registeredDay).dayOfWeek
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (!session || !template || isInitialSession(session.id)) {
+  if (!session || isInitialSession(session.id)) {
     return <Navigate to="/historial" replace />
   }
 
@@ -104,33 +102,31 @@ export function EditSessionPage() {
           </label>
           <div className="rounded-xl bg-muted px-3 py-2.5">
             <p className="text-xs font-bold text-secondary">Plantilla usada</p>
-            <p className="mt-1 font-extrabold text-ink">{storedTemplate?.name ?? session.name ?? 'No disponible'}</p>
+            <p className="mt-1 font-extrabold text-ink">{session.name}</p>
           </div>
         </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
         {logs.map((log) => {
-          const templateExercise = template.exercises.find(
-            (item) => item.exerciseId === log.exerciseId
-          ) ?? {
+          const templateExercise = {
             id: `historical-${log.id}`,
-            templateId: template.id,
+            templateId: session.templateId ?? session.id,
             exerciseId: log.exerciseId,
             order: log.order,
             targetSets: Math.max(1, log.sets.length),
             targetReps: String(log.sets[0]?.reps ?? 8)
           }
-          return templateExercise ? (
+          return (
             <ExerciseLogger
               key={log.id}
               templateExercise={templateExercise}
               log={log}
               previousPerformance={null}
               onChange={updateLog}
-              exercise={getExerciseById(log.exerciseId)}
+              exercise={{ id: log.exerciseId, name: getExerciseById(log.exerciseId)?.name ?? `Ejercicio archivado (${log.exerciseId})`, active: false }}
             />
-          ) : null
+          )
         })}
       </div>
 

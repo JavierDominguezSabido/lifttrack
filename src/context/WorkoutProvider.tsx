@@ -7,11 +7,12 @@ import {
   copyLegacyRoutine, getExerciseCatalog, getStoredExercises, getStoredTemplates,
   hasCustomRoutine as getHasCustomRoutine, storeExercises, storeTemplates
 } from '../services/routineStorage'
-import { loadRemoteRoutine, saveRemoteRoutine } from '../services/supabase/supabaseRoutineRepository'
+import { loadRemoteRoutine, queueRemoteRoutine, saveRemoteRoutine } from '../services/supabase/supabaseRoutineRepository'
 import { useAuth } from './AuthContext'
 import { readSessionCache, writeSessionCache } from '../services/workoutSessionCache'
 import { getSyncStatus } from '../utils/syncStatus'
 import { assertUniqueTemplateExercises } from '../services/templateImport'
+import { activateSyncOwner, flushSyncOperations, isSendingSync, overlayPendingSessions, pendingOperations, resolveSyncConflict } from '../services/syncOutbox'
 
 function createId() {
   return typeof globalThis.crypto?.randomUUID === 'function'
@@ -27,12 +28,21 @@ interface RoutineState {
 }
 
 export function WorkoutProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  return <AccountWorkoutProvider key={user?.id ?? 'local'}>{children}</AccountWorkoutProvider>
+}
+
+function AccountWorkoutProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const userId = user?.id
   const owner = userId ?? 'local'
   const ownerRef = useRef(owner)
   ownerRef.current = owner
   const requestRevision = useRef(0)
+  const routineRevision = useRef(0)
+  const routineReadRevision = useRef(0)
+  const [syncInfo, setSyncInfo] = useState(() => ({ operations: userId ? pendingOperations(owner) : [], sending: false }))
+  const [remoteChecked, setRemoteChecked] = useState({ history: false, routine: false })
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
   const [pendingWrites, setPendingWrites] = useState(0)
   const [writeError, setWriteError] = useState<string | null>(null)
@@ -45,7 +55,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('offline', update)
     }
   }, [])
-  const [sessions, setSessions] = useState<WorkoutSession[]>(getStoredSessions)
+  const [sessions, setSessions] = useState<WorkoutSession[]>(() => userId ? overlayPendingSessions(owner, readSessionCache(owner)?.sessions ?? []) : getStoredSessions())
   const [sessionsLoading, setSessionsLoading] = useState(authLoading)
   const [historyLoaded, setHistoryLoaded] = useState(!authLoading)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
@@ -58,7 +68,6 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     owner: 'local', exercises: getStoredExercises('local'), templates: getStoredTemplates('local'),
     customized: getHasCustomRoutine('local')
   }))
-  const routineSyncQueue = useRef(Promise.resolve())
   const dataMode = user ? 'cloud' : 'local'
   const activeRepository = getWorkoutRepository(Boolean(user))
   const currentRoutine = useMemo(() => routine.owner === owner
@@ -73,11 +82,12 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     else setSessionsLoading(true)
     setSessionsError(null)
     try {
-      const remoteSessions = await activeRepository.getWorkoutSessions()
+      const remoteSessions = await activeRepository.getWorkoutSessions(userId)
       if (!isCurrent()) return
       setSessions(remoteSessions)
       writeSessionCache(owner, remoteSessions)
       setHistoryLoaded(true)
+      setRemoteChecked(value => ({ ...value, history: true }))
     } catch (error) {
       if (!isCurrent()) return
       console.error('[workout] No se pudo cargar el historial activo:', error)
@@ -90,15 +100,90 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
         setSessionsLoading(false)
       }
     }
-  }, [activeRepository, authLoading, dataMode, owner])
+  }, [activeRepository, authLoading, dataMode, owner, userId])
+
+  useEffect(() => {
+    ownerRef.current = owner
+    activateSyncOwner(userId ?? null)
+    if (!userId || authLoading) return
+    let active = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const flush = () => { void flushSyncOperations(owner).catch(error => { if (active) setWriteError(String(error)) }) }
+    const change = (event: Event) => {
+      if (event instanceof CustomEvent && event.detail.owner !== owner) return
+      if (event instanceof StorageEvent && event.key && !event.key.startsWith('lifttrack.outbox.v1.')) return
+      setSyncInfo({ operations: pendingOperations(owner), sending: isSendingSync(owner) })
+      if (event instanceof StorageEvent) {
+        requestRevision.current += 1
+        setSessions(items => overlayPendingSessions(owner, items))
+        const queued = pendingOperations(owner, 'routine').slice(-1)[0]?.payload
+        if (queued?.exercises && queued.templates) {
+          routineRevision.current += 1
+          setRoutine({ owner, exercises: queued.exercises, templates: queued.templates, customized: true })
+        }
+        if (event.newValue) {
+          const operation = JSON.parse(event.newValue)
+          if (operation.owner === owner && operation.status === 'done') refresh(new CustomEvent('sync', { detail: { owner, resource: operation.resource } }))
+        }
+      }
+      if (pendingOperations(owner)[0]?.status === 'pending') {
+        clearTimeout(timer)
+        timer = setTimeout(flush, 750)
+      }
+    }
+    const refresh = (event: Event) => {
+      if (!(event instanceof CustomEvent) || event.detail.owner !== owner) return
+      if (event.detail.resource.startsWith('draft:')) return
+      requestRevision.current += 1
+      void reloadSessions(true)
+      if (event.detail.resource === 'routine') {
+        const revision = routineRevision.current
+        const readRevision = ++routineReadRevision.current
+        void loadRemoteRoutine(owner).then(remote => {
+          if (!active || ownerRef.current !== owner || routineRevision.current !== revision || routineReadRevision.current !== readRevision) return
+          storeExercises(owner, remote.exercises)
+          storeTemplates(owner, remote.templates)
+          setRoutine({ owner, exercises: remote.exercises, templates: remote.templates, customized: true })
+          setRoutineError(null)
+          setRemoteChecked(value => ({ ...value, routine: true }))
+        }).catch(error => { if (active && ownerRef.current === owner && routineReadRevision.current === readRevision && routineRevision.current === revision) setRoutineError(String(error)) })
+          .finally(() => { if (active && routineReadRevision.current === readRevision) { setRoutineLoading(false); setRoutineRefreshing(false); setInitialLoading(false) } })
+      }
+    }
+    window.addEventListener('lifttrack-sync', change)
+    window.addEventListener('storage', change)
+    const reconnect = () => {
+      flush()
+      refresh(new CustomEvent('sync', { detail: { owner, resource: 'routine' } }))
+    }
+    window.addEventListener('online', reconnect)
+    window.addEventListener('lifttrack-sync-confirmed', refresh)
+    window.addEventListener('lifttrack-sync-resolved', refresh)
+    setSyncInfo({ operations: pendingOperations(owner), sending: isSendingSync(owner) })
+    const interval = setInterval(flush, 15000)
+    flush()
+    return () => {
+      active = false
+      ownerRef.current = ''
+      activateSyncOwner(null)
+      clearTimeout(timer)
+      clearInterval(interval)
+      window.removeEventListener('lifttrack-sync', change)
+      window.removeEventListener('storage', change)
+      window.removeEventListener('online', reconnect)
+      window.removeEventListener('lifttrack-sync-confirmed', refresh)
+      window.removeEventListener('lifttrack-sync-resolved', refresh)
+    }
+  }, [authLoading, owner, reloadSessions, userId])
 
   useEffect(() => {
     if (authLoading) return
     let active = true
     setPendingWrites(0)
     setWriteError(null)
-    const cachedExercises = getStoredExercises(owner)
-    const cachedTemplates = getStoredTemplates(owner)
+    const queuedRoutine = userId ? pendingOperations(owner, 'routine').slice(-1)[0]?.payload : undefined
+    const cachedExercises = queuedRoutine?.exercises ?? getStoredExercises(owner)
+    const cachedTemplates = queuedRoutine?.templates ?? getStoredTemplates(owner)
     const cachedHistory = userId ? readSessionCache(owner) : null
     const hasUsableLocalState = cachedTemplates.length > 0
     setInitialLoading(!hasUsableLocalState)
@@ -107,7 +192,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     setRoutineRefreshing(true)
     setBackgroundRefreshing(hasUsableLocalState)
     setRoutineError(null)
-    setSessions(userId ? cachedHistory?.sessions ?? [] : getStoredSessions())
+    setSessions(userId ? overlayPendingSessions(owner, cachedHistory?.sessions ?? []) : getStoredSessions())
     setHistoryLoaded(!userId || Boolean(cachedHistory))
     setRoutine({
       owner,
@@ -117,6 +202,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     })
     void reloadSessions(hasUsableLocalState)
     void (async () => {
+      const revision = routineRevision.current
+      const readRevision = ++routineReadRevision.current
       try {
         if (!userId) {
           copyLegacyRoutine('local')
@@ -124,16 +211,16 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
           return
         }
         let remote = await loadRemoteRoutine(userId)
-        if (!active) return
+        if (!active || routineRevision.current !== revision || routineReadRevision.current !== readRevision) return
         // Solo una cuenta con datos remotos previos puede reclamar la antigua rutina global.
-        if (!remote.hasCompleteRoutine && remote.hasSessions) {
+        if (!remote.hasCompleteRoutine && remote.hasSessions && !pendingOperations(owner, 'routine').length) {
           copyLegacyRoutine(userId, true)
           const migratedExercises = getStoredExercises(userId)
           const migratedTemplates = getStoredTemplates(userId)
           await saveRemoteRoutine(userId, migratedExercises, migratedTemplates)
           remote = await loadRemoteRoutine(userId)
         }
-        if (!active) return
+        if (!active || routineRevision.current !== revision || routineReadRevision.current !== readRevision) return
         const catalog = getExerciseCatalog()
         const byId = new Map(catalog.map((exercise) => [exercise.id, exercise]))
         for (const exercise of remote.exercises) byId.set(exercise.id, exercise)
@@ -142,12 +229,12 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
         storeExercises(userId, exercises)
         if (remote.templates.length) storeTemplates(userId, templates)
         if (active) setRoutine({ owner: userId, exercises, templates, customized: remote.templates.length > 0 })
+        setRemoteChecked(value => ({ ...value, routine: true }))
       } catch (error) {
         console.error('[routine] No se pudo cargar la rutina:', error)
-        if (active) setRoutineError('No se pudo cargar la rutina sincronizada.')
-        if (active) setRoutine({ owner, exercises: getStoredExercises(owner), templates: getStoredTemplates(owner), customized: getHasCustomRoutine(owner) })
+        if (active && routineReadRevision.current === readRevision && routineRevision.current === revision) setRoutineError('No se pudo cargar la rutina sincronizada.')
       } finally {
-        if (active) {
+        if (active && routineReadRevision.current === readRevision) {
           setRoutineLoading(false)
           setRoutineRefreshing(false)
           setInitialLoading(false)
@@ -185,27 +272,14 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   }, [authLoading, reloadSessions])
 
   const persist = useCallback((exercises: Exercise[], templates: WorkoutTemplate[]) => {
+    if (ownerRef.current !== owner) throw new Error('La cuenta ha cambiado.')
     assertUniqueTemplateExercises(templates)
+    if (user) queueRemoteRoutine(user.id, exercises, templates)
+    routineRevision.current += 1
     storeExercises(owner, exercises)
     storeTemplates(owner, templates)
-    if (user) {
-      setPendingWrites((count) => count + 1)
-      setRoutineError(null)
-      routineSyncQueue.current = routineSyncQueue.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (ownerRef.current !== owner) return
-          await saveRemoteRoutine(user.id, exercises, templates)
-          if (ownerRef.current === owner) setRoutineError(null)
-        })
-        .catch((error) => {
-          console.error('[routine] No se pudo sincronizar:', error)
-          if (ownerRef.current === owner) setRoutineError('La rutina está guardada en este dispositivo, pero no se ha confirmado en la nube. Reintenta Guardar cambios.')
-        })
-        .finally(() => { if (ownerRef.current === owner) setPendingWrites((count) => Math.max(0, count - 1)) })
-    }
+    setRoutineError(null)
   }, [owner, user])
-
   const value = useMemo<WorkoutContextValue>(() => ({
     sessions,
     exercises: currentRoutine.exercises,
@@ -225,11 +299,18 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     routineError,
     dataMode,
     syncStatus: getSyncStatus({ cloud: dataMode === 'cloud', online,
-      pending: pendingWrites > 0 || backgroundRefreshing || sessionsLoading || routineRefreshing,
+      confirmed: remoteChecked.history && remoteChecked.routine,
+      queued: syncInfo.operations.length,
+      conflict: syncInfo.operations.some(op => op.status === 'conflict'),
+      pending: syncInfo.sending || pendingWrites > 0 || backgroundRefreshing || sessionsLoading || routineRefreshing,
       error: Boolean(writeError || routineError || sessionsError) }),
-    syncError: writeError ?? routineError ?? sessionsError,
+    syncError: syncInfo.operations.find(op => op.error)?.error ?? writeError ?? routineError ?? sessionsError,
+    syncOperations: syncInfo.operations,
+    retrySync: () => flushSyncOperations(owner),
+    resolveConflict: (id, keepLocal) => resolveSyncConflict(owner, id, keepLocal),
     ownerId: owner,
     saveSession: async (session) => {
+      if (ownerRef.current !== owner) throw new Error('La cuenta ha cambiado.')
       requestRevision.current += 1
       setPendingWrites((count) => count + 1)
       setWriteError(null)
@@ -256,11 +337,12 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       }
     },
     deleteSession: async (id) => {
+      if (ownerRef.current !== owner) throw new Error('La cuenta ha cambiado.')
       requestRevision.current += 1
       setPendingWrites((count) => count + 1)
       setWriteError(null)
       try {
-        await activeRepository.deleteWorkoutSession(id)
+        await activeRepository.deleteWorkoutSession(id, userId, sessions.find(session => session.id === id)?.syncRevision)
         if (ownerRef.current !== owner) return
         requestRevision.current += 1
         setSessions((items) => {
@@ -309,23 +391,17 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       const ids = new Set(currentRoutine.exercises.map((exercise) => exercise.id))
       const exercises = [...currentRoutine.exercises, ...imported.filter((exercise) => !ids.has(exercise.id)).map((exercise) => ({ ...exercise, active: exercise.active !== false }))]
       const nextTemplates = templates?.length ? templates : currentRoutine.templates
-      let confirmedExercises = exercises
-      let confirmedTemplates = nextTemplates
-      if (user) {
-        await saveRemoteRoutine(user.id, exercises, nextTemplates)
-        const remote = await loadRemoteRoutine(user.id)
-        const byId = new Map(getExerciseCatalog().map((exercise) => [exercise.id, exercise]))
-        for (const exercise of remote.exercises) byId.set(exercise.id, exercise)
-        confirmedExercises = [...byId.values()]
-        confirmedTemplates = remote.templates
-      }
-      storeExercises(owner, confirmedExercises)
-      storeTemplates(owner, confirmedTemplates)
-      setRoutine({ ...currentRoutine, exercises: confirmedExercises, templates: confirmedTemplates, customized: templates?.length ? true : currentRoutine.customized })
+      persist(exercises, nextTemplates)
+      setRoutine({ ...currentRoutine, exercises, templates: nextTemplates, customized: templates?.length ? true : currentRoutine.customized })
     },
-    mergeDuplicateExercises: async (canonicalId, duplicateIds) => { const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds); await reloadSessions(true); return count },
+    mergeDuplicateExercises: async (canonicalId, duplicateIds) => {
+      if (ownerRef.current !== owner) throw new Error('La cuenta ha cambiado.')
+      const count = await activeRepository.mergeExerciseIds(canonicalId, duplicateIds, userId)
+      if (ownerRef.current === owner) await reloadSessions(true)
+      return count
+    },
     reloadSessions
-  }), [activeRepository, authLoading, online, pendingWrites, writeError, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, routineRefreshing, sessions, sessionsError, sessionsLoading, user, userId])
+  }), [activeRepository, authLoading, online, pendingWrites, writeError, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, routineRefreshing, sessions, sessionsError, sessionsLoading, userId, syncInfo, remoteChecked])
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>
 }

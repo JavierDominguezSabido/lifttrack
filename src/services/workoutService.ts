@@ -4,8 +4,8 @@ import type { WorkoutRepository } from './workoutRepository'
 
 /**
  * Resuelve el almacenamiento principal para la sesión actual.
- * No hace fallback silencioso: con una sesión autenticada, un error de red se
- * muestra al usuario y no escribe una copia local parcial.
+ * Con cuenta autenticada, las escrituras se conservan en una cola local por
+ * usuario y se confirman mediante el protocolo transaccional de Supabase.
  */
 export function getWorkoutRepository(authenticated: boolean): WorkoutRepository {
   return authenticated ? supabaseWorkoutRepository : localWorkoutRepository

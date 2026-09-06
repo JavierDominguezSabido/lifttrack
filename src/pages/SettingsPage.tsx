@@ -62,6 +62,7 @@ function SettingsPageContent() {
   } = useWorkouts()
   const [settingsView, setSettingsView] = useState<'overview' | 'routine' | 'library'>('overview')
   const [drafts, setDrafts] = useState(() => cloneTemplates(templates))
+  const [routineDirty, setRoutineDirty] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
@@ -81,7 +82,7 @@ function SettingsPageContent() {
   const [exerciseStatus, setExerciseStatus] = useState<'active' | 'all' | 'archived'>('active')
   const [openSettingsSection, setOpenSettingsSection] = useState<SettingsSection>('account')
 
-  useEffect(() => setDrafts(cloneTemplates(templates)), [templates])
+  useEffect(() => { if (!routineDirty) setDrafts(cloneTemplates(templates)) }, [templates, routineDirty])
 
   const orderedDrafts = [...drafts].sort(
     (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
@@ -107,6 +108,7 @@ function SettingsPageContent() {
   }, [openSettingsSection, settingsView])
 
   function updateTemplate(templateId: string, update: (template: WorkoutTemplate) => WorkoutTemplate) {
+    setRoutineDirty(true)
     setDrafts((current) => current.map((item) => item.id === templateId ? update(item) : item))
     setMessage(null)
   }
@@ -170,6 +172,7 @@ function SettingsPageContent() {
     setError(null)
     try {
       saveTemplates(drafts)
+      setRoutineDirty(false)
       setMessage('Rutina guardada en este dispositivo. Consulta el estado de la nube en la cabecera.')
     } catch (error) {
       setMessage(null)
@@ -689,9 +692,12 @@ function ExerciseForm({
   const [initial] = useState(() => {
     try {
       const draft = JSON.parse(window.sessionStorage.getItem(draftKey) ?? 'null')
-      if (draft && typeof draft.name === 'string' && typeof draft.muscleGroup === 'string' && typeof draft.notes === 'string') return draft as { name: string; muscleGroup: string; notes: string }
+      if (draft && typeof draft.name === 'string' && typeof draft.muscleGroup === 'string' && typeof draft.notes === 'string') return {
+        name: draft.name as string, muscleGroup: draft.muscleGroup as string, notes: draft.notes as string,
+        syncRevision: typeof draft.syncRevision === 'string' ? draft.syncRevision : exercise ? 'unread' : undefined
+      }
     } catch { /* Un borrador ilegible no sustituye los datos del ejercicio. */ }
-    return { name: exercise?.name ?? '', muscleGroup: exercise?.muscleGroup ?? '', notes: exercise?.notes ?? '' }
+    return { name: exercise?.name ?? '', muscleGroup: exercise?.muscleGroup ?? '', notes: exercise?.notes ?? '', syncRevision: exercise?.syncRevision }
   })
   const [name, setName] = useState(initial.name)
   const [muscleGroup, setMuscleGroup] = useState(initial.muscleGroup)
@@ -703,11 +709,11 @@ function ExerciseForm({
   useLayoutEffect(() => {
     onDirtyChange(dirty)
     try {
-      if (dirty) window.sessionStorage.setItem(draftKey, JSON.stringify({ name, muscleGroup, notes }))
+      if (dirty) window.sessionStorage.setItem(draftKey, JSON.stringify({ name, muscleGroup, notes, syncRevision: initial.syncRevision }))
       else window.sessionStorage.removeItem(draftKey)
       setStorageError(false)
     } catch { setStorageError(true) }
-  }, [dirty, draftKey, name, muscleGroup, notes, onDirtyChange])
+  }, [dirty, draftKey, name, muscleGroup, notes, onDirtyChange, initial.syncRevision])
 
   useEffect(() => {
     if (!dirty) return
@@ -734,6 +740,7 @@ function ExerciseForm({
       return
     }
     try { onSave({
+      syncRevision: initial.syncRevision,
       name: name.trim(),
       muscleGroup: muscleGroup ? muscleGroup as MuscleGroup : undefined,
       notes: notes.trim() || undefined

@@ -1,10 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, Json } from '../../types/database'
+import type { Database } from '../../types/database'
 import type { WorkoutSession } from '../../types'
 import { getLastExercisePerformanceFromSessions } from '../../utils/workoutHistory'
 import type { WorkoutRepository } from '../workoutRepository'
 import { getStoredExercises, getStoredTemplates } from '../routineStorage'
 import { supabase } from './supabaseClient'
+import { enqueueSyncOperation, overlayPendingSessions, readSessionVersions, rememberSyncRevision } from '../syncOutbox'
 
 type DbClient = SupabaseClient<Database>
 type ExerciseLogRow = Database['public']['Tables']['exercise_logs']['Row']
@@ -115,40 +116,31 @@ async function fetchSetLogsForExerciseLogs(
 }
 
 async function persistSession(session: WorkoutSession, expectedUserId?: string) {
-  const client = requireClient()
-  const userId = await requireUserId(client)
-  if (expectedUserId && userId !== expectedUserId) throw new Error('La cuenta ha cambiado. Vuelve a abrir el entrenamiento.')
+  const userId = expectedUserId ?? await requireUserId(requireClient())
   validateSessionSets(session, 'save:start')
   const domainTemplate = getStoredTemplates(userId).find((item) => item.id === session.templateId)
   const exerciseIds = new Set(session.exerciseLogs.map((log) => log.exerciseId))
   const exercises = getStoredExercises(userId).filter((exercise) => exerciseIds.has(exercise.id))
-  const { data, error } = await client.rpc('save_workout_session', {
-    p_user_id: userId,
-    p_session: session as unknown as Json,
-    p_exercises: exercises as unknown as Json,
-    p_template: (domainTemplate ?? null) as unknown as Json
-  })
-  if (error?.code === 'PGRST202' || error?.code === '42883') {
-    throw new Error('El servidor necesita actualizarse para guardar sesiones de forma segura. Tu borrador se conserva en este dispositivo.')
-  }
-  throwIfError(error)
-  if (!data || typeof data !== 'object' || Array.isArray(data) || data.id !== session.id) {
-    throw new Error('No se ha recibido confirmación del guardado. Puedes reintentarlo sin crear otra sesión.')
-  }
-  return { ...session, volumeKg: typeof data.volumeKg === 'number' ? data.volumeKg : session.volumeKg }
+  const operation = enqueueSyncOperation(userId, `session:${session.id}`, { action: 'save', session, exercises, template: domainTemplate ?? null }, session.syncRevision ?? 'empty')
+  return { ...session, syncRevision: `operation:${operation.id}` }
 }
 
 export const supabaseWorkoutRepository: WorkoutRepository = {
-  async getWorkoutSessions() {
+  async getWorkoutSessions(expectedUserId) {
     const client = requireClient()
     const userId = await requireUserId(client)
+    if (expectedUserId && userId !== expectedUserId) throw new Error('La cuenta ha cambiado.')
+    const before = await readSessionVersions(userId)
     const { data: sessions, error: sessionsError } = await client
       .from('workout_sessions')
       .select('*')
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
     throwIfError(sessionsError)
-    if (!sessions?.length) return []
+    if (!sessions?.length) {
+      if (JSON.stringify(before) !== JSON.stringify(await readSessionVersions(userId))) throw new Error('El historial cambió durante la lectura. Reintenta.')
+      return overlayPendingSessions(userId, [])
+    }
 
     const logs = await fetchExerciseLogsForSessions(
       client,
@@ -173,8 +165,12 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
 
     const exerciseKeys = new Map(dbExercises?.map((item) => [item.id, item.stable_key]))
     const templateKeys = new Map(dbTemplates?.map((item) => [item.id, item.stable_key]))
+    const after = await readSessionVersions(userId)
+    if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('El historial cambió durante la lectura. Reintenta la sincronización.')
+    for (const [resource, revision] of Object.entries(after)) rememberSyncRevision(userId, resource, revision)
 
-    return sessions.map((session): WorkoutSession => ({
+    return overlayPendingSessions(userId, sessions.map((session): WorkoutSession => ({
+      syncRevision: after[`session:${session.client_id}`],
       id: session.client_id,
       templateId: session.template_id
         ? templateKeys.get(session.template_id)
@@ -210,76 +206,38 @@ export const supabaseWorkoutRepository: WorkoutRepository = {
               isWarmup: set.is_warmup
             }))
         }))
-    }))
+    })))
   },
 
   saveWorkoutSession: persistSession,
   updateWorkoutSession: persistSession,
 
-  async deleteWorkoutSession(sessionId) {
-    const client = requireClient()
-    const userId = await requireUserId(client)
-    const { error } = await client
-      .from('workout_sessions')
-      .delete()
-      .eq('user_id', userId)
-      .eq('client_id', sessionId)
-    throwIfError(error)
+  async deleteWorkoutSession(sessionId, expectedUserId, expectedRevision) {
+    const userId = expectedUserId ?? await requireUserId(requireClient())
+    enqueueSyncOperation(userId, `session:${sessionId}`, { action: 'delete' }, expectedRevision ?? 'unread')
   },
 
   async clearWorkoutSessions() {
-    const client = requireClient()
-    const userId = await requireUserId(client)
-    const { error } = await client
-      .from('workout_sessions')
-      .delete()
-      .eq('user_id', userId)
-    throwIfError(error)
+    const userId = await requireUserId(requireClient())
+    for (const session of await this.getWorkoutSessions(userId)) await this.deleteWorkoutSession(session.id, userId, session.syncRevision)
   },
 
-  async mergeExerciseIds(canonicalId, duplicateIds) {
-    const client = requireClient()
-    const userId = await requireUserId(client)
-    const storedExercises = getStoredExercises(userId)
-    const canonicalExercise = storedExercises.find((item) => item.id === canonicalId)
-
-    const { data: canonicalRow, error: canonicalError } = await client
-      .from('exercises')
-      .upsert({
-        user_id: userId,
-        stable_key: canonicalId,
-        name: canonicalExercise?.name ?? canonicalId,
-        muscle_group: canonicalExercise?.muscleGroup ?? 'Sin grupo',
-        equipment: canonicalExercise?.equipment ?? null,
-        notes: canonicalExercise?.notes ?? null
-      }, { onConflict: 'user_id,stable_key' })
-      .select('id')
-      .single()
-    throwIfError(canonicalError)
-    if (!canonicalRow) throw new Error(`No se pudo preparar el ejercicio ${canonicalId}.`)
-
-    const { data: duplicateRows, error: duplicateError } = await client
-      .from('exercises')
-      .select('id')
-      .eq('user_id', userId)
-      .in('stable_key', duplicateIds)
-    throwIfError(duplicateError)
-
-    const duplicateDbIds = (duplicateRows ?? [])
-      .map((row) => row.id)
-      .filter((id) => id !== canonicalRow.id)
-
-    if (duplicateDbIds.length === 0) return 0
-
-    const { count, error } = await client
-      .from('exercise_logs')
-      .update({ exercise_id: canonicalRow.id }, { count: 'exact' })
-      .eq('user_id', userId)
-      .in('exercise_id', duplicateDbIds)
-    throwIfError(error)
-    return count ?? 0
+  async mergeExerciseIds(canonicalId, duplicateIds, expectedUserId) {
+    const userId = await requireUserId(requireClient())
+    if (expectedUserId && userId !== expectedUserId) throw new Error('La cuenta ha cambiado.')
+    const duplicates = new Set(duplicateIds.filter(id => id !== canonicalId))
+    let count = 0
+    for (const session of await this.getWorkoutSessions(userId)) {
+      if (!session.exerciseLogs.some(log => duplicates.has(log.exerciseId))) continue
+      const exerciseLogs = session.exerciseLogs.map(log => {
+        if (!duplicates.has(log.exerciseId)) return log
+        count += 1
+        return { ...log, exerciseId: canonicalId }
+      })
+      await persistSession({ ...session, exerciseLogs }, userId)
+    }
+    return count
   },
-
   async getLastPerformanceByExercise(exerciseId) {
     const sessions = await this.getWorkoutSessions()
     return getLastExercisePerformanceFromSessions(sessions, exerciseId)

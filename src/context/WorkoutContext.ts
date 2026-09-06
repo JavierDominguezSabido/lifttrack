@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { Exercise, WorkoutSession, WorkoutTemplate } from '../types'
 import type { SyncStatus } from '../utils/syncStatus'
+import type { SyncOperation } from '../services/syncOutbox'
 
 export interface WorkoutContextValue {
   sessions: WorkoutSession[]
@@ -22,6 +23,9 @@ export interface WorkoutContextValue {
   dataMode: 'local' | 'cloud'
   syncStatus: SyncStatus
   syncError: string | null
+  syncOperations: SyncOperation[]
+  retrySync: () => Promise<void>
+  resolveConflict: (operationId: string, keepLocal: boolean) => Promise<void>
   ownerId: string
   saveSession: (session: WorkoutSession) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>

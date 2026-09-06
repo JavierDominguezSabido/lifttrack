@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '../../types/database'
 import { supabase } from './supabaseClient'
-import { enqueueDraftWrite } from './draftWriteQueue'
+import { enqueueSyncOperation, pendingOperations, readSyncRevision, rememberSyncRevision } from '../syncOutbox'
 
 type DbClient = SupabaseClient<Database>
 type WorkoutDraftRow = Database['public']['Tables']['workout_drafts']['Row']
@@ -12,6 +12,7 @@ export interface RemoteWorkoutDraft<TPayload> {
   draftKey: string
   payload: TPayload
   updatedAt: string
+  pending?: boolean
 }
 
 function requireClient(): DbClient {
@@ -65,6 +66,7 @@ export async function getRemoteWorkoutDraft<TPayload>(
 ): Promise<RemoteWorkoutDraft<TPayload> | null> {
   const client = requireClient()
   const userId = await requireUserId(client, expectedUserId)
+  const before = await readSyncRevision(userId, `draft:${draftKey}`)
   const { data, error } = await client
     .from('workout_drafts')
     .select('*')
@@ -73,52 +75,25 @@ export async function getRemoteWorkoutDraft<TPayload>(
     .eq('draft_key', draftKey)
     .maybeSingle()
   throwIfError(error)
+  const after = await readSyncRevision(userId, `draft:${draftKey}`)
+  if (before !== after) throw new Error('El borrador cambió durante la lectura. Reintenta.')
+  rememberSyncRevision(userId, `draft:${draftKey}`, after)
+  const pending = pendingOperations(userId, `draft:${draftKey}`).slice(-1)[0]
+  if (pending?.payload.action === 'delete') return null
+  if (pending?.payload.draft) return {
+    dayOfWeek, draftKey, payload: pending.payload.draft as TPayload,
+    updatedAt: (pending.payload.draft as { updatedAt?: string }).updatedAt ?? new Date().toISOString(), pending: true
+  }
   return data ? mapRow<TPayload>(data) : null
 }
 
 export async function upsertRemoteWorkoutDraft<TPayload extends object>(
-  dayOfWeek: number,
-  draftKey: string,
-  payload: TPayload,
-  expectedUserId: string
+  dayOfWeek: number, draftKey: string, payload: TPayload, expectedUserId: string
 ): Promise<RemoteWorkoutDraft<TPayload>> {
-  return enqueueDraftWrite(expectedUserId, draftKey, async () => {
-    const client = requireClient()
-    const userId = await requireUserId(client, expectedUserId)
-
-    const { error: profileError } = await client
-      .from('profiles')
-      .upsert({ id: userId }, { onConflict: 'id' })
-    throwIfError(profileError)
-
-    const { data, error } = await client
-      .from('workout_drafts')
-      .upsert(
-        createWorkoutDraftUpsert(userId, dayOfWeek, draftKey, payload),
-        { onConflict: WORKOUT_DRAFT_CONFLICT_COLUMNS }
-      )
-      .select('*')
-      .single()
-    throwIfError(error)
-    if (!data) throw new Error('No se pudo sincronizar el borrador.')
-    return mapRow<TPayload>(data)
-  })
+  enqueueSyncOperation(expectedUserId, `draft:${draftKey}`, { action: 'save', dayOfWeek, draft: payload })
+  return { dayOfWeek, draftKey, payload, updatedAt: (payload as { updatedAt?: string }).updatedAt ?? new Date().toISOString(), pending: true }
 }
 
-export async function deleteRemoteWorkoutDraft(
-  dayOfWeek: number,
-  draftKey: string,
-  expectedUserId: string
-) {
-  return enqueueDraftWrite(expectedUserId, draftKey, async () => {
-    const client = requireClient()
-    const userId = await requireUserId(client, expectedUserId)
-    const { error } = await client
-      .from('workout_drafts')
-      .delete()
-      .eq('user_id', userId)
-      .eq('day_of_week', dayOfWeek)
-      .eq('draft_key', draftKey)
-    throwIfError(error)
-  })
+export async function deleteRemoteWorkoutDraft(dayOfWeek: number, draftKey: string, expectedUserId: string) {
+  enqueueSyncOperation(expectedUserId, `draft:${draftKey}`, { action: 'delete', dayOfWeek })
 }

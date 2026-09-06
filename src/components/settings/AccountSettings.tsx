@@ -78,6 +78,8 @@ export function AccountSettings() {
   }
 
   async function uploadLocalData() {
+    const targetOwner = user?.id
+    if (!targetOwner) return
     const localSessions = getLocalSessions()
     if (localSessions.length === 0) return
 
@@ -86,12 +88,12 @@ export function AccountSettings() {
     setMigrating(true)
     try {
       for (const session of localSessions) {
-        await supabaseWorkoutRepository.saveWorkoutSession(session)
+        await supabaseWorkoutRepository.saveWorkoutSession(session, targetOwner)
       }
       await reloadSessions(true)
       setLocalCount(getLocalSessions().length)
       setMessage(
-        `${localSessions.length} entrenamiento${localSessions.length === 1 ? '' : 's'} subido${localSessions.length === 1 ? '' : 's'}. Los datos locales se han conservado.`
+        `${localSessions.length} entrenamiento${localSessions.length === 1 ? '' : 's'} en la cola de sincronización. Consulta su confirmación en la cabecera. Los datos locales se han conservado.`
       )
     } catch (migrationError) {
       console.error('[migration] No se pudieron subir los datos locales:', migrationError)

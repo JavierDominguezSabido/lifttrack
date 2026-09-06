@@ -5,12 +5,12 @@ import type { LastExercisePerformance, WorkoutSession } from '../types'
  * dominio y no necesitan conocer si los datos vienen del navegador o de SQL.
  */
 export interface WorkoutRepository {
-  getWorkoutSessions(): Promise<WorkoutSession[]>
+  getWorkoutSessions(expectedUserId?: string): Promise<WorkoutSession[]>
   saveWorkoutSession(session: WorkoutSession, expectedUserId?: string): Promise<WorkoutSession>
   updateWorkoutSession(session: WorkoutSession, expectedUserId?: string): Promise<WorkoutSession>
-  deleteWorkoutSession(sessionId: string): Promise<void>
+  deleteWorkoutSession(sessionId: string, expectedUserId?: string, expectedRevision?: string): Promise<void>
   clearWorkoutSessions(): Promise<void>
-  mergeExerciseIds(canonicalId: string, duplicateIds: string[]): Promise<number>
+  mergeExerciseIds(canonicalId: string, duplicateIds: string[], expectedUserId?: string): Promise<number>
   getLastPerformanceByExercise(
     exerciseId: string
   ): Promise<LastExercisePerformance | null>

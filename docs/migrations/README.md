@@ -1,5 +1,10 @@
 # Guardado atómico de sesiones (bloque 1)
 
+El cliente del bloque 3 utiliza además `persistent-sync.sql`. El comportamiento
+vigente de la cola, los reintentos y los conflictos se describe en
+[persistent-sync.md](persistent-sync.md); sustituye las limitaciones del bloque 1
+sobre finalizar sin red y reintentar manualmente.
+
 ## Instalación
 
 En una base existente con el esquema de LiftTrack, ejecutar

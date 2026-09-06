@@ -37,6 +37,9 @@ export function rebuildImportRelationships(
   })
 
   for (const template of templates ?? []) {
+    if (new Set(template.exercises.map(item => item.exerciseId)).size !== template.exercises.length) {
+      errors.push(`La rutina "${template.name}" contiene ejercicios duplicados tras reconstruir las relaciones.`)
+    }
     for (const item of template.exercises) {
       if (!validExerciseIds.has(item.exerciseId)) errors.push(`La rutina "${template.name}" referencia el ejercicio inexistente "${item.exerciseId}".`)
       if (item.templateId !== template.id) errors.push(`El elemento "${item.id}" no pertenece a la rutina "${template.id}".`)
