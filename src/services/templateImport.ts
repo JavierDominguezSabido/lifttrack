@@ -5,6 +5,19 @@ export interface TemplateNormalization {
   conflicts: string[]
 }
 
+/** Una relación (rutina, ejercicio), igual que UNIQUE(template_id, exercise_id). */
+export function assertUniqueTemplateExercises(templates: WorkoutTemplate[]) {
+  for (const template of templates) {
+    const seen = new Set<string>()
+    for (const item of template.exercises) {
+      if (seen.has(item.exerciseId)) {
+        throw new Error(`La rutina "${template.name}" contiene un ejercicio repetido. Quita la repetición o crea un ejercicio distinto para la variante.`)
+      }
+      seen.add(item.exerciseId)
+    }
+  }
+}
+
 export function normalizeWeeklyTemplates(templates: WorkoutTemplate[]): TemplateNormalization {
   const byDay = new Map<number, WorkoutTemplate>()
   const conflicts: string[] = []
@@ -22,6 +35,8 @@ export function normalizeWeeklyTemplates(templates: WorkoutTemplate[]): Template
 }
 
 export function mergeWeeklyTemplates(existing: WorkoutTemplate[], imported: WorkoutTemplate[]): TemplateNormalization {
+  assertUniqueTemplateExercises(existing)
+  assertUniqueTemplateExercises(imported)
   const normalizedExisting = normalizeWeeklyTemplates(existing)
   const byDay = new Map(normalizedExisting.templates.map((template) => [template.dayOfWeek, template]))
   const conflicts = [...normalizedExisting.conflicts]

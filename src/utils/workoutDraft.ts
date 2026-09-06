@@ -195,7 +195,7 @@ export function createWorkoutSession({
         id: createId?.() ?? `${exerciseLogId}:set:${encodeURIComponent(set.id)}`,
         exerciseLogId,
         reps: Number(set.reps),
-        weightKg: normalizeWeight(set.weightOverrideKg ?? workingWeightKg),
+        weightKg: normalizeWeight(set.weightOverrideKg ?? set.weightKg),
         completed: true
       }))
     }]
@@ -240,7 +240,7 @@ export function updateWorkoutSession(
       return [{
         ...set,
         reps: Number(reps),
-        weightKg: normalizeWeight(set.weightOverrideKg ?? workingWeightKg)
+        weightKg: normalizeWeight(set.weightOverrideKg ?? set.weightKg)
       }]
     })
     if (sets.length === 0) return []

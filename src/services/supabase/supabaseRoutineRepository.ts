@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/database'
 import type { Exercise, WorkoutTemplate } from '../../types'
 import { supabase } from './supabaseClient'
-import { normalizeWeeklyTemplates } from '../templateImport'
+import { assertUniqueTemplateExercises, normalizeWeeklyTemplates } from '../templateImport'
 
 type DbClient = SupabaseClient<Database>
 
@@ -64,6 +64,7 @@ export async function loadRemoteRoutine(userId: string) {
 }
 
 export async function saveRemoteRoutine(userId: string, exercises: Exercise[], templates: WorkoutTemplate[]) {
+  assertUniqueTemplateExercises(templates)
   const db = client()
   const normalized = normalizeWeeklyTemplates(templates)
   if (normalized.conflicts.length) throw new Error(normalized.conflicts.join(' '))

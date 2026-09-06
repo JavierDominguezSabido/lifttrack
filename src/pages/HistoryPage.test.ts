@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkoutSession } from '../types'
 import { filterSessions, getHistorySummary, getProgressEntryWeight, getSessionDeletionMessage } from './HistoryPage'
 
@@ -15,6 +15,12 @@ function session(id: string, date: string, volumeKg: number): WorkoutSession {
 }
 
 describe('resumen compacto del historial', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-18T12:00:00Z'))
+  })
+  afterEach(() => vi.useRealTimers())
+
   it('mantiene todas las sesiones y suma el volumen existente', () => {
     const sessions = [
       session('latest', '2026-08-17T18:00:00.000Z', 4000),

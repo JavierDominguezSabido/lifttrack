@@ -1172,7 +1172,9 @@ function WorkoutPageContent() {
   }
 
   return (
-    !syncReady ? (
+    new Set(template.exercises.map((item) => item.exerciseId)).size !== template.exercises.length ? (
+      <p role="alert" className="status-error">Esta rutina contiene ejercicios repetidos. Quita las repeticiones en <Link to="/configuracion" className="underline">Ajustes</Link> antes de entrenar.</p>
+    ) : !syncReady ? (
       <div className="card p-6 text-center" role="status" aria-live="polite">
         <Dumbbell className="mx-auto size-7 animate-pulse text-brand" aria-hidden="true" />
         <p className="mt-3 font-extrabold text-ink">Preparando pesos del entrenamiento…</p>

@@ -1,6 +1,6 @@
 import { exercises as exampleExercises, templates as exampleTemplates } from '../data/mockData'
 import type { Exercise, WorkoutTemplate } from '../types'
-import { normalizeWeeklyTemplates } from './templateImport'
+import { assertUniqueTemplateExercises, normalizeWeeklyTemplates } from './templateImport'
 
 const LEGACY_EXERCISES_KEY = 'lifttrack.exercises.v1'
 const LEGACY_TEMPLATES_KEY = 'lifttrack.workoutTemplates.v1'
@@ -71,6 +71,7 @@ export function storeExercises(owner: string, exercises: Exercise[]) {
 }
 
 export function storeTemplates(owner: string, templates: WorkoutTemplate[]) {
+  assertUniqueTemplateExercises(templates)
   localStorage.setItem(keys(owner).templates, JSON.stringify(normalizeWeeklyTemplates(templates).templates))
 }
 

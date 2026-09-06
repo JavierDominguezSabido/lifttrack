@@ -57,13 +57,13 @@ export function ExerciseLogger({
 
   function addSet() {
     const lastSet = log.sets[log.sets.length - 1]
-    const setNumber = log.sets.length + 1
+    const setNumber = Math.max(0, ...log.sets.map((set) => set.setNumber)) + 1
     onChange({
       ...log,
       sets: [
         ...log.sets,
         {
-          id: `${log.id}-set-${setNumber}`,
+          id: `${log.id}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}-set-${setNumber}`,
           exerciseLogId: log.id,
           setNumber,
           reps: lastSet?.reps ?? templateExercise.targetReps ?? '8',
@@ -136,6 +136,7 @@ export function ExerciseLogger({
 
       <div className="space-y-3 p-3.5 sm:p-4">
         <section aria-labelledby={`weight-label-${log.id}`} className="rounded-xl bg-muted/55 p-3">
+          <p className="mb-2 text-xs text-secondary">Cambiar el peso de trabajo aplica el nuevo peso a todas las series.</p>
           <div className={showWeightIncrement ? 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2' : 'block'}>
             <label className="min-w-0">
               <span
@@ -216,6 +217,7 @@ export function ExerciseLogger({
                   {set.setNumber}
                 </span>
                 <div className="relative">
+                  <p className="text-xs text-secondary">{set.weightOverrideKg ?? set.weightKg} kg</p>
                   <label className="sr-only" htmlFor={`reps-${set.id}`}>
                     Repeticiones de la serie {set.setNumber} de {exercise.name}
                   </label>

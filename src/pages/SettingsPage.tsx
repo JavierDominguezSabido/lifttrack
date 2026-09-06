@@ -12,7 +12,7 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
@@ -44,8 +44,14 @@ function parseRest(value: string) {
 }
 
 export function SettingsPage() {
+  const { ownerId } = useWorkouts()
+  return <SettingsPageContent key={ownerId} />
+}
+
+function SettingsPageContent() {
   const {
     exercises,
+    ownerId,
     templates,
     hasCustomRoutine,
     createExercise,
@@ -60,6 +66,16 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
   const [showExerciseForm, setShowExerciseForm] = useState(false)
+  const [exerciseFormDirty, setExerciseFormDirty] = useState(false)
+  const exerciseDraftKey = `lifttrack.exerciseForm.${ownerId}.${editingExercise?.id ?? 'new'}`
+
+  function discardExerciseForm() {
+    if (!showExerciseForm) return true
+    if (exerciseFormDirty && !window.confirm('Hay cambios sin guardar en el ejercicio. ¿Descartarlos?')) return false
+    try { window.sessionStorage.removeItem(exerciseDraftKey) } catch { /* El formulario sigue disponible en memoria. */ }
+    setExerciseFormDirty(false)
+    return true
+  }
   const [daySelections, setDaySelections] = useState<Record<string, string>>({})
   const [exerciseSearch, setExerciseSearch] = useState('')
   const [exerciseStatus, setExerciseStatus] = useState<'active' | 'all' | 'archived'>('active')
@@ -100,7 +116,8 @@ export function SettingsPage() {
     const template = drafts.find((item) => item.id === templateId)
     if (!template) return
     const duplicate = template.exercises.some((item) => item.exerciseId === exerciseId)
-    if (duplicate && !window.confirm('Este ejercicio ya está en el día. ¿Quieres añadirlo otra vez como variante?')) {
+    if (duplicate) {
+      setError('Este ejercicio ya está en la rutina. Para una variante, crea un ejercicio distinto en el catálogo.')
       return
     }
 
@@ -151,11 +168,17 @@ export function SettingsPage() {
 
   function persistRoutine() {
     setError(null)
-    saveTemplates(drafts)
-    setMessage('Rutina guardada en este dispositivo. Consulta el estado de la nube en la cabecera.')
+    try {
+      saveTemplates(drafts)
+      setMessage('Rutina guardada en este dispositivo. Consulta el estado de la nube en la cabecera.')
+    } catch (error) {
+      setMessage(null)
+      setError(error instanceof Error ? error.message : 'No se pudo guardar la rutina.')
+    }
   }
 
   function openOverview() {
+    if (!discardExerciseForm()) return
     setSettingsView('overview')
     setEditingExercise(null)
     setShowExerciseForm(false)
@@ -306,6 +329,8 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => {
+                if (showExerciseForm && !editingExercise) return
+                if (!discardExerciseForm()) return
                 setEditingExercise(null)
                 setShowExerciseForm(true)
               }}
@@ -337,11 +362,16 @@ export function SettingsPage() {
 
         {showExerciseForm && (
           <ExerciseForm
+            key={exerciseDraftKey}
+            draftKey={exerciseDraftKey}
+            onDirtyChange={setExerciseFormDirty}
             exercise={editingExercise}
-            onCancel={() => setShowExerciseForm(false)}
+            onCancel={() => { if (discardExerciseForm()) setShowExerciseForm(false) }}
             onSave={(values) => {
               if (editingExercise) updateExercise({ ...editingExercise, ...values })
               else createExercise({ ...values, active: true })
+              try { window.sessionStorage.removeItem(exerciseDraftKey) } catch { /* No impide guardar. */ }
+              setExerciseFormDirty(false)
               setShowExerciseForm(false)
               setMessage(editingExercise ? 'Ejercicio actualizado.' : 'Ejercicio creado.')
             }}
@@ -370,6 +400,8 @@ export function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (showExerciseForm && editingExercise?.id === exercise.id) return
+                    if (!discardExerciseForm()) return
                     setEditingExercise(exercise)
                     setShowExerciseForm(true)
                   }}
@@ -643,17 +675,57 @@ function RoutineExerciseEditor({
 
 function ExerciseForm({
   exercise,
+  draftKey,
+  onDirtyChange,
   onCancel,
   onSave
 }: {
   exercise: Exercise | null
+  draftKey: string
+  onDirtyChange: (dirty: boolean) => void
   onCancel: () => void
   onSave: (exercise: Omit<Exercise, 'id' | 'active'>) => void
 }) {
-  const [name, setName] = useState(exercise?.name ?? '')
-  const [muscleGroup, setMuscleGroup] = useState(exercise?.muscleGroup ?? '')
-  const [notes, setNotes] = useState(exercise?.notes ?? '')
+  const [initial] = useState(() => {
+    try {
+      const draft = JSON.parse(window.sessionStorage.getItem(draftKey) ?? 'null')
+      if (draft && typeof draft.name === 'string' && typeof draft.muscleGroup === 'string' && typeof draft.notes === 'string') return draft as { name: string; muscleGroup: string; notes: string }
+    } catch { /* Un borrador ilegible no sustituye los datos del ejercicio. */ }
+    return { name: exercise?.name ?? '', muscleGroup: exercise?.muscleGroup ?? '', notes: exercise?.notes ?? '' }
+  })
+  const [name, setName] = useState(initial.name)
+  const [muscleGroup, setMuscleGroup] = useState(initial.muscleGroup)
+  const [notes, setNotes] = useState(initial.notes)
   const [error, setError] = useState<string | null>(null)
+  const [storageError, setStorageError] = useState(false)
+  const dirty = name !== (exercise?.name ?? '') || muscleGroup !== (exercise?.muscleGroup ?? '') || notes !== (exercise?.notes ?? '')
+
+  useLayoutEffect(() => {
+    onDirtyChange(dirty)
+    try {
+      if (dirty) window.sessionStorage.setItem(draftKey, JSON.stringify({ name, muscleGroup, notes }))
+      else window.sessionStorage.removeItem(draftKey)
+      setStorageError(false)
+    } catch { setStorageError(true) }
+  }, [dirty, draftKey, name, muscleGroup, notes, onDirtyChange])
+
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    const guardNavigation = (event: MouseEvent) => {
+      if (storageError && event.target instanceof Element && event.target.closest('a[href]') &&
+        !window.confirm('No se pudo conservar el borrador. ¿Salir y perder los cambios del ejercicio?')) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+    window.addEventListener('beforeunload', warn)
+    document.addEventListener('click', guardNavigation, true)
+    return () => {
+      window.removeEventListener('beforeunload', warn)
+      document.removeEventListener('click', guardNavigation, true)
+    }
+  }, [dirty, storageError])
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -661,11 +733,13 @@ function ExerciseForm({
       setError('El nombre del ejercicio es obligatorio.')
       return
     }
-    onSave({
+    try { onSave({
       name: name.trim(),
       muscleGroup: muscleGroup ? muscleGroup as MuscleGroup : undefined,
       notes: notes.trim() || undefined
-    })
+    }) } catch (error) {
+      setError(error instanceof Error ? error.message : 'No se pudo guardar el ejercicio.')
+    }
   }
 
   return (
@@ -677,6 +751,9 @@ function ExerciseForm({
         </button>
       </div>
       {error && <p className="status-error">{error}</p>}
+      {dirty && <p role="status" className={storageError ? 'status-error' : 'text-sm text-secondary'}>
+        {storageError ? 'No se pudo conservar el borrador. Guarda los cambios antes de salir.' : 'Cambios sin guardar. El borrador se recuperará al volver a abrir este ejercicio en esta pestaña.'}
+      </p>}
       <label className="block text-sm font-bold text-secondary">
         Nombre *
         <input value={name} onChange={(event) => setName(event.target.value)} className="input mt-1 !text-left" placeholder="Press banca" />

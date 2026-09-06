@@ -11,6 +11,7 @@ import { loadRemoteRoutine, saveRemoteRoutine } from '../services/supabase/supab
 import { useAuth } from './AuthContext'
 import { readSessionCache, writeSessionCache } from '../services/workoutSessionCache'
 import { getSyncStatus } from '../utils/syncStatus'
+import { assertUniqueTemplateExercises } from '../services/templateImport'
 
 function createId() {
   return typeof globalThis.crypto?.randomUUID === 'function'
@@ -184,6 +185,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   }, [authLoading, reloadSessions])
 
   const persist = useCallback((exercises: Exercise[], templates: WorkoutTemplate[]) => {
+    assertUniqueTemplateExercises(templates)
     storeExercises(owner, exercises)
     storeTemplates(owner, templates)
     if (user) {
@@ -302,6 +304,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       persist(exercises, currentRoutine.templates); setRoutine({ ...currentRoutine, exercises })
     },
     importRoutine: async (imported, templates) => {
+      if (templates) assertUniqueTemplateExercises(templates)
       if (routineLoading || currentRoutine.owner !== owner) throw new Error('La sincronización de la rutina todavía se está preparando.')
       const ids = new Set(currentRoutine.exercises.map((exercise) => exercise.id))
       const exercises = [...currentRoutine.exercises, ...imported.filter((exercise) => !ids.has(exercise.id)).map((exercise) => ({ ...exercise, active: exercise.active !== false }))]
