@@ -355,7 +355,7 @@ function WorkoutPageContent() {
   const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
   const [guidedFeedback, setGuidedFeedback] = useState<GuidedFeedback | null>(null)
   const [guidedStepAnimationKey, setGuidedStepAnimationKey] = useState(0)
-  const [draftSyncStatus, setDraftSyncStatus] = useState<DraftSyncStatus>(
+  const [, setDraftSyncStatus] = useState<DraftSyncStatus>(
     initialStateRef.current!.draftActive ? (user ? 'pending' : 'local') : 'idle'
   )
   const [saving, setSaving] = useState(false)
@@ -514,23 +514,14 @@ function WorkoutPageContent() {
   }, [exercises, initialLogs, sessions, syncReady, template])
   const hasDraftChanges = !logsAreEqual(logs, initialLogs)
   const hasDraftState = hasDraftChanges || viewMode !== 'full' || Boolean(guidedPosition)
-  const draftStatusLabel = localSaveError
-    ? 'No se pudo guardar en este dispositivo'
-    : draftSyncError
-      ? 'Guardado en este dispositivo · nube pendiente'
-      : !user && draftActive
-        ? 'Guardado en este dispositivo'
-        : draftHydrationStatus === 'hydrating'
-      ? 'Comprobando borrador sincronizado…'
-      : draftSyncStatus === 'synced'
-      ? 'Borrador sincronizado'
-      : draftSyncStatus === 'syncing'
-        ? 'Sincronizando borrador…'
-        : draftSyncStatus === 'error'
-          ? 'Guardado en este dispositivo · nube pendiente'
-          : draftSyncStatus === 'local'
-            ? 'Guardado en este dispositivo'
-            : 'Guardado en este dispositivo · nube pendiente'
+  const [persistentDraftError, setPersistentDraftError] = useState<string | null>(null)
+  useEffect(() => {
+    setPersistentDraftError(null)
+    if (!draftSyncError) return
+    const timer = window.setTimeout(() => setPersistentDraftError(draftSyncError), 15000)
+    return () => window.clearTimeout(timer)
+  }, [draftSyncError])
+  const visibleDraftError = persistentDraftError === draftSyncError ? persistentDraftError : null
 
   const confirmRemoteSync = useCallback((
     sentDraft: StoredWorkoutDraft,
@@ -1302,20 +1293,13 @@ function WorkoutPageContent() {
             style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
           />
         </div>
-        {(draftActive || (hasDraftState && !pendingDraft)) && (
-          <div className="mt-2 flex items-center">
-            <span role="status" aria-live="polite" className="rounded-full bg-muted px-2 py-1 text-[11px] font-extrabold leading-none text-secondary">
-              {draftStatusLabel}
-            </span>
-          </div>
-        )}
       </section>
 
       {localSaveError && <p role="alert" className="status-error">{localSaveError}</p>}
-      {(draftSyncError || localSaveError) && (
+      {(visibleDraftError || localSaveError) && (
         <p role="alert" className="status-error">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{draftSyncError ?? 'El guardado local requiere atención.'}</span>
+          <span>{visibleDraftError ?? 'El guardado local requiere atención.'}</span>
           <button type="button" className="underline" onClick={() => setHydrationRetry((current) => current + 1)}>Reintentar</button>
         </p>
       )}
@@ -1326,7 +1310,7 @@ function WorkoutPageContent() {
             <p className="min-w-0 text-xs font-bold text-secondary sm:text-sm">
               <span className="font-extrabold text-ink">Entrenamiento en curso</span>
               <span aria-hidden="true"> · </span>
-              {draftStatusLabel}
+              Hay un entrenamiento sin terminar.
             </p>
             <button
               type="button"

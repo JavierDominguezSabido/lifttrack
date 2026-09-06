@@ -38,20 +38,14 @@ export function RoutinePage() {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid gap-3 sm:flex sm:items-start sm:justify-between">
-        <p className="max-w-xl text-base leading-6 text-secondary">
-          Consulta tu planificación semanal y empieza el entrenamiento de cada día.
-        </p>
-        <div className="grid gap-2 sm:flex"><Link to="/rutina/ejercicios" className="btn-secondary">Ejercicios</Link>
-        <Link to="/rutina/editar" className="btn-secondary w-full sm:w-auto">
-          Editar rutina
-        </Link></div>
-      </div>
-
       <section aria-labelledby="week-overview-title" className="card p-3.5 md:p-4">
-        <h2 id="week-overview-title" className="mb-3 text-sm font-extrabold text-ink">
-          Vista semanal
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <h2 id="week-overview-title" className="text-sm font-extrabold text-ink">Vista semanal</h2>
+          <nav aria-label="Gestionar rutina" className="flex items-center gap-4">
+            <Link to="/rutina/ejercicios" className="inline-flex min-h-11 items-center text-sm font-semibold text-secondary hover:text-ink">Ejercicios</Link>
+            <Link to="/rutina/editar" className="inline-flex min-h-11 items-center text-sm font-semibold text-secondary hover:text-ink">Editar rutina</Link>
+          </nav>
+        </div>
         <div className="grid grid-cols-7 gap-2">
           {shortDayNames.slice(1).concat(shortDayNames[0]).map((day, index) => {
             const dayIndex = (index + 1) % 7

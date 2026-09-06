@@ -33,7 +33,7 @@ export function DashboardPage() {
         <p className="mt-2 text-secondary">{activeTemplates.filter(template => completed.has(template.dayOfWeek)).length} de {activeTemplates.length} días completados</p>
         <Link to="/rutina" className="btn-secondary mt-4 w-full sm:w-auto">Ver y editar rutina</Link>
       </section>}
-      {hasHistory ? <section className="card p-5">
+      {hasHistory ? target !== '/progreso' && <section className="card p-5">
         <h2 className="font-extrabold">Tus entrenamientos anteriores</h2>
         <p className="mt-2 text-secondary">Consulta sesiones, edita registros y revisa la evolución de tus ejercicios.</p>
         <Link to="/progreso" className="btn-secondary mt-4 w-full sm:w-auto">Ver progreso</Link>

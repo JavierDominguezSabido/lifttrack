@@ -202,7 +202,7 @@ function SettingsPageContent() {
       saveTemplates(drafts)
       try { sessionStorage.removeItem(routineDraftKey) } catch { /* Guardado realizado. */ }
       setRoutineDirty(false)
-      setMessage('Rutina guardada en este dispositivo. Consulta el estado de la nube en la cabecera.')
+      setMessage('Rutina guardada.')
     } catch (error) {
       setMessage(null)
       setError(error instanceof Error ? error.message : 'No se pudo guardar la rutina.')

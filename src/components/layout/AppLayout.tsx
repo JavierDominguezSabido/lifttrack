@@ -1,5 +1,4 @@
-import { syncStatusLabels } from '../../utils/syncStatus'
-import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, LayoutDashboard, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
@@ -25,9 +24,18 @@ const pageTitles: Record<string, string> = {
 
 export function AppLayout() {
   const location = useLocation()
-  const { sessions, templates, dataMode, sessionsError, initialLoading, backgroundRefreshing, ownerId, syncStatus, syncError, syncOperations, retrySync, resolveConflict } = useWorkouts()
+  const { sessions, templates, sessionsError, initialLoading, ownerId, syncError, syncOperations, retrySync, resolveConflict } = useWorkouts()
   const [syncActionError, setSyncActionError] = useState<string | null>(null)
   const [resolving, setResolving] = useState(false)
+  const currentError = syncError ?? sessionsError ?? syncOperations.find(op => op.status === 'error')?.error ?? null
+  const [persistentError, setPersistentError] = useState<string | null>(null)
+  useEffect(() => {
+    setPersistentError(null)
+    if (!currentError) return
+    const timer = window.setTimeout(() => setPersistentError(currentError), 15000)
+    return () => window.clearTimeout(timer)
+  }, [currentError, ownerId])
+  const visibleError = persistentError === currentError ? persistentError : null
   const conflicted = syncOperations.find(op => op.status === 'conflict')
   const latestConflict = conflicted ? syncOperations.filter(op => op.resource === conflicted.resource).slice(-1)[0] : undefined
   const conflictLabel = latestConflict?.resource === 'routine' ? 'la rutina' : latestConflict?.resource.startsWith('draft:') ? 'el entrenamiento en curso' : 'la sesión'
@@ -131,31 +139,14 @@ export function AppLayout() {
             <h1 className="truncate text-lg font-extrabold tracking-tight lg:text-xl">{title}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <span
-              className={`inline-flex min-h-9 items-center gap-1 rounded-md px-1.5 text-xs font-extrabold sm:px-2 ${
-                syncStatus === 'error' || syncStatus === 'offline' || syncStatus === 'conflict'
-                  ? 'bg-danger-soft text-danger-text'
-                  : 'bg-transparent text-secondary'
-              }`}
-              title={syncError ?? syncStatusLabels[syncStatus]}
-              role="status"
-              aria-label={syncStatusLabels[syncStatus]}
-            >
-              {dataMode === 'cloud'
-                ? <Cloud className="size-4" aria-hidden="true" />
-                : <HardDrive className="size-4" aria-hidden="true" />}
-              <span className="max-w-32 truncate sm:max-w-none">
-                {syncStatusLabels[syncStatus]}
-              </span>
-            </span>
             <ThemeToggle />
           </div>
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
-          {syncOperations.length > 0 && (
+          {(latestConflict || visibleError) && (
             <section aria-label="Operaciones pendientes de sincronización" className="card mb-4 space-y-2 p-3">
-              <p role="status" className="text-sm">Guardado en este dispositivo · {syncOperations.length} operaciones pendientes de confirmar en la nube.</p>
+              {!latestConflict && <p role="alert" className="status-error">{visibleError}</p>}
               {latestConflict ? <>
                 <p role="alert" className="text-sm">Hay cambios distintos en {conflictLabel}. La cola está pausada y tu copia local se conserva.</p>
                 <div className="flex flex-wrap gap-2">
@@ -172,12 +163,6 @@ export function AppLayout() {
             </p>
           ) : (
             <>
-              {(syncError || sessionsError) && (
-                <p role="alert" className="status-error mb-4">{syncError ?? sessionsError}</p>
-              )}
-              {backgroundRefreshing && (
-                <p role="status" className="mb-3 text-right text-xs font-bold text-secondary">Sincronizando…</p>
-              )}
               <Outlet />
             </>
           )}
