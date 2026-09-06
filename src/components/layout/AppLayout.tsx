@@ -1,26 +1,26 @@
 import { syncStatusLabels } from '../../utils/syncStatus'
-import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, Dumbbell, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, Cloud, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
-import { getCurrentWeekSessions } from '../../utils/workout'
+import { getCompletedRoutineDaysForWeek } from '../../utils/workout'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { shouldShowInitialWorkoutLoader } from '../../utils/workoutLifecycle'
 
 const navigation = [
-  { label: 'Inicio', path: '/', icon: LayoutDashboard },
+  { label: 'Hoy', path: '/', icon: LayoutDashboard },
   { label: 'Rutina', path: '/rutina', icon: CalendarDays },
-  { label: 'Entrenar', path: '/entrenamiento', icon: Dumbbell },
-  { label: 'Historial', path: '/historial', icon: ChartNoAxesColumnIncreasing },
-  { label: 'Ajustes', path: '/configuracion', icon: Settings }
+  { label: 'Progreso', path: '/progreso', icon: ChartNoAxesColumnIncreasing },
+  { label: 'Cuenta', path: '/cuenta', icon: Settings }
 ]
 
 const pageTitles: Record<string, string> = {
-  '/': 'Resumen',
+  '/': 'Hoy',
   '/rutina': 'Rutina semanal',
   '/entrenamiento': 'Entrenamiento',
   '/historial': 'Historial',
-  '/configuracion': 'Configuración'
+  '/cuenta': 'Cuenta',
+  '/progreso': 'Progreso'
 }
 
 export function AppLayout() {
@@ -59,7 +59,8 @@ export function AppLayout() {
     hasLocalDraft: hasLocalWorkoutDraft
   })
   const activeTemplateCount = templates.filter((template) => template.exercises.length > 0).length
-  const weeklySessionCount = getCurrentWeekSessions(sessions).length
+  const completedDays = getCompletedRoutineDaysForWeek(sessions, templates)
+  const weeklySessionCount = templates.filter(template => template.exercises.length > 0 && completedDays.has(template.dayOfWeek)).length
   const weeklyProgress = activeTemplateCount
     ? Math.min(100, (weeklySessionCount / activeTemplateCount) * 100)
     : 0
@@ -91,7 +92,7 @@ export function AppLayout() {
           </div>
         </div>
 
-        <nav className="space-y-1">
+        <nav aria-label="Navegación principal de escritorio" className="space-y-1">
           {navigation.map(({ label, path, icon: Icon }) => (
             <NavLink
               key={path}
@@ -99,7 +100,7 @@ export function AppLayout() {
               end={path === '/'}
               className={({ isActive }) =>
                 `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition ${
-                  isActive ? 'bg-brand-solid text-on-brand shadow-sm' : 'text-secondary hover:bg-muted hover:text-ink'
+                  (isActive || (path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial'))) ? 'bg-brand-solid text-on-brand shadow-sm' : 'text-secondary hover:bg-muted hover:text-ink'
                 }`
               }
             >
@@ -109,7 +110,7 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="mt-auto rounded-xl border border-line/70 bg-raised p-3">
+        {activeTemplateCount > 0 && <div className="mt-auto rounded-xl border border-line/70 bg-raised p-3">
           <p className="text-xs font-bold uppercase tracking-wider text-brand">Semana activa</p>
           <p className="mt-1 text-xl font-extrabold text-ink">
             {weeklySessionCount} / {activeTemplateCount}
@@ -120,7 +121,7 @@ export function AppLayout() {
               style={{ width: `${weeklyProgress}%` }}
             />
           </div>
-        </div>
+        </div>}
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
@@ -148,9 +149,6 @@ export function AppLayout() {
               </span>
             </span>
             <ThemeToggle />
-            <div aria-label="LiftTrack" className="grid size-8 place-items-center rounded-lg bg-muted text-[11px] font-extrabold text-secondary sm:size-9">
-              LT
-            </div>
           </div>
         </header>
 
@@ -186,7 +184,7 @@ export function AppLayout() {
         </main>
       </div>
 
-      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-5 border-t border-line bg-surface px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_24px_rgba(7,11,18,0.14)] backdrop-blur-sm lg:hidden">
+      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-4 border-t border-line bg-surface px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_24px_rgba(7,11,18,0.14)] backdrop-blur-sm lg:hidden">
         {navigation.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
@@ -194,7 +192,7 @@ export function AppLayout() {
             end={path === '/'}
             className={({ isActive }) =>
               `relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
-                isActive ? 'bg-brand-soft text-brand' : 'text-subtle'
+                (isActive || (path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial'))) ? 'bg-brand-soft text-brand' : 'text-subtle'
               }`
             }
           >

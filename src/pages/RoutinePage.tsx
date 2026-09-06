@@ -1,4 +1,4 @@
-import { CalendarDays, Clock3, Dumbbell, Play } from 'lucide-react'
+import { CalendarDays, Dumbbell, Play } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TemplateExerciseRow } from '../components/workout/TemplateExerciseRow'
@@ -30,7 +30,7 @@ export function RoutinePage() {
           <Dumbbell className="mx-auto size-9 text-brand" aria-hidden="true" />
           <h2 className="mt-3 text-xl font-extrabold text-ink">Todavía no tienes una rutina</h2>
           <p className="mt-1 text-sm text-secondary">Crea tus días y elige ejercicios para empezar.</p>
-          <Link to="/configuracion" className="btn-primary mt-5">Crear mi rutina</Link>
+          <Link to="/rutina/editar" className="btn-primary mt-5">Crear mi rutina</Link>
         </div>
       </section>
     )
@@ -42,9 +42,10 @@ export function RoutinePage() {
         <p className="max-w-xl text-base leading-6 text-secondary">
           Consulta tu planificación semanal y empieza el entrenamiento de cada día.
         </p>
-        <Link to="/configuracion" className="btn-secondary w-full sm:w-auto">
-          Configurar rutina
-        </Link>
+        <div className="grid gap-2 sm:flex"><Link to="/rutina/ejercicios" className="btn-secondary">Ejercicios</Link>
+        <Link to="/rutina/editar" className="btn-secondary w-full sm:w-auto">
+          Editar rutina
+        </Link></div>
       </div>
 
       <section aria-labelledby="week-overview-title" className="card p-3.5 md:p-4">
@@ -78,7 +79,7 @@ export function RoutinePage() {
             <button
               type="button"
               onClick={() => setOpenTemplateId((current) => current === template.id ? '' : template.id)}
-              className="flex min-h-16 items-center justify-between gap-3 border-b border-line/70 p-4 text-left lg:pointer-events-none"
+              className="flex min-h-16 items-center justify-between gap-3 border-b border-line/70 p-4 text-left "
               aria-expanded={isOpen}
             >
               <span className="min-w-0">
@@ -98,7 +99,7 @@ export function RoutinePage() {
               </span>
             </button>
 
-            <div className={`${isOpen ? 'block' : 'hidden'} flex-1 divide-y divide-line/70 px-4 py-1 lg:block`}>
+            <div className={`${isOpen ? 'block' : 'hidden'} flex-1 divide-y divide-line/70 px-4 py-1`}>
               {template.exercises.map((item) => {
                 const exercise = getExerciseById(item.exerciseId)
                 return (
@@ -128,7 +129,7 @@ export function RoutinePage() {
               )}
             </div>
 
-            <footer className={`${isOpen ? 'block' : 'hidden'} p-3.5 pt-2 lg:block`}>
+            <footer className="p-3.5 pt-2">
               {template.exercises.length > 0 ? (
                 <Link
                   to={`/entrenamiento/${template.id}`}
@@ -138,20 +139,16 @@ export function RoutinePage() {
                   Entrenar {template.name.toLowerCase()}
                 </Link>
               ) : (
-                <Link to="/configuracion" className="btn-secondary w-full">
-                  Añadir ejercicios
-                </Link>
+                <p className="py-2 text-center text-sm text-secondary">Descanso</p>
               )}
+              <Link to={`/rutina/editar#${encodeURIComponent(template.id)}`} className="btn-secondary mt-2 w-full">Editar día</Link>
             </footer>
           </article>
           )
         })}
       </section>
 
-      <p className="flex items-center gap-2 text-xs font-medium text-secondary">
-        <Clock3 className="size-4" aria-hidden="true" />
-        Objetivos y descansos se gestionan desde Configuración.
-      </p>
+
     </div>
   )
 }

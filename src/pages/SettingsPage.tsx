@@ -3,9 +3,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
-  CalendarDays,
   Edit3,
-  Library,
   Plus,
   Save,
   Search,
@@ -13,12 +11,13 @@ import {
   X
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
 import { dayNames, formatRestSeconds } from '../utils/workout'
+import { getEmptyRoutine } from '../services/routineStorage'
 
 const muscleGroups: MuscleGroup[] = [
   'Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Core'
@@ -31,7 +30,7 @@ const createId = () => typeof globalThis.crypto?.randomUUID === 'function'
   ? globalThis.crypto.randomUUID()
   : `template-exercise-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 const weekOrder = [1, 2, 3, 4, 5, 6, 0]
-type SettingsSection = 'account' | 'routine' | 'data'
+type SettingsSection = 'account' | 'data'
 
 function parseTarget(value: string) {
   const match = value.trim().match(/^([1-9]\d*)\s*[xX×]\s*([1-9]\d*)$/)
@@ -53,20 +52,33 @@ function SettingsPageContent() {
     exercises,
     ownerId,
     templates,
-    hasCustomRoutine,
     createExercise,
     updateExercise,
     archiveExercise,
     saveTemplates,
     getExerciseById
   } = useWorkouts()
-  const [settingsView, setSettingsView] = useState<'overview' | 'routine' | 'library'>('overview')
-  const [drafts, setDrafts] = useState(() => cloneTemplates(templates))
-  const [routineDirty, setRoutineDirty] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const settingsView = location.pathname === '/rutina/editar' ? 'routine' : location.pathname === '/rutina/ejercicios' ? 'library' : 'overview'
+  const setSettingsView = (view: string) => navigate(view === 'routine' ? '/rutina/editar' : view === 'library' ? '/rutina/ejercicios' : '/rutina')
+  const routineDraftKey = `lifttrack.routineEditor.${ownerId}`
+  const [recovered] = useState<WorkoutTemplate[] | null>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(routineDraftKey) ?? 'null')
+      return Array.isArray(saved) ? saved : null
+    } catch { return null }
+  })
+  const [drafts, setDrafts] = useState(() => recovered ?? cloneTemplates(templates.length ? templates : getEmptyRoutine()))
+  const [routineDirty, setRoutineDirty] = useState(Boolean(recovered))
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
-  const [showExerciseForm, setShowExerciseForm] = useState(false)
+  const exerciseParam = params.get('ejercicio')
+  const editingExercise = exercises.find(exercise => exercise.id === exerciseParam) ?? null
+  const showExerciseForm = settingsView === 'library' && (exerciseParam === 'nuevo' || Boolean(editingExercise))
+  const setEditingExercise = (exercise: Exercise | null) => setParams(current => { current.set('ejercicio', exercise?.id ?? 'nuevo'); return current })
+  const setShowExerciseForm = (show: boolean) => { if (!show) setParams(current => { current.delete('ejercicio'); return current }) }
   const [exerciseFormDirty, setExerciseFormDirty] = useState(false)
   const exerciseDraftKey = `lifttrack.exerciseForm.${ownerId}.${editingExercise?.id ?? 'new'}`
 
@@ -80,9 +92,21 @@ function SettingsPageContent() {
   const [daySelections, setDaySelections] = useState<Record<string, string>>({})
   const [exerciseSearch, setExerciseSearch] = useState('')
   const [exerciseStatus, setExerciseStatus] = useState<'active' | 'all' | 'archived'>('active')
-  const [openSettingsSection, setOpenSettingsSection] = useState<SettingsSection>('account')
+  const openSettingsSection: SettingsSection = location.pathname === '/cuenta/datos' ? 'data' : 'account'
+  const setOpenSettingsSection = (section: SettingsSection) => navigate(section === 'data' ? '/cuenta/datos' : '/cuenta')
 
-  useEffect(() => { if (!routineDirty) setDrafts(cloneTemplates(templates)) }, [templates, routineDirty])
+  useEffect(() => { if (!routineDirty) setDrafts(cloneTemplates(templates.length ? templates : getEmptyRoutine())) }, [templates, routineDirty])
+  useLayoutEffect(() => {
+    if (!routineDirty) return
+    try { sessionStorage.setItem(routineDraftKey, JSON.stringify(drafts)) }
+    catch { setError('No se pudo conservar el borrador. Guarda la rutina antes de salir.') }
+  }, [drafts, routineDirty, routineDraftKey])
+  useEffect(() => {
+    if (!routineDirty) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [routineDirty])
 
   const orderedDrafts = [...drafts].sort(
     (a, b) => weekOrder.indexOf(a.dayOfWeek) - weekOrder.indexOf(b.dayOfWeek)
@@ -104,8 +128,12 @@ function SettingsPageContent() {
   }, [exerciseSearch, exerciseStatus, exercises])
 
   useEffect(() => {
+    if (location.hash && settingsView === 'routine') {
+      document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView({ block: 'start' })
+      return
+    }
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-  }, [openSettingsSection, settingsView])
+  }, [openSettingsSection, settingsView, location.hash])
 
   function updateTemplate(templateId: string, update: (template: WorkoutTemplate) => WorkoutTemplate) {
     setRoutineDirty(true)
@@ -172,6 +200,7 @@ function SettingsPageContent() {
     setError(null)
     try {
       saveTemplates(drafts)
+      try { sessionStorage.removeItem(routineDraftKey) } catch { /* Guardado realizado. */ }
       setRoutineDirty(false)
       setMessage('Rutina guardada en este dispositivo. Consulta el estado de la nube en la cabecera.')
     } catch (error) {
@@ -183,8 +212,6 @@ function SettingsPageContent() {
   function openOverview() {
     if (!discardExerciseForm()) return
     setSettingsView('overview')
-    setEditingExercise(null)
-    setShowExerciseForm(false)
   }
 
   function handleArchive(exerciseId: string) {
@@ -207,18 +234,18 @@ function SettingsPageContent() {
         <SettingsSubpageHeader
           eyebrow="Rutina"
           title="Editar rutina"
-          description={hasCustomRoutine
-            ? 'Estás usando tu rutina personalizada.'
-            : 'Estás usando la rutina base. Guarda cualquier cambio para personalizarla.'}
+          description="Añade ejercicios a tus días y ajusta series, repeticiones y descansos."
           onBack={openOverview}
         />
 
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p role="alert" className="status-error">{error}</p>}
+        {routineDirty && <p role="status" className="text-sm text-secondary">Tienes cambios sin guardar. El borrador se conserva al volver a esta pantalla.</p>}
+        <Link to="/rutina/ejercicios" className="btn-secondary">Gestionar ejercicios</Link>
 
-        <section aria-label="Editar entrenamientos por día" className="space-y-4">
+        <section aria-label="Editar entrenamientos por día" className="grid items-start gap-4 xl:grid-cols-2">
           {orderedDrafts.map((template) => (
-            <article key={template.id} className="card overflow-hidden">
+            <article id={template.id} key={template.id} className="card scroll-mt-24 overflow-hidden">
               <header className="border-b border-line/70 p-3.5 sm:p-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-brand">
                   {dayNames[template.dayOfWeek]}
@@ -258,7 +285,7 @@ function SettingsPageContent() {
                     }))}
                   >
                     <option value="" disabled>Añadir ejercicio desde la biblioteca</option>
-                    {exercises.filter((exercise) => exercise.active).map((exercise) => (
+                    {exercises.filter((exercise) => exercise.active && !template.exercises.some(item => item.exerciseId === exercise.id)).map((exercise) => (
                       <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
                     ))}
                   </select>
@@ -274,25 +301,29 @@ function SettingsPageContent() {
                     <Plus className="size-4" /> Añadir al día
                   </button>
                 </div>
-                <button type="button" onClick={() => setSettingsView('library')} className="text-sm font-bold text-brand">
+                <button type="button" onClick={() => navigate('/rutina/ejercicios?ejercicio=nuevo')} className="text-sm font-bold text-brand">
                   ¿No está en la lista? Crear ejercicio nuevo
                 </button>
               </div>
 
-              <div className="border-t border-line/70 p-3 sm:p-4">
+              {template.exercises.length > 0 && !routineDirty && <div className="border-t border-line/70 p-3 sm:p-4">
                 <Link to={`/entrenamiento/${template.id}`} className="text-sm font-bold text-brand">
                   Entrenar {template.name.toLowerCase()}
                 </Link>
-              </div>
+              </div>}
             </article>
           ))}
         </section>
 
-        <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 grid gap-2 rounded-xl border border-line/70 bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4">
-          <button type="button" onClick={openOverview} className="btn-secondary w-full">
-            Volver a configuración
+        <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 grid gap-2 rounded-xl border border-line/70 bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4 lg:left-[264px] lg:right-8">
+          <button type="button" disabled={!routineDirty} onClick={() => {
+            if (!window.confirm('¿Descartar los cambios sin guardar de la rutina?')) return
+            try { sessionStorage.removeItem(routineDraftKey) } catch { /* Continúa en memoria. */ }
+            setRoutineDirty(false)
+          }} className="btn-secondary w-full">
+            Descartar cambios
           </button>
-          <button type="button" onClick={persistRoutine} className="btn-primary w-full">
+          <button type="button" disabled={!routineDirty} onClick={persistRoutine} className="btn-primary w-full">
             <Save className="size-4" /> Guardar cambios
           </button>
         </div>
@@ -363,6 +394,8 @@ function SettingsPageContent() {
           </div>
         </section>
 
+        <Link to="/rutina/editar" className="btn-secondary">Volver a editar rutina</Link>
+        {exerciseParam && !showExerciseForm && <p role="alert" className="status-error">Este ejercicio ya no está en la biblioteca. Puedes crear uno nuevo.</p>}
         {showExerciseForm && (
           <ExerciseForm
             key={exerciseDraftKey}
@@ -456,58 +489,6 @@ function SettingsPageContent() {
       />
       {openSettingsSection === 'account' && <AccountSettings />}
 
-      <SettingsAccordionHeader
-        id="routine"
-        title="Rutina y ejercicios"
-        summary={`${orderedDrafts.reduce((total, template) => total + template.exercises.length, 0)} ejercicios planificados`}
-        open={openSettingsSection === 'routine'}
-        onOpen={setOpenSettingsSection}
-      />
-      {openSettingsSection === 'routine' && (
-      <section className="card overflow-hidden" aria-labelledby="routine-settings-title">
-        <header className="border-b border-line/70 p-4 md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="eyebrow">Rutina</p>
-              <h2 id="routine-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
-                Rutina y ejercicios
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-                Personaliza tus días de entrenamiento y tu biblioteca de ejercicios.
-              </p>
-            </div>
-            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-extrabold text-secondary">
-              {hasCustomRoutine ? 'Rutina personalizada' : 'Rutina base'}
-            </span>
-          </div>
-        </header>
-
-        <div className="space-y-3 p-4 md:p-5">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {orderedDrafts.map((template) => (
-              <div key={template.id} className="flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-raised px-3 py-2.5">
-                <span className="font-bold text-ink">{dayNames[template.dayOfWeek]}</span>
-                <span className="text-sm font-semibold text-secondary">
-                  {template.exercises.length > 0
-                    ? `${template.exercises.length} ejercicios`
-                    : 'Sin ejercicios'}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => setSettingsView('routine')} className="btn-primary w-full">
-              <CalendarDays className="size-4" /> Editar rutina
-            </button>
-            <button type="button" onClick={() => setSettingsView('library')} className="btn-secondary w-full">
-              <Library className="size-4" /> Gestionar ejercicios
-            </button>
-          </div>
-        </div>
-      </section>
-      )}
-
       {message && <p role="status" className="status-success">{message}</p>}
       {error && <p role="alert" className="status-error">{error}</p>}
 
@@ -572,10 +553,10 @@ function SettingsSubpageHeader({
   return (
     <section className="card p-4 md:p-5">
       <button type="button" onClick={onBack} className="btn-secondary mb-3">
-        <ArrowLeft className="size-4" /> Volver a configuración
+        <ArrowLeft className="size-4" /> Volver a rutina
       </button>
       <p className="eyebrow">{eyebrow}</p>
-      <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{title}</h1>
+      <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{title}</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{description}</p>
     </section>
   )

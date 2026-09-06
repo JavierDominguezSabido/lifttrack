@@ -35,7 +35,7 @@ function EditSessionContent() {
   const [error, setError] = useState<string | null>(null)
 
   if (!session || isInitialSession(session.id)) {
-    return <Navigate to="/historial" replace />
+    return <Navigate to="/progreso" replace />
   }
 
   function updateLog(updatedLog: DraftExerciseLog) {
@@ -62,7 +62,7 @@ function EditSessionContent() {
       )
       console.info('[workout] Sesión local actualizada:', updatedSession)
       await saveSession(updatedSession)
-      navigate('/historial', { state: { sessionUpdated: true } })
+      navigate('/progreso', { state: { sessionUpdated: true } })
     } catch (saveError) {
       console.error('[workout] Error al actualizar la sesión:', saveError)
       setError('No se pudieron guardar los cambios. Inténtalo de nuevo.')
@@ -75,11 +75,11 @@ function EditSessionContent() {
     <div className="space-y-5">
       <section className="card p-5 md:p-6">
         <Link
-          to="/historial"
+          to="/progreso"
           className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-secondary hover:text-ink"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver al historial
+          Volver a Progreso
         </Link>
         <p className="eyebrow mt-3">Editar entrenamiento</p>
         <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{session.name}</h2>

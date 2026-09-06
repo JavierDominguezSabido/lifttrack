@@ -159,7 +159,7 @@ function readWorkoutDraft(userKey: string, localDate: string, template: WorkoutT
   }
 }
 
-function readWorkoutDrafts(userKey: string, localDate: string) {
+export function readWorkoutDrafts(userKey: string, localDate: string) {
   const drafts: StoredWorkoutDraft[] = []
   try {
     const keyPrefix = `${WORKOUT_DRAFT_PREFIX}.${userKey}.`
@@ -266,7 +266,7 @@ function createFreshWorkoutLogs(
 }
 
 export function WorkoutPage() {
-  const { ownerId } = useWorkouts()
+  const { ownerId, templates, syncReady } = useWorkouts()
   const { templateId } = useParams()
   const [resolved, setResolved] = useState(0)
   useEffect(() => {
@@ -280,6 +280,14 @@ export function WorkoutPage() {
     window.addEventListener('lifttrack-sync-resolved', resolve)
     return () => window.removeEventListener('lifttrack-sync-resolved', resolve)
   }, [ownerId])
+  if (templateId && syncReady && !templates.some(template => template.id === templateId) &&
+    !readWorkoutDrafts(ownerId === 'local' ? 'local' : `user:${ownerId}`, toLocalDateKey(new Date())).some(draft => draft.templateId === templateId)) {
+    return <section className="card p-6">
+      <h2 className="text-xl font-extrabold">Este entrenamiento no está disponible</h2>
+      <p className="mt-2 text-secondary">La rutina puede haber cambiado. Elige un día de tu planificación.</p>
+      <Link to="/rutina" className="btn-primary mt-4">Ver rutina</Link>
+    </section>
+  }
   return <WorkoutPageContent key={JSON.stringify([ownerId, templateId, resolved])} />
 }
 
@@ -294,7 +302,7 @@ function WorkoutPageContent() {
     templateId ? draft.templateId === templateId : true
   ) ?? null
   const template = templates.find((item) => item.id === templateId) ??
-    getTodayTemplate(templates) ??
+    (!templateId && !localDraftHint ? getTodayTemplate(templates) : undefined) ??
     (localDraftHint ? {
       id: localDraftHint.templateId,
       name: `Entrenamiento día ${localDraftHint.dayOfWeek}`,
@@ -1223,7 +1231,7 @@ function WorkoutPageContent() {
 
   return (
     new Set(template.exercises.map((item) => item.exerciseId)).size !== template.exercises.length ? (
-      <p role="alert" className="status-error">Esta rutina contiene ejercicios repetidos. Quita las repeticiones en <Link to="/configuracion" className="underline">Ajustes</Link> antes de entrenar.</p>
+      <p role="alert" className="status-error">Esta rutina contiene ejercicios repetidos. Quita las repeticiones en <Link to="/rutina/editar" className="underline">Rutina</Link> antes de entrenar.</p>
     ) : !syncReady ? (
       <div className="card p-6 text-center" role="status" aria-live="polite">
         <Dumbbell className="mx-auto size-7 animate-pulse text-brand" aria-hidden="true" />
@@ -1536,7 +1544,7 @@ function WorkoutPageContent() {
             <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-secondary">
               Añade ejercicios a {template.name.toLowerCase()} desde la configuración de rutina.
             </p>
-            <Link to="/configuracion" className="btn-secondary mt-4">
+            <Link to="/rutina/editar" className="btn-secondary mt-4">
               Configurar rutina
             </Link>
           </div>

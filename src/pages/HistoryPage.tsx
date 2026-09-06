@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, ExerciseLog, SetLog, WorkoutSession, WorkoutTemplate } from '../types'
 import {
@@ -87,8 +87,12 @@ export function HistoryPage() {
   } = useWorkouts()
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [historyTab, setHistoryTab] = useState<HistoryTab>('sessions')
-  const [selectedProgressId, setSelectedProgressId] = useState<string | undefined>(exerciseId)
+  const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+  const historyTab: HistoryTab = params.get('vista') === 'progress' || exerciseId ? 'progress' : 'sessions'
+  const setHistoryTab = (tab: HistoryTab) => navigate('/progreso?vista=' + tab)
+  const selectedProgressId = exerciseId ?? params.get('ejercicio') ?? undefined
+  const setSelectedProgressId = (id: string) => setParams(current => { current.set('ejercicio', id); current.set('vista', 'progress'); return current })
   const [filterExerciseId, setFilterExerciseId] = useState('all')
   const [filterDay, setFilterDay] = useState('all')
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>('all')
@@ -222,6 +226,15 @@ export function HistoryPage() {
       ? 'Entrenamiento actualizado correctamente.'
       : actionMessage
 
+  if (realSessions.length === 0 && !sessionsError) return <section className="card p-6 md:p-8">
+    <h2 className="text-2xl font-extrabold">Tu progreso empieza con una sesión</h2>
+    <p className="mt-3 max-w-xl text-secondary">Aquí podrás revisar tus entrenamientos, editar registros y comparar tus marcas por ejercicio.</p>
+    <Link to={templates.some(template => template.exercises.length) ? '/' : '/rutina/editar'} className="btn-primary mt-5 w-full sm:w-auto">
+      {templates.some(template => template.exercises.length) ? 'Ir a mi entrenamiento' : 'Crear rutina'}
+    </Link>
+    <Link to="/cuenta/datos" className="btn-secondary mt-3 w-full sm:ml-3 sm:w-auto">Importar entrenamientos</Link>
+  </section>
+
   return (
     <div className="mx-auto max-w-5xl space-y-4 md:space-y-5">
       {successMessage && (
@@ -247,7 +260,7 @@ export function HistoryPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="eyebrow">Actividad</p>
-            <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-ink">Historial</h1>
+            <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-ink">Progreso</h1>
             <p className="mt-1 text-sm font-bold text-secondary">
               {historySummary.sessionCount} sesiones · {historySummary.activeWeeks} semanas · {formatCompactNumber(historySummary.totalVolume)} kg
             </p>
@@ -270,12 +283,13 @@ export function HistoryPage() {
       <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1 sm:max-w-sm">
         {([
           ['sessions', 'Sesiones'],
-          ['progress', 'Progreso']
+          ['progress', 'Por ejercicio']
         ] as const).map(([value, label]) => (
           <button
             key={value}
             type="button"
             onClick={() => setHistoryTab(value)}
+            aria-pressed={historyTab === value}
             className={`min-h-10 rounded-lg text-sm font-extrabold transition ${
               historyTab === value ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-muted'
             }`}
@@ -662,7 +676,7 @@ function SessionCard({
             {expanded ? 'Ocultar' : 'Ver'}
           </button>
           <Link
-            to={`/historial/sesion/${session.id}/editar`}
+            to={`/progreso/sesion/${session.id}/editar`}
             className="hidden min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-secondary hover:bg-muted hover:text-ink sm:inline-flex"
           >
             <Edit3 className="size-4" aria-hidden="true" />
@@ -688,7 +702,7 @@ function SessionCard({
             </button>
             {menuOpen && (
               <div className="absolute bottom-11 right-0 z-10 min-w-36 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-card">
-                <Link to={`/historial/sesion/${session.id}/editar`} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold text-ink hover:bg-muted">
+                <Link to={`/progreso/sesion/${session.id}/editar`} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold text-ink hover:bg-muted">
                   <Edit3 className="size-4" aria-hidden="true" /> Editar
                 </Link>
                 <button type="button" onClick={() => { setMenuOpen(false); onDelete() }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-bold text-danger-text hover:bg-danger-soft">
