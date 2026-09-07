@@ -803,7 +803,7 @@ function ExerciseProgressSelector({
             <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
               <input
-                autoFocus
+                autoFocus={window.matchMedia('(min-width: 640px)').matches}
                 className="input min-h-12 !text-left !font-semibold pl-9"
                 value={search}
                 placeholder="Buscar ejercicio..."
