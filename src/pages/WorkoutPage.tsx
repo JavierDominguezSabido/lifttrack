@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
+import { moveViewFocus } from '../components/ui/moveViewFocus'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
@@ -1248,6 +1249,7 @@ function WorkoutPageContent() {
         aria-live="polite"
         aria-atomic="true"
       >
+        {viewMode === 'guided' && currentGuidedStep && <span className="sr-only">{currentGuidedStep.exercise?.name ?? 'Ejercicio'}, serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length}, {currentGuidedStep.set.completed ? 'completada' : 'pendiente'}.</span>}
         {guidedFeedback && (
           <div
             role="status"
@@ -1261,10 +1263,11 @@ function WorkoutPageContent() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
+      <div role="group" aria-label="Vista de entrenamiento" onKeyDown={moveViewFocus} className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1">
         <button
           type="button"
           onClick={enterFullMode}
+          aria-pressed={viewMode === 'full'}
           className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
             viewMode === 'full'
               ? 'bg-brand-solid text-on-brand shadow-sm'
@@ -1276,6 +1279,7 @@ function WorkoutPageContent() {
         <button
           type="button"
           onClick={enterGuidedMode}
+          aria-pressed={viewMode === 'guided'}
           className={`min-h-10 rounded-lg px-3 text-sm font-extrabold transition ${
             viewMode === 'guided'
               ? 'bg-brand-solid text-on-brand shadow-sm'
@@ -1300,6 +1304,7 @@ function WorkoutPageContent() {
           aria-valuemin={0}
           aria-valuemax={progress.total}
           aria-valuenow={progress.completed}
+          aria-valuetext={`${progress.completed} de ${progress.total} series completadas`}
         >
           <div
             className="h-full rounded-full bg-brand transition-all duration-300"
@@ -1418,6 +1423,7 @@ function WorkoutPageContent() {
                         return (
                           <span
                             key={set.id}
+                            role="img"
                             aria-current={isCurrent ? 'step' : undefined}
                             aria-label={
                               set.completed
@@ -1455,6 +1461,8 @@ function WorkoutPageContent() {
                       <span className="relative block">
                         <input
                           id={`guided-weight-${currentGuidedStep.log.id}`}
+                          aria-label="Peso, en kilogramos"
+                          aria-describedby={saveError ? 'guided-save-error' : undefined}
                           className="min-h-20 w-full rounded-xl border border-line bg-canvas py-2 pl-3 pr-9 text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                           type="number"
                           inputMode="decimal"
@@ -1476,6 +1484,7 @@ function WorkoutPageContent() {
                       className="min-h-20 w-full rounded-xl border border-line bg-canvas px-3 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                       type="text"
                       inputMode="numeric"
+                      aria-describedby={saveError ? 'guided-save-error' : undefined}
                       pattern="[0-9]*"
                       value={currentGuidedStep.set.reps}
                       placeholder={currentGuidedStep.templateExercise.targetReps}
@@ -1498,7 +1507,7 @@ function WorkoutPageContent() {
                 )}
 
               {saveError && (
-                <p role="alert" className="status-error">
+                <p id="guided-save-error" role="alert" className="status-error">
                   <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{saveError}</span>
                 </p>

@@ -1,4 +1,6 @@
 import { confirmAction } from '../components/ui/confirmAction'
+import { useModalFocus } from '../components/ui/useModalFocus'
+import { moveViewFocus } from '../components/ui/moveViewFocus'
 import {
   AlertCircle,
   BarChart3,
@@ -16,7 +18,7 @@ import {
   Trophy,
   X
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, ExerciseLog, SetLog, WorkoutSession, WorkoutTemplate } from '../types'
@@ -283,7 +285,7 @@ export function HistoryPage() {
         )}
       </header>
 
-      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1 sm:max-w-sm">
+      <div role="group" aria-label="Vista de progreso" onKeyDown={moveViewFocus} className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-raised p-1 sm:max-w-sm">
         {([
           ['sessions', 'Sesiones'],
           ['progress', 'Por ejercicio']
@@ -293,7 +295,7 @@ export function HistoryPage() {
             type="button"
             onClick={() => setHistoryTab(value)}
             aria-pressed={historyTab === value}
-            className={`min-h-10 rounded-lg text-sm font-extrabold transition ${
+            className={`min-h-11 rounded-lg text-sm font-extrabold transition ${
               historyTab === value ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-muted'
             }`}
           >
@@ -614,6 +616,7 @@ function SessionCard({
   templates: WorkoutTemplate[]
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuTrigger = useRef<HTMLButtonElement>(null)
   const completedSets = session.exerciseLogs.reduce(
     (sum, log) => sum + log.sets.filter((set) => set.completed).length,
     0
@@ -683,8 +686,11 @@ function SessionCard({
           >
             <Trash2 className="size-4" aria-hidden="true" />
           </button>
-          <div className="relative ml-auto sm:hidden">
+          <div className="relative ml-auto sm:hidden" onKeyDown={event => {
+            if (event.key === 'Escape' && menuOpen) { event.preventDefault(); setMenuOpen(false); menuTrigger.current?.focus() }
+          }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setMenuOpen(false) }}>
             <button
+              ref={menuTrigger}
               type="button"
               onClick={() => setMenuOpen((current) => !current)}
               className="grid size-9 place-items-center rounded-lg border border-line text-secondary"
@@ -695,10 +701,10 @@ function SessionCard({
             </button>
             {menuOpen && (
               <div className="absolute bottom-11 right-0 z-10 min-w-36 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-card">
-                <Link to={`/progreso/sesion/${session.id}/editar`} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold text-ink hover:bg-muted">
+                <Link to={`/progreso/sesion/${session.id}/editar`} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-bold text-ink hover:bg-muted">
                   <Edit3 className="size-4" aria-hidden="true" /> Editar
                 </Link>
-                <button type="button" onClick={() => { setMenuOpen(false); onDelete() }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-bold text-danger-text hover:bg-danger-soft">
+                <button type="button" onClick={() => { menuTrigger.current?.focus(); setMenuOpen(false); onDelete() }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-bold text-danger-text hover:bg-danger-soft">
                   <Trash2 className="size-4" aria-hidden="true" /> Eliminar
                 </button>
               </div>
@@ -782,8 +788,10 @@ function ExerciseProgressSelector({
   onSelect: (summary: ExerciseProgressSummary) => void
   onClose: () => void
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus(dialogRef, onClose, window.matchMedia('(min-width: 640px)').matches ? 'input' : 'button')
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Seleccionar ejercicio">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-end bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Seleccionar ejercicio">
       <div className="max-h-[86vh] w-full overflow-hidden rounded-3xl border border-line bg-surface shadow-card sm:max-w-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-line bg-muted/40 p-4 sm:p-5">
           <div>
@@ -803,7 +811,6 @@ function ExerciseProgressSelector({
             <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
               <input
-                autoFocus={window.matchMedia('(min-width: 640px)').matches}
                 className="input min-h-12 !text-left !font-semibold pl-9"
                 value={search}
                 placeholder="Buscar ejercicio..."
@@ -811,6 +818,7 @@ function ExerciseProgressSelector({
               />
             </span>
           </label>
+          <p className="sr-only" role="status">{summaries.length} ejercicios encontrados</p>
 
           <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
             {summaries.map((summary) => {
@@ -889,7 +897,7 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
           Peso mantenido en {minWeight} kg durante {entries.length} sesiones.
         </p>
       )}
-      <div className="relative mt-2 h-56 overflow-visible sm:h-64" role="img" aria-label="Evolucion del peso de trabajo por fecha">
+      <div className="relative mt-2 h-56 overflow-visible sm:h-64" role="img" aria-label={`Evolución del peso de trabajo: ${entries.map(entry => `${formatDate(getSessionDateObject(entry.session), { day: 'numeric', month: 'long', year: 'numeric' })}: ${getProgressEntryWeight(entry)} kg`).join('; ')}`}>
         <div className="absolute inset-x-1 top-12 bottom-10 sm:inset-x-2">
           <span className="absolute inset-x-0 top-1/4 border-t border-dashed border-line" aria-hidden="true" />
           <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-line" aria-hidden="true" />

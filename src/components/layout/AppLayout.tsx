@@ -89,6 +89,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-dvh bg-canvas transition-colors lg:grid lg:grid-cols-[232px_1fr]">
+      <a href="#main-content" className="skip-link">Saltar al contenido</a>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-line/40 bg-canvas px-4 py-8 backdrop-blur-xl lg:flex">
         <div className="mb-12 flex items-center gap-3 px-2">
           <span className="grid size-10 place-items-center rounded-xl bg-hero text-hero-accent">
@@ -105,6 +106,7 @@ export function AppLayout() {
             <NavLink
               key={path}
               to={path}
+              aria-current={(path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial')) ? 'page' : undefined}
               end={path === '/'}
               className={({ isActive }) =>
                 `flex min-h-14 items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
@@ -112,7 +114,7 @@ export function AppLayout() {
                 }`
               }
             >
-              <Icon className="size-5" />
+              <Icon className="size-5" aria-hidden="true" />
               {label}
             </NavLink>
           ))}
@@ -141,7 +143,7 @@ export function AppLayout() {
           <span className="lifttrack-mark" aria-hidden="true">LT<span>/</span></span>
         </header>
 
-        <main className="app-main mx-auto w-full max-w-[1600px] px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
+        <main id="main-content" tabIndex={-1} className="app-main mx-auto w-full max-w-[1600px] px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
           {(latestConflict || visibleError) && (
             <section aria-label="Operaciones pendientes de sincronización" className="card mb-4 space-y-2 p-3">
               {!latestConflict && <p role="alert" className="status-error">{visibleError}</p>}
@@ -172,6 +174,7 @@ export function AppLayout() {
           <NavLink
             key={path}
             to={path}
+            aria-current={(path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial')) ? 'page' : undefined}
             end={path === '/'}
             className={({ isActive }) =>
               `relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
@@ -184,7 +187,7 @@ export function AppLayout() {
                 {isActive && (
                   <span className="absolute top-1 h-0.5 w-5 rounded-full bg-brand" aria-hidden="true" />
                 )}
-            <Icon className="size-[18px]" strokeWidth={2.3} />
+            <Icon className="size-[18px]" strokeWidth={2.3} aria-hidden="true" />
             {label}
               </>
             )}

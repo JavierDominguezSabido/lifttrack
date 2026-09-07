@@ -128,7 +128,7 @@ export function AccountSettings() {
 
       <div className="space-y-3 border-t border-line/70 p-4 md:p-5">
         {message && <p role="status" className="status-success">{message}</p>}
-        {error && <p role="alert" className="status-error">{error}</p>}
+        {error && <p id="account-error" role="alert" className="status-error">{error}</p>}
 
         {!configured ? (
           <p className="rounded-xl border border-warning/30 bg-warning-soft/80 p-3 text-sm font-semibold text-warning-text">
@@ -197,6 +197,8 @@ export function AccountSettings() {
                 Email
                 <input
                   type="email"
+                  aria-required="true"
+                  aria-describedby={error ? 'account-error' : undefined}
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -208,6 +210,8 @@ export function AccountSettings() {
                 Contraseña
                 <input
                   type="password"
+                  aria-required="true"
+                  aria-describedby={error ? 'account-error' : undefined}
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                   minLength={6}
                   value={password}

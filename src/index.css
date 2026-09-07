@@ -4,6 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
+.skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 200; padding: .75rem 1rem; background: rgb(var(--color-brand)); color: rgb(var(--color-on-brand)); transform: translateY(-200%); }
+.skip-link:focus { transform: translateY(0); }
+:where(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid rgb(var(--color-brand)) !important; outline-offset: 3px; }
+:where(button, a, input, select, textarea, [tabindex]) { scroll-margin-block: 5rem 6rem; }
+.workout-view > [role='group'] > button { position: relative; }
+.workout-view > [role='group'] > button::after { content: ''; position: absolute; inset: -2px 0; }
+@media (max-width: 639px) {
+  .session-entry button.size-9, .session-entry button.min-h-9, .session-entry button.\!min-h-9 { min-height: 44px; }
+  .session-entry button.size-9 { min-width: 44px; }
+}
+
 /* El modo guiado reserva solo la cabecera y la navegación; crece si no cabe. */
 .app-main:has(.workout-view[data-guided='true']) {
   --guided-header-height: 3.5rem;

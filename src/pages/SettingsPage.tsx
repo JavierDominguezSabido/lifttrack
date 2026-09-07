@@ -593,10 +593,10 @@ function RoutineExerciseEditor({
           <p className="font-extrabold text-ink">{exercise?.name ?? 'Ejercicio no disponible'}</p>
           <p className="text-xs text-secondary">{exercise?.muscleGroup || 'Sin grupo muscular'}</p>
         </div>
-        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-10 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label="Subir">
+        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-11 shrink-0 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label={`Subir ${exercise?.name ?? 'ejercicio'}`}>
           <ArrowUp className="size-4" />
         </button>
-        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-10 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label="Bajar">
+        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-11 shrink-0 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label={`Bajar ${exercise?.name ?? 'ejercicio'}`}>
           <ArrowDown className="size-4" />
         </button>
       </div>
@@ -610,6 +610,7 @@ function RoutineExerciseEditor({
             className="input mt-1 !text-left"
             inputMode="numeric"
             placeholder="8x4"
+            aria-label={`Objetivo de ${exercise?.name ?? 'ejercicio'}: repeticiones por series, por ejemplo 8x4`}
             onBlur={(event) => {
               const parsed = parseTarget(event.target.value)
               if (!parsed) {
@@ -630,6 +631,7 @@ function RoutineExerciseEditor({
             className="input mt-1 !text-left"
             inputMode="numeric"
             placeholder="1:30"
+            aria-label={`Descanso de ${exercise?.name ?? 'ejercicio'} en minutos y segundos, por ejemplo 1:30`}
             onBlur={(event) => {
               const parsed = parseRest(event.target.value)
               if (parsed === null) {
@@ -742,13 +744,13 @@ function ExerciseForm({
           <X className="size-5" />
         </button>
       </div>
-      {error && <p className="status-error">{error}</p>}
+      {error && <p id="exercise-form-error" role="alert" className="status-error">{error}</p>}
       {dirty && <p role="status" className={storageError ? 'status-error' : 'text-sm text-secondary'}>
         {storageError ? 'No se pudo conservar el borrador. Guarda los cambios antes de salir.' : 'Cambios sin guardar. El borrador se recuperará al volver a abrir este ejercicio en esta pestaña.'}
       </p>}
       <label className="block text-sm font-bold text-secondary">
         Nombre *
-        <input value={name} onChange={(event) => setName(event.target.value)} className="input mt-1 !text-left" placeholder="Press banca" />
+        <input aria-required="true" aria-invalid={!!error && !name.trim()} aria-describedby={error ? 'exercise-form-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} className="input mt-1 !text-left" placeholder="Press banca" />
       </label>
       <label className="block text-sm font-bold text-secondary">
         Grupo muscular

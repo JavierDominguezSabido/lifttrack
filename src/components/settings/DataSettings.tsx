@@ -351,6 +351,8 @@ export function DataSettings() {
           <input
             ref={jsonInput}
             type="file"
+            aria-label="Archivo JSON de entrenamientos para importar"
+            tabIndex={-1}
             accept=".json,application/json,text/json,text/plain,application/octet-stream"
             className="sr-only"
             onChange={(event) => void handleImportFile(event)}
