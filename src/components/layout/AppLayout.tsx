@@ -143,7 +143,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
+        <main className="app-main mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
           {(latestConflict || visibleError) && (
             <section aria-label="Operaciones pendientes de sincronización" className="card mb-4 space-y-2 p-3">
               {!latestConflict && <p role="alert" className="status-error">{visibleError}</p>}

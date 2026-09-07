@@ -4,6 +4,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* El modo guiado reserva solo la cabecera y la navegación; crece si no cabe. */
+.app-main:has(.workout-view[data-guided='true']) {
+  --guided-header-height: 3.5rem;
+  --guided-nav-height: calc(4rem + env(safe-area-inset-bottom));
+  padding-top: .75rem;
+  padding-bottom: calc(var(--guided-nav-height) + .75rem);
+}
+
+.workout-view[data-guided='true'] {
+  min-height: calc(100dvh - var(--guided-header-height) - var(--guided-nav-height) - 1.5rem);
+  padding-bottom: 0;
+}
+
+@media (min-width: 1024px) {
+  .app-main:has(.workout-view[data-guided='true']) {
+    --guided-header-height: 4rem;
+    --guided-nav-height: 0rem;
+  }
+}
+
 :root {
   --color-canvas: 242 244 247;
   --color-surface: 255 255 255;

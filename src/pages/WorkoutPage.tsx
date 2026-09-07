@@ -2,6 +2,7 @@ import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
+import { DiscardWorkoutDialog } from '../components/workout/DiscardWorkoutDialog'
 import { useAuth } from '../context/AuthContext'
 import { useWorkouts } from '../context/WorkoutContext'
 import {
@@ -352,6 +353,7 @@ function WorkoutPageContent() {
   const [pendingDraft, setPendingDraft] = useState<StoredWorkoutDraft | null>(() => initialStateRef.current!.pendingDraft)
   const [draftActive, setDraftActive] = useState(() => initialStateRef.current!.draftActive)
   const [viewMode, setViewMode] = useState<WorkoutViewMode>(() => initialStateRef.current!.viewMode)
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
   const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
   const [guidedFeedback, setGuidedFeedback] = useState<GuidedFeedback | null>(null)
   const [guidedStepAnimationKey, setGuidedStepAnimationKey] = useState(0)
@@ -1112,7 +1114,7 @@ function WorkoutPageContent() {
   }
 
   async function discardDraft() {
-    if (draftMutationBlocked.current || !window.confirm('¿Seguro que quieres descartar el entrenamiento en curso?')) return
+    if (draftMutationBlocked.current) return
     draftMutationBlocked.current = true
     syncGeneration.current += 1
     const generation = syncGeneration.current
@@ -1229,7 +1231,11 @@ function WorkoutPageContent() {
         <p className="mt-3 font-extrabold text-ink">Preparando pesos del entrenamiento…</p>
       </div>
     ) : (
-    <fieldset disabled={saving} className="min-w-0 space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
+    <fieldset disabled={saving} data-guided={viewMode === 'guided'} className="workout-view min-w-0 space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:space-y-5 lg:pb-0">
+      {discardDialogOpen && <DiscardWorkoutDialog
+        onCancel={() => setDiscardDialogOpen(false)}
+        onConfirm={() => { setDiscardDialogOpen(false); void discardDraft() }}
+      />}
       <div
         className="pointer-events-none fixed inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] z-40 flex justify-center lg:left-[calc(232px+1rem)] lg:top-20"
         aria-live="polite"
@@ -1386,12 +1392,15 @@ function WorkoutPageContent() {
                     <p className="text-sm font-bold text-secondary">
                       Serie {currentGuidedStep.setIndex + 1} de {currentGuidedStep.log.sets.length} · {currentGuidedStep.templateExercise.targetReps} reps · Descanso {formatRestSeconds(currentGuidedStep.templateExercise.restSeconds)}
                     </p>
-                    {currentGuidedStep.set.completed && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success-soft px-2 py-0.5 text-xs font-extrabold text-success-text">
+                    <div className="flex h-6 items-center justify-center">
+                      <span
+                        aria-hidden={!currentGuidedStep.set.completed}
+                        className={`inline-flex items-center gap-1 rounded-md border border-success/30 bg-success-soft px-2 py-0.5 text-xs font-extrabold text-success-text ${currentGuidedStep.set.completed ? 'visible' : 'invisible'}`}
+                      >
                         <CheckCircle2 className="size-3.5" aria-hidden="true" />
                         Completada
                       </span>
-                    )}
+                    </div>
                     <div
                       className="flex flex-wrap items-center justify-center gap-1.5"
                       aria-label={`Series de ${currentGuidedStep.exercise?.name ?? 'este ejercicio'}`}
@@ -1572,7 +1581,7 @@ function WorkoutPageContent() {
             </div>
             <button
               type="button"
-              onClick={discardDraft}
+              onClick={() => setDiscardDialogOpen(true)}
               className="inline-flex min-h-10 items-center justify-center rounded-lg border border-danger/30 bg-surface px-3 py-2 text-sm font-extrabold text-danger-text transition hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-danger/20 sm:w-auto"
             >
               Descartar borrador
