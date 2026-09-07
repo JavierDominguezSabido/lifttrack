@@ -237,7 +237,7 @@ export function HistoryPage() {
   </section>
 
   return (
-    <div className="progress-page mx-auto w-full space-y-5 md:space-y-6">
+    <div data-progress-view={historyTab} className="progress-page mx-auto w-full space-y-5 md:space-y-6">
       {successMessage && (
         <p role="status" className="status-success">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -325,8 +325,8 @@ export function HistoryPage() {
             </div>
 
             <div className="progress-detail min-w-0 gap-5">
-              <div className="rounded-xl bg-canvas/50 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="exercise-summary rounded-xl bg-canvas/50 p-4">
+                <div className="exercise-identity flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="eyebrow">{selectedExercise.muscleGroup ?? 'Ejercicio'}</p>
                     <h3 className="mt-1 text-xl font-extrabold text-ink">{selectedExercise.name}</h3>
@@ -348,7 +348,7 @@ export function HistoryPage() {
                   </span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="exercise-metrics mt-3 grid grid-cols-2 gap-3">
                   <HistoryStat icon={Trophy} label="Mejor peso" value={`${bestWeight} kg`} compact />
                   <HistoryStat
                     icon={CalendarDays}

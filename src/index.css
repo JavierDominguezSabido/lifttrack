@@ -310,6 +310,20 @@ nav[aria-label='Navegación principal'] a[aria-current='page'] svg { stroke-widt
 .workout-view[data-guided='false'] { padding-bottom: 0; }
 .progress-page > section[aria-labelledby='exercise-progress-title'] > .space-y-4 { padding-inline: 0; }
 .progress-page > header .display-title { font-size: clamp(2.7rem, 4.5vw, 4.5rem); }
+/* Solo Por ejercicio móvil: identidad, gráfica, métricas y registros. */
+@media (max-width: 639px) {
+  .progress-page[data-progress-view='progress'] > header { display: none; }
+  .progress-page[data-progress-view='progress'] > .grid { margin-top: 0; }
+  .progress-page[data-progress-view='progress'] .exercise-summary { display: contents; }
+  .progress-page[data-progress-view='progress'] .exercise-identity { order: 1; }
+  .progress-page[data-progress-view='progress'] .progress-detail > :nth-child(2) { order: 2; padding-block: .5rem; }
+  .progress-page[data-progress-view='progress'] .exercise-metrics { order: 3; }
+  .progress-page[data-progress-view='progress'] .progress-records { order: 4; }
+  .progress-page[data-progress-view='progress'] .exercise-identity > span { display: none; }
+  .progress-page[data-progress-view='progress'] .exercise-identity p:not(.eyebrow) { display: inline; font-size: .75rem; line-height: 1.6; }
+  .progress-page[data-progress-view='progress'] .exercise-identity p:last-child::before { content: ' · '; color: rgb(var(--color-secondary)); }
+  .progress-page[data-progress-view='progress'] .exercise-identity h3 { margin-bottom: .35rem; font-size: 1.25rem; line-height: 1.25; }
+}
 aside nav a.text-brand { background: transparent; box-shadow: inset 3px 0 rgb(var(--color-brand)); }
 @media (min-width: 1024px) {
   .app-main { padding-bottom: 3rem; }
