@@ -1,9 +1,9 @@
+import { confirmAction } from '../ui/confirmAction'
 import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, LayoutDashboard, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { getCompletedRoutineDaysForWeek } from '../../utils/workout'
-import { ThemeToggle } from '../ui/ThemeToggle'
 import { shouldShowInitialWorkoutLoader } from '../../utils/workoutLifecycle'
 
 const navigation = [
@@ -17,7 +17,7 @@ const pageTitles: Record<string, string> = {
   '/': 'Hoy',
   '/rutina': 'Rutina semanal',
   '/entrenamiento': 'Entrenamiento',
-  '/historial': 'Historial',
+  '/historial': 'Progreso',
   '/cuenta': 'Cuenta',
   '/progreso': 'Progreso'
 }
@@ -41,7 +41,7 @@ export function AppLayout() {
   const conflictLabel = latestConflict?.resource === 'routine' ? 'la rutina' : latestConflict?.resource.startsWith('draft:') ? 'el entrenamiento en curso' : 'la sesión'
   useEffect(() => { setSyncActionError(null); setResolving(false) }, [ownerId])
   async function resolve(keepLocal: boolean) {
-    if (!latestConflict || !window.confirm(keepLocal
+    if (!latestConflict || !await confirmAction(keepLocal
       ? `¿Aplicar tu versión local de ${conflictLabel}, incluido cualquier borrado pendiente, sobre la versión de la nube?`
       : `¿Descartar los cambios locales pendientes de ${conflictLabel} y conservar la nube?`)) return
     setResolving(true)
@@ -89,14 +89,14 @@ export function AppLayout() {
 
   return (
     <div className="min-h-dvh bg-canvas transition-colors lg:grid lg:grid-cols-[232px_1fr]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-line/70 bg-surface/80 px-3 py-5 backdrop-blur-xl lg:flex">
-        <div className="mb-8 flex items-center gap-3 px-2">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-line/40 bg-canvas px-4 py-8 backdrop-blur-xl lg:flex">
+        <div className="mb-12 flex items-center gap-3 px-2">
           <span className="grid size-10 place-items-center rounded-xl bg-hero text-hero-accent">
             <Activity className="size-5" strokeWidth={2.5} />
           </span>
           <div>
             <p className="text-base font-extrabold tracking-tight">LiftTrack</p>
-            <p className="text-xs font-medium text-subtle">Registro de entrenos</p>
+            <p className="text-xs font-medium text-subtle">Entrena con intención</p>
           </div>
         </div>
 
@@ -107,8 +107,8 @@ export function AppLayout() {
               to={path}
               end={path === '/'}
               className={({ isActive }) =>
-                `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition ${
-                  (isActive || (path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial'))) ? 'bg-brand-solid text-on-brand shadow-sm' : 'text-secondary hover:bg-muted hover:text-ink'
+                `flex min-h-14 items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
+                  (isActive || (path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial'))) ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-muted hover:text-ink'
                 }`
               }
             >
@@ -118,8 +118,8 @@ export function AppLayout() {
           ))}
         </nav>
 
-        {activeTemplateCount > 0 && <div className="mt-auto rounded-xl border border-line/70 bg-raised p-3">
-          <p className="text-xs font-bold uppercase tracking-wider text-brand">Semana activa</p>
+        {activeTemplateCount > 0 && <div className="mt-auto border-t border-line/50 px-2 pt-6">
+          <p className="text-xs font-bold uppercase tracking-wider text-brand">Tu ritmo semanal</p>
           <p className="mt-1 text-xl font-extrabold text-ink">
             {weeklySessionCount} / {activeTemplateCount}
           </p>
@@ -138,12 +138,10 @@ export function AppLayout() {
             <p className="hidden text-xs font-semibold capitalize text-subtle sm:block">{currentDate}</p>
             <h1 className="truncate text-lg font-extrabold tracking-tight lg:text-xl">{title}</h1>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <ThemeToggle />
-          </div>
+          <span className="lifttrack-mark" aria-hidden="true">LT<span>/</span></span>
         </header>
 
-        <main className="app-main mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
+        <main className="app-main mx-auto w-full max-w-[1600px] px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
           {(latestConflict || visibleError) && (
             <section aria-label="Operaciones pendientes de sincronización" className="card mb-4 space-y-2 p-3">
               {!latestConflict && <p role="alert" className="status-error">{visibleError}</p>}
@@ -169,7 +167,7 @@ export function AppLayout() {
         </main>
       </div>
 
-      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-4 border-t border-line bg-surface px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_24px_rgba(7,11,18,0.14)] backdrop-blur-sm lg:hidden">
+      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-4 border-t border-line bg-canvas/95 px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_24px_rgba(7,11,18,0.14)] backdrop-blur-sm lg:hidden">
         {navigation.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}

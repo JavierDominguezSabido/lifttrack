@@ -1003,7 +1003,14 @@ function WorkoutPageContent() {
 
   function goToPreviousGuidedStep() {
     if (currentGuidedIndex <= 0) return
+    const previousStep = guidedSteps[currentGuidedIndex - 1]
+    if (!previousStep) return
     reviewingCompletedGuidedStepRef.current = true
+    // Returning to a completed set makes it the active pending set again while
+    // preserving the recorded weight and repetitions for review/editing.
+    if (previousStep.set.completed) {
+      updateGuidedSet(previousStep.log.id, previousStep.set.id, { completed: false })
+    }
     goToGuidedStep(currentGuidedIndex - 1)
   }
 
@@ -1279,7 +1286,7 @@ function WorkoutPageContent() {
         </button>
       </div>
 
-      <section className="rounded-2xl border border-line/70 bg-surface/90 px-3.5 py-3">
+      <section className="workout-progress rounded-xl bg-surface px-4 py-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <h2 className="truncate text-lg font-extrabold text-ink">{template.name}</h2>
           <span className="shrink-0 text-sm font-extrabold text-secondary">
@@ -1330,7 +1337,7 @@ function WorkoutPageContent() {
       )}
 
       {viewMode === 'guided' ? (
-        <section className="card overflow-hidden">
+        <section className="guided-panel card overflow-hidden">
           {guidedIsComplete && !currentGuidedStep ? (
             <div className="space-y-5 p-5 sm:p-6">
               <div>
@@ -1376,12 +1383,12 @@ function WorkoutPageContent() {
               </div>
             </div>
           ) : currentGuidedStep ? (
-            <div className="mx-auto max-w-lg space-y-3 p-3.5 sm:p-4">
+            <div className="guided-stage p-4 sm:p-6">
               <div
                 key={guidedStepAnimationKey}
-                className="space-y-3 animate-[guidedStepIn_220ms_ease-out]"
+                className="guided-step animate-[guidedStepIn_220ms_ease-out]"
               >
-                <div className="text-center">
+                <div className="guided-heading text-center">
                   <p className="text-xs font-bold uppercase tracking-wider text-secondary">
                     {currentGuidedStep.exercise?.muscleGroup ?? 'Ejercicio'}
                   </p>
@@ -1441,14 +1448,14 @@ function WorkoutPageContent() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-muted/45 p-3.5">
+                <div className="guided-inputs grid grid-cols-2 items-end gap-3">
                   <div>
                     <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
                       <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
                       <span className="relative block">
                         <input
                           id={`guided-weight-${currentGuidedStep.log.id}`}
-                          className="min-h-11 w-full rounded-lg border border-control bg-surface py-2 pl-3 pr-10 text-xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                          className="min-h-20 w-full rounded-xl border border-line bg-canvas py-2 pl-3 pr-9 text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                           type="number"
                           inputMode="decimal"
                           min="0"
@@ -1463,10 +1470,10 @@ function WorkoutPageContent() {
                     </label>
                   </div>
 
-                  <label className="mt-4 block">
+                  <label className="block min-w-0">
                     <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Reps reales</span>
                     <input
-                      className="min-h-14 w-full rounded-xl border border-control bg-surface px-4 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                      className="min-h-20 w-full rounded-xl border border-line bg-canvas px-3 text-center text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -1497,7 +1504,7 @@ function WorkoutPageContent() {
                 </p>
               )}
 
-              <div className="grid gap-2">
+              <div className="guided-actions grid gap-2">
                 <button
                   type="button"
                   onClick={completeGuidedSet}
@@ -1508,13 +1515,13 @@ function WorkoutPageContent() {
                   }`}
                 >
                   <CheckCircle2 className={guidedFeedback ? 'size-6' : 'size-5'} aria-hidden="true" />
-                  {currentGuidedStep.set.completed ? 'Continuar' : 'Marcar hecha y continuar'}
+                  {currentGuidedStep.set.completed ? 'Continuar' : 'Completar serie'}
                 </button>
                 <button
                   type="button"
                   onClick={goToPreviousGuidedStep}
                   disabled={currentGuidedIndex === 0}
-                  className="btn-secondary w-full !min-h-11 !px-3 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="btn-secondary w-full !min-h-11 !bg-transparent !px-3 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Anterior
                 </button>

@@ -1,3 +1,4 @@
+import { confirmAction } from '../components/ui/confirmAction'
 import {
   AlertCircle,
   BarChart3,
@@ -204,7 +205,7 @@ export function HistoryPage() {
   async function removeSession(session: WorkoutSession) {
     const label = getSessionDeletionMessage(session, templates)
 
-    if (!window.confirm(label)) {
+    if (!await confirmAction(label)) {
       return
     }
 
@@ -227,7 +228,7 @@ export function HistoryPage() {
       : actionMessage
 
   if (realSessions.length === 0 && !sessionsError) return <section className="card p-6 md:p-8">
-    <h2 className="text-2xl font-extrabold">Tu progreso empieza con una sesión</h2>
+    <h2 className="display-title">Tu progreso empieza con una sesión</h2>
     <p className="mt-3 max-w-xl text-secondary">Aquí podrás revisar tus entrenamientos, editar registros y comparar tus marcas por ejercicio.</p>
     <Link to={templates.some(template => template.exercises.length) ? '/' : '/rutina/editar'} className="btn-primary mt-5 w-full sm:w-auto">
       {templates.some(template => template.exercises.length) ? 'Ir a mi entrenamiento' : 'Crear rutina'}
@@ -236,7 +237,7 @@ export function HistoryPage() {
   </section>
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 md:space-y-5">
+    <div className="progress-page mx-auto w-full space-y-5 md:space-y-6">
       {successMessage && (
         <p role="status" className="status-success">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -256,19 +257,21 @@ export function HistoryPage() {
         </p>
       )}
 
-      <header className="rounded-2xl border border-line/80 bg-surface/95 px-4 py-4 shadow-card sm:px-5">
+      <header className="border-b border-line/50 pb-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="eyebrow">Actividad</p>
-            <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-ink">Progreso</h1>
-            <p className="mt-1 text-sm font-bold text-secondary">
-              {historySummary.sessionCount} sesiones · {historySummary.activeWeeks} semanas · {formatCompactNumber(historySummary.totalVolume)} kg
-            </p>
+            <p className="eyebrow">Cada serie cuenta</p>
+            <h2 className="display-title">Más fuerte.</h2>
+            <dl className="activity-metrics">
+              <div><dd>{historySummary.sessionCount}</dd><dt>Sesiones</dt></div>
+              <div><dd>{historySummary.activeWeeks}</dd><dt>Semanas activas</dt></div>
+              <div><dd>{formatCompactNumber(historySummary.totalVolume)}<small> kg</small></dd><dt>Volumen total</dt></div>
+            </dl>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand">
+          {historySummary.streakWeeks > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand">
             <Flame className="size-4" aria-hidden="true" />
             {historySummary.streakWeeks} {historySummary.streakWeeks === 1 ? 'semana' : 'semanas'} de racha
-          </span>
+          </span>}
         </div>
         {historySummary.latestSession && (
           <p className="mt-3 border-t border-line/70 pt-3 text-xs font-semibold text-secondary sm:text-sm">
@@ -301,15 +304,7 @@ export function HistoryPage() {
 
       {historyTab === 'progress' && (
       <section aria-labelledby="exercise-progress-title" className="card overflow-hidden">
-        <div className="border-b border-line/70 px-4 py-3 md:px-5">
-          <p className="eyebrow">Progreso por ejercicio</p>
-          <h2 id="exercise-progress-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
-            Evolución
-          </h2>
-          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-secondary">
-            Busca un ejercicio y revisa cómo evoluciona su peso de trabajo sesión a sesión.
-          </p>
-        </div>
+        <h2 id="exercise-progress-title" className="sr-only">Evolución por ejercicio</h2>
 
         {selectedExercise && selectedSummary ? (
           <div className="space-y-4 p-3.5 sm:p-5">
@@ -329,8 +324,8 @@ export function HistoryPage() {
               </button>
             </div>
 
-            <div className="min-w-0 space-y-5">
-              <div className="rounded-xl bg-muted/45 p-3">
+            <div className="progress-detail min-w-0 gap-5">
+              <div className="rounded-xl bg-canvas/50 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="eyebrow">{selectedExercise.muscleGroup ?? 'Ejercicio'}</p>
@@ -353,7 +348,7 @@ export function HistoryPage() {
                   </span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   <HistoryStat icon={Trophy} label="Mejor peso" value={`${bestWeight} kg`} compact />
                   <HistoryStat
                     icon={CalendarDays}
@@ -384,7 +379,7 @@ export function HistoryPage() {
                 </div>
               )}
 
-              <div className="rounded-xl border border-line/70 bg-surface">
+              <div className="progress-records border-t border-line/50 bg-transparent">
                 <div className="border-b border-line/70 px-4 py-3">
                   <h4 className="font-extrabold text-ink">Registros recientes</h4>
                 </div>
@@ -630,19 +625,17 @@ function SessionCard({
   const routine = getSessionRoutineIdentity(session, templates, sessionDate.getDay())
 
   return (
-    <article className="card overflow-hidden">
+    <article className="session-entry overflow-hidden">
       <header className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand">
               <CalendarDays className="size-3.5" aria-hidden="true" />
               {routine.dayIsExplicit ? dayNames[routine.dayOfWeek] : 'Día de rutina sin confirmar'}
-              {routine.template?.name && <span>· {routine.template.name}</span>}
+              {routine.template?.name && routine.template.name.toLocaleLowerCase() !== dayNames[routine.dayOfWeek].toLocaleLowerCase() && <span>· {routine.template.name}</span>}
             </p>
             <h3 className="mt-0.5 break-words text-base font-extrabold leading-snug text-ink sm:text-lg">
-              <span className="font-semibold text-secondary">Fecha registrada: </span>
               {formatDate(sessionDate, {
-                weekday: 'long',
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric'
@@ -751,20 +744,14 @@ function SessionCard({
                       {weight} kg
                     </span>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {log.sets.map((set) => (
-                      <span
-                        key={set.id}
-                        className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${
-                          set.completed
-                            ? 'bg-success-soft text-success-text'
-                            : 'bg-surface text-secondary'
-                        }`}
-                      >
-                        S{set.setNumber}: {set.reps} reps · {set.weightKg} kg · {set.completed ? 'hecha' : 'pendiente'}
-                      </span>
-                    ))}
-                  </div>
+                  <table className="session-sets mt-3 w-full text-left text-xs">
+                    <caption className="sr-only">Series de {loggedExercise?.name ?? log.exerciseId}</caption>
+                    <thead><tr><th>Serie</th><th>Reps</th><th>kg</th><th>Estado</th></tr></thead>
+                    <tbody>{log.sets.map((set) => <tr key={set.id}>
+                      <td>{set.setNumber}</td><td>{set.reps}</td><td>{set.weightKg}</td>
+                      <td className={set.completed ? 'text-success-text' : 'text-secondary'}>{set.completed ? 'Hecha' : 'Pendiente'}</td>
+                    </tr>)}</tbody>
+                  </table>
                 </div>
               )
             })}
@@ -796,7 +783,7 @@ function ExerciseProgressSelector({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-ink/40 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Seleccionar ejercicio">
+    <div className="fixed inset-0 z-50 flex items-end bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Seleccionar ejercicio">
       <div className="max-h-[86vh] w-full overflow-hidden rounded-3xl border border-line bg-surface shadow-card sm:max-w-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-line bg-muted/40 p-4 sm:p-5">
           <div>
@@ -888,7 +875,7 @@ function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   ).join(' ')
 
   return (
-    <div className="rounded-xl border border-line/70 bg-surface px-3.5 py-4 sm:px-5">
+    <div className="px-1 py-4 sm:px-3">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h4 className="font-extrabold text-ink">Peso de trabajo</h4>
@@ -975,7 +962,7 @@ function HistoryStat({
   compact?: boolean
 }) {
   return (
-    <div className={`card flex ${compact ? 'min-h-18' : 'min-h-20'} items-center gap-3 p-3 sm:p-3.5 ${wide ? 'col-span-2 md:col-span-1' : ''}`}>
+    <div className={`flex border-b border-line/40 ${compact ? 'min-h-18' : 'min-h-20'} items-center gap-3 p-3 sm:p-3.5 ${wide ? 'col-span-2 md:col-span-1' : ''}`}>
       <span className={`${compact ? 'size-8' : 'size-9'} grid shrink-0 place-items-center rounded-lg bg-muted text-brand`}>
         <Icon className={compact ? 'size-4' : 'size-5'} aria-hidden="true" />
       </span>

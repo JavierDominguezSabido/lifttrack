@@ -1,3 +1,4 @@
+import { confirmAction } from '../components/ui/confirmAction'
 import {
   Archive,
   ArrowDown,
@@ -82,9 +83,9 @@ function SettingsPageContent() {
   const [exerciseFormDirty, setExerciseFormDirty] = useState(false)
   const exerciseDraftKey = `lifttrack.exerciseForm.${ownerId}.${editingExercise?.id ?? 'new'}`
 
-  function discardExerciseForm() {
+  async function discardExerciseForm() {
     if (!showExerciseForm) return true
-    if (exerciseFormDirty && !window.confirm('Hay cambios sin guardar en el ejercicio. ¿Descartarlos?')) return false
+    if (exerciseFormDirty && !await confirmAction('Hay cambios sin guardar en el ejercicio. ¿Descartarlos?')) return false
     try { window.sessionStorage.removeItem(exerciseDraftKey) } catch { /* El formulario sigue disponible en memoria. */ }
     setExerciseFormDirty(false)
     return true
@@ -209,15 +210,15 @@ function SettingsPageContent() {
     }
   }
 
-  function openOverview() {
-    if (!discardExerciseForm()) return
+  async function openOverview() {
+    if (!await discardExerciseForm()) return
     setSettingsView('overview')
   }
 
-  function handleArchive(exerciseId: string) {
+  async function handleArchive(exerciseId: string) {
     setError(null)
     const exercise = exercises.find((item) => item.id === exerciseId)
-    if (!window.confirm(
+    if (!await confirmAction(
       `Vas a archivar ${exercise?.name ?? 'este ejercicio'}. Se conservará su historial, pero dejará de aparecer como ejercicio activo. ¿Continuar?`
     )) return
 
@@ -230,7 +231,7 @@ function SettingsPageContent() {
 
   if (settingsView === 'routine') {
     return (
-      <div className="space-y-4 md:space-y-5">
+      <div className="routine-editor space-y-4 md:space-y-5">
         <SettingsSubpageHeader
           eyebrow="Rutina"
           title="Editar rutina"
@@ -293,7 +294,7 @@ function SettingsPageContent() {
                     type="button"
                     className="btn-secondary"
                     disabled={!daySelections[template.id]}
-                    onClick={() => {
+                    onClick={async () => {
                       addToDay(template.id, daySelections[template.id])
                       setDaySelections((current) => ({ ...current, [template.id]: '' }))
                     }}
@@ -316,8 +317,8 @@ function SettingsPageContent() {
         </section>
 
         <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 grid gap-2 rounded-xl border border-line/70 bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4 lg:left-[264px] lg:right-8">
-          <button type="button" disabled={!routineDirty} onClick={() => {
-            if (!window.confirm('¿Descartar los cambios sin guardar de la rutina?')) return
+          <button type="button" disabled={!routineDirty} onClick={async () => {
+            if (!await confirmAction('¿Descartar los cambios sin guardar de la rutina?')) return
             try { sessionStorage.removeItem(routineDraftKey) } catch { /* Continúa en memoria. */ }
             setRoutineDirty(false)
           }} className="btn-secondary w-full">
@@ -333,7 +334,7 @@ function SettingsPageContent() {
 
   if (settingsView === 'library') {
     return (
-      <div className="space-y-5 md:space-y-6">
+      <div className="exercise-library space-y-5 md:space-y-6">
         <SettingsSubpageHeader
           eyebrow="Biblioteca"
           title="Gestionar ejercicios"
@@ -362,9 +363,9 @@ function SettingsPageContent() {
             </label>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (showExerciseForm && !editingExercise) return
-                if (!discardExerciseForm()) return
+                if (!await discardExerciseForm()) return
                 setEditingExercise(null)
                 setShowExerciseForm(true)
               }}
@@ -402,7 +403,7 @@ function SettingsPageContent() {
             draftKey={exerciseDraftKey}
             onDirtyChange={setExerciseFormDirty}
             exercise={editingExercise}
-            onCancel={() => { if (discardExerciseForm()) setShowExerciseForm(false) }}
+            onCancel={async () => { if (await discardExerciseForm()) setShowExerciseForm(false) }}
             onSave={(values) => {
               if (editingExercise) updateExercise({ ...editingExercise, ...values })
               else createExercise({ ...values, active: true })
@@ -435,9 +436,9 @@ function SettingsPageContent() {
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (showExerciseForm && editingExercise?.id === exercise.id) return
-                    if (!discardExerciseForm()) return
+                    if (!await discardExerciseForm()) return
                     setEditingExercise(exercise)
                     setShowExerciseForm(true)
                   }}
@@ -456,7 +457,7 @@ function SettingsPageContent() {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       updateExercise({ ...exercise, active: true })
                       setMessage('Ejercicio activado.')
                     }}
@@ -479,7 +480,8 @@ function SettingsPageContent() {
   }
 
   return (
-      <div className="space-y-4 md:space-y-5">
+      <div className="account-page space-y-4 md:space-y-5">
+      <header className="account-intro hidden lg:block"><p className="eyebrow">Tu espacio</p><h2>Cuenta y datos</h2><p>Gestiona tu sesión y tus entrenamientos.</p></header>
       <SettingsAccordionHeader
         id="account"
         title="Cuenta y sincronización"
@@ -487,7 +489,7 @@ function SettingsPageContent() {
         open={openSettingsSection === 'account'}
         onOpen={setOpenSettingsSection}
       />
-      {openSettingsSection === 'account' && <AccountSettings />}
+      {openSettingsSection === 'account' && <section className="account-content"><AccountSettings /></section>}
 
       {message && <p role="status" className="status-success">{message}</p>}
       {error && <p role="alert" className="status-error">{error}</p>}
@@ -499,7 +501,7 @@ function SettingsPageContent() {
         open={openSettingsSection === 'data'}
         onOpen={setOpenSettingsSection}
       />
-      <div hidden={openSettingsSection !== 'data'}>
+      <div className="account-content" hidden={openSettingsSection !== 'data'}>
         <DataSettings />
       </div>
     </div>
@@ -699,11 +701,13 @@ function ExerciseForm({
   useEffect(() => {
     if (!dirty) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
-    const guardNavigation = (event: MouseEvent) => {
-      if (storageError && event.target instanceof Element && event.target.closest('a[href]') &&
-        !window.confirm('No se pudo conservar el borrador. ¿Salir y perder los cambios del ejercicio?')) {
-        event.preventDefault()
-        event.stopPropagation()
+    const guardNavigation = async (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null
+      if (!storageError || !link) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (await confirmAction('No se pudo conservar el borrador. ¿Salir y perder los cambios del ejercicio?')) {
+        window.location.assign(link.href)
       }
     }
     window.addEventListener('beforeunload', warn)

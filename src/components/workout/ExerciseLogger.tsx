@@ -80,8 +80,8 @@ export function ExerciseLogger({
   }
 
   return (
-    <article className={`card overflow-hidden transition ${isCompleted ? '!border-success/45' : ''}`}>
-      <header className="border-b border-line/70 px-3.5 py-3 sm:px-4">
+    <article className={`exercise-logger card overflow-hidden transition ${isCompleted ? '!border-success/45' : ''}`}>
+      <header className="px-4 pb-2 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -134,9 +134,9 @@ export function ExerciseLogger({
         )}
       </header>
 
-      <div className="space-y-3 p-3.5 sm:p-4">
-        <section aria-labelledby={`weight-label-${log.id}`} className="rounded-xl bg-muted/55 p-3">
-          <p className="mb-2 text-xs text-secondary">Cambiar el peso de trabajo aplica el nuevo peso a todas las series.</p>
+      <div className="space-y-3 px-4 pb-4">
+        <section aria-labelledby={`weight-label-${log.id}`} className="rounded-xl bg-canvas/50 p-3">
+          <p className="mb-2 text-xs text-secondary">Peso de trabajo para todas las series.</p>
           <div className={showWeightIncrement ? 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2' : 'block'}>
             <label className="min-w-0">
               <span
@@ -187,7 +187,7 @@ export function ExerciseLogger({
               <button
                 type="button"
                 onClick={() => onChange(setAllSetsCompleted(log, true))}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-success/30 bg-success-soft/80 px-2.5 text-xs font-extrabold leading-tight text-success-text transition hover:brightness-95 active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-success/30 bg-success-soft/80 px-2.5 text-xs font-extrabold leading-tight text-success-text transition hover:brightness-95 active:scale-[0.98]"
               >
                 <CheckCheck className="size-4 shrink-0" aria-hidden="true" />
                 Marcar todas
@@ -195,7 +195,7 @@ export function ExerciseLogger({
               <button
                 type="button"
                 onClick={() => onChange(setAllSetsCompleted(log, false))}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-xs font-bold leading-tight text-secondary transition hover:bg-muted active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-xs font-bold leading-tight text-secondary transition hover:bg-muted active:scale-[0.98]"
               >
                 <RotateCcw className="size-4 shrink-0" aria-hidden="true" />
                 Desmarcar
@@ -203,11 +203,12 @@ export function ExerciseLogger({
             </div>
           </div>
 
+          <div aria-hidden="true" className="mb-2 grid grid-cols-[24px_52px_minmax(0,1fr)_76px] gap-2 px-2 text-center text-[10px] font-semibold uppercase tracking-wider text-subtle sm:grid-cols-[28px_64px_minmax(0,1fr)_92px] sm:px-2.5"><span>Serie</span><span>kg</span><span>Reps</span><span>Estado</span></div>
           <div className="space-y-1.5">
             {log.sets.map((set) => (
               <div
                 key={set.id}
-                className={`grid grid-cols-[28px_minmax(0,1fr)_92px] items-center gap-2 rounded-xl border px-2 py-1.5 transition sm:grid-cols-[32px_minmax(0,1fr)_100px] sm:px-2.5 ${
+                className={`grid grid-cols-[24px_52px_minmax(0,1fr)_76px] items-center gap-2 rounded-xl border px-2 py-1.5 transition sm:grid-cols-[28px_64px_minmax(0,1fr)_92px] sm:px-2.5 ${
                   set.completed
                     ? 'border-success/25 bg-success-soft/55'
                     : 'border-line/70 bg-raised'
@@ -216,14 +217,14 @@ export function ExerciseLogger({
                 <span className="text-center text-base font-extrabold text-ink">
                   {set.setNumber}
                 </span>
+                <p className="text-center text-sm font-semibold tabular-nums text-secondary">{set.weightOverrideKg ?? set.weightKg}</p>
                 <div className="relative">
-                  <p className="text-xs text-secondary">{set.weightOverrideKg ?? set.weightKg} kg</p>
                   <label className="sr-only" htmlFor={`reps-${set.id}`}>
                     Repeticiones de la serie {set.setNumber} de {exercise.name}
                   </label>
                   <input
                     id={`reps-${set.id}`}
-                    className="min-h-10 w-full rounded-lg border border-control bg-surface py-2 pl-3 pr-14 text-base font-bold text-ink outline-none transition placeholder:text-subtle focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                    className="min-h-11 w-full rounded-lg border border-control bg-surface px-2 py-2 text-center text-base font-bold text-ink outline-none transition placeholder:text-subtle focus:border-brand focus:ring-4 focus:ring-brand-soft"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -233,16 +234,13 @@ export function ExerciseLogger({
                       reps: normalizeRepsInput(event.target.value)
                     })}
                   />
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-secondary">
-                    reps
-                  </span>
                 </div>
                 <button
                   type="button"
                   aria-label={`${set.completed ? 'Marcar como pendiente' : 'Marcar como hecha'} la serie ${set.setNumber}`}
                   aria-pressed={set.completed}
                   onClick={() => updateSet(set.id, { completed: !set.completed })}
-                  className={`inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-1.5 text-xs font-extrabold transition active:scale-95 sm:gap-1.5 sm:px-2 ${
+                  className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1.5 text-xs font-extrabold transition active:scale-95 sm:gap-1.5 sm:px-2 ${
                     set.completed
                       ? 'border-success-solid bg-success-solid text-on-brand shadow-sm'
                       : 'border-control bg-raised text-secondary hover:border-success hover:text-success'
@@ -256,7 +254,7 @@ export function ExerciseLogger({
           </div>
 
           <div className="mt-3 grid grid-cols-[1fr_44px] gap-2">
-            <button type="button" onClick={addSet} className="btn-secondary !min-h-10">
+            <button type="button" onClick={addSet} className="btn-secondary !min-h-11">
               <Plus className="size-4" aria-hidden="true" />
               Añadir serie
             </button>
@@ -264,7 +262,7 @@ export function ExerciseLogger({
               type="button"
               onClick={removeSet}
               disabled={log.sets.length <= 1}
-              className="btn-secondary !min-h-10 !px-0 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-secondary !min-h-11 !px-0 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Quitar última serie"
             >
               <Minus className="size-5" aria-hidden="true" />

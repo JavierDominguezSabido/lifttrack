@@ -1,3 +1,4 @@
+import { confirmAction } from '../ui/confirmAction'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -238,12 +239,12 @@ export function DataSettings() {
     let templatesToImport = preview.templates
     const hasExistingRoutine = templates.some((template) => template.exercises.length > 0)
     if (hasRoutine && hasExistingRoutine) {
-      if (window.confirm('Ya tienes una rutina con ejercicios. Aceptar: reemplazar la rutina actual. Cancelar: elegir entre fusionar o no importar.')) {
+      if (await confirmAction('Ya tienes una rutina. Puedes reemplazarla por la del archivo o ver la opción de fusionarlas.', { title: 'Importar rutina', confirmLabel: 'Reemplazar rutina', cancelLabel: 'Otras opciones' })) {
         templatesToImport = normalizeWeeklyTemplates(preview.templates ?? []).templates
-      } else if (window.confirm('¿Quieres fusionar por día sin duplicar plantillas ni ejercicios? Cancelar detendrá la importación.')) {
+      } else if (await confirmAction('Se combinarán los días sin duplicar plantillas ni ejercicios.', { title: 'Fusionar rutinas', confirmLabel: 'Fusionar', cancelLabel: 'No importar' })) {
         templatesToImport = mergeWeeklyTemplates(templates, preview.templates ?? []).templates
       } else return
-    } else if (!window.confirm(
+    } else if (!await confirmAction(
       `Se va a importar una copia JSON con ${preview.sessionsToImport.length} sesiones nuevas${hasRoutine ? ' y rutina personalizada' : ''}. No se sobrescribirán sesiones existentes. ¿Continuar?`
     )) return
 
@@ -279,7 +280,7 @@ export function DataSettings() {
       0
     )
 
-    if (!window.confirm(
+    if (!await confirmAction(
       `Se van a fusionar ${duplicateCount} ejercicios duplicados y actualizar ${logCount} registros. No se borrarán sesiones ni series. ¿Continuar?`
     )) return
 

@@ -1,3 +1,4 @@
+import { confirmAction } from '../ui/confirmAction'
 import { syncStatusLabels } from '../../utils/syncStatus'
 import { Cloud, CloudUpload, HardDrive, LogIn, LogOut, UserPlus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -61,7 +62,7 @@ export function AccountSettings() {
         return false
       }
     })()
-    if (hasWorkoutDraft && !window.confirm('Hay un entrenamiento en curso guardado como borrador en este dispositivo. Si cierras sesión, seguirá guardado localmente. ¿Continuar?')) {
+    if (hasWorkoutDraft && !await confirmAction('Hay un entrenamiento en curso guardado como borrador en este dispositivo. Si cierras sesión, seguirá guardado localmente. ¿Continuar?')) {
       return
     }
 

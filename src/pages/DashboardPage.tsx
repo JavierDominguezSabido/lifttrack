@@ -1,46 +1,64 @@
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Check, Circle, Minus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
 import { readWorkoutDrafts } from './WorkoutPage'
 import { toLocalDateKey } from '../utils/date'
-import { getCompletedRoutineDaysForWeek, getNextPendingTemplate, isInitialSession } from '../utils/workout'
+import { getCompletedRoutineDaysForWeek, getNextPendingTemplate, isInitialSession, dayNames, getSessionDate, formatDate } from '../utils/workout'
 import { hasCompletedSessionForDraft } from '../utils/workoutLifecycle'
 
 export function DashboardPage() {
-  const { sessions, templates, ownerId } = useWorkouts()
+  const { sessions, templates, ownerId, getExerciseById } = useWorkouts()
   const today = new Date()
   const activeTemplates = templates.filter(template => template.exercises.length > 0)
   const completed = getCompletedRoutineDaysForWeek(sessions, templates, today)
   const next = getNextPendingTemplate(activeTemplates, completed, today)
   const draft = readWorkoutDrafts(ownerId === 'local' ? 'local' : 'user:' + ownerId, toLocalDateKey(today))
     .find(item => !hasCompletedSessionForDraft(sessions, item))
-  const hasHistory = sessions.some(session => !isInitialSession(session.id))
+  const recent = sessions.filter(session => !isInitialSession(session.id)).sort((a, b) => getSessionDate(b).localeCompare(getSessionDate(a))).slice(0, 3)
   const title = draft ? 'Tu entrenamiento sigue aquí' : !activeTemplates.length ? 'Prepara tu primera rutina' : next ? next.name : 'Semana completada'
   const action = draft ? 'Continuar entrenamiento' : !activeTemplates.length ? 'Crear rutina' : next ? 'Empezar entrenamiento' : 'Revisar progreso'
   const target = draft ? '/entrenamiento/' + encodeURIComponent(draft.templateId) : !activeTemplates.length ? '/rutina/editar' : next ? '/entrenamiento/' + encodeURIComponent(next.id) : '/progreso'
-  return <div className="space-y-5">
-    <section className="rounded-2xl border border-line/70 bg-hero p-5 text-on-hero shadow-card md:p-8">
-      <p className="eyebrow !text-hero-accent">{draft ? 'En curso' : 'Tu siguiente paso'}</p>
-      <h2 className="mt-2 text-2xl font-extrabold md:text-3xl">{title}</h2>
-      <p className="mt-3 max-w-xl text-sm leading-6 text-hero-muted">
-        {draft ? 'Retoma las series que dejaste guardadas.' : !activeTemplates.length ? 'Elige ejercicios para tus días de entrenamiento. Después podrás registrar cada sesión desde aquí.' : next ? next.exercises.length + ' ejercicios preparados. Registra tus series a tu ritmo.' : 'Has completado los días de tu rutina. Consulta cómo has avanzado o elige otra sesión desde Rutina.'}
-      </p>
-      <Link to={target} className="btn-primary mt-5 w-full sm:w-auto">{action}<ArrowRight className="size-4" aria-hidden="true" /></Link>
-    </section>
-    <div className="grid gap-4 md:grid-cols-2">
-      {activeTemplates.length > 0 && <section className="card p-5">
-        <h2 className="font-extrabold">Tu semana</h2>
-        <p className="mt-2 text-secondary">{activeTemplates.filter(template => completed.has(template.dayOfWeek)).length} de {activeTemplates.length} días completados</p>
-        <Link to="/rutina" className="btn-secondary mt-4 w-full sm:w-auto">Ver y editar rutina</Link>
-      </section>}
-      {hasHistory ? target !== '/progreso' && <section className="card p-5">
-        <h2 className="font-extrabold">Tus entrenamientos anteriores</h2>
-        <p className="mt-2 text-secondary">Consulta sesiones, edita registros y revisa la evolución de tus ejercicios.</p>
-        <Link to="/progreso" className="btn-secondary mt-4 w-full sm:w-auto">Ver progreso</Link>
-      </section> : activeTemplates.length > 0 && <section className="card p-5">
-        <h2 className="font-extrabold">Todo listo para empezar</h2>
-        <p className="mt-2 text-secondary">Al guardar tu primera sesión, verás tu evolución en Progreso.</p>
+  return <div className="today-page space-y-6 lg:space-y-8">
+    <div className="today-stage">
+      <section className="training-headline">
+        <p className="eyebrow !text-brand">{draft ? 'Entrenamiento en curso' : 'Tu siguiente paso'}</p>
+        <h2 className="mt-3 max-w-lg text-3xl font-semibold leading-tight tracking-tight md:text-5xl">{title}</h2>
+        <p className="mt-4 max-w-md text-sm leading-6 text-secondary">
+          {draft ? 'Tu sesión, justo donde la dejaste.' : !activeTemplates.length ? 'Construye tu semana. Elige tus ejercicios y empieza a registrar cada serie.' : next ? next.exercises.length + ' ejercicios. Una serie cada vez.' : 'Has completado tu planificación. Es un buen momento para ver cómo has avanzado.'}
+        </p>
+        <Link to={target} className="btn-primary mt-6 w-full sm:w-fit !min-h-12">{action}<ArrowRight className="size-4" aria-hidden="true" /></Link>
+      </section>
+      {next && <section className="session-lineup py-2 xl:px-4">
+        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">En esta sesión</h2><Link to="/rutina" className="text-sm font-semibold text-secondary hover:text-ink">Ver rutina</Link></div>
+        <ol className="divide-y divide-line/40">
+          {next.exercises.slice(0, 5).map((item, i) => <li key={item.id} className="flex items-center gap-4 py-3.5">
+            <span className="w-5 text-xs tabular-nums text-subtle">{String(i + 1).padStart(2, '0')}</span>
+            <div className="min-w-0 flex-1"><p className="font-semibold">{getExerciseById(item.exerciseId)?.name ?? item.exerciseId}</p><p className="mt-1 text-xs text-secondary">{item.targetSets} series · {item.targetReps} reps</p></div>
+          </li>)}
+        </ol>
+        {next.exercises.length > 5 && <p className="mt-2 text-xs text-secondary">Y {next.exercises.length - 5} ejercicios más</p>}
       </section>}
     </div>
+    {activeTemplates.length > 0 && <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="section-title">Tu semana</h2><p className="text-sm text-secondary">{activeTemplates.filter(t => completed.has(t.dayOfWeek)).length} de {activeTemplates.length} días completados</p></div>
+      <div className="week-track">
+        {[1,2,3,4,5,6,0].map(day => {
+          const planned = activeTemplates.find(t => t.dayOfWeek === day)
+          const state = !planned ? 'Descanso' : completed.has(day) ? 'Completado' : 'Pendiente'
+          return <Link key={day} aria-label={`${dayNames[day]}: ${state}`} to={planned ? '/entrenamiento/' + encodeURIComponent(planned.id) : '/rutina'} className={'rounded-xl px-4 py-3 ' + (planned ? 'bg-surface hover:bg-raised' : 'bg-transparent')}>
+            <p className="text-xs font-semibold text-secondary"><span className="sm:hidden">{dayNames[day].slice(0, 3)}</span><span className="hidden sm:inline">{dayNames[day]}</span></p>
+            <span aria-hidden="true" className={'week-indicator sm:hidden ' + (state === 'Completado' ? 'text-success-text' : 'text-secondary')}>{state === 'Completado' ? <Check /> : state === 'Pendiente' ? <Circle /> : <Minus />}</span>
+            <p className={'hidden sm:block mt-2 text-sm font-semibold ' + (completed.has(day) ? 'text-success-text' : 'text-ink')}>{planned ? completed.has(day) ? 'Completado' : planned.exercises.length + ' ejercicios' : 'Descanso'}</p>
+          </Link>
+        })}
+      </div>
+      <div className="week-legend sm:hidden" aria-hidden="true"><span><Check />Completado</span><span><Circle />Pendiente</span><span><Minus />Descanso</span></div>
+    </section>}
+    {recent.length > 0 && <section>
+      <div className="mb-3 flex items-center justify-between"><h2 className="section-title">Actividad reciente</h2>{target !== '/progreso' && <Link to="/progreso" className="text-sm font-semibold text-brand">Ver progreso</Link>}</div>
+      <div className="grid gap-3 lg:grid-cols-3">{recent.map(session => <div key={session.id} className="border-l-2 border-line py-1 pl-4">
+        <p className="font-semibold">{session.name}</p><p className="mt-1 text-sm text-secondary">{formatDate(getSessionDate(session))} · {session.exerciseLogs.length} ejercicios</p>
+      </div>)}</div>
+    </section>}
   </div>
 }
