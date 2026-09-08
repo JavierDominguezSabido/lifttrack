@@ -220,6 +220,12 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
+      lifttrack_read_session_v1: { Args: Record<string, Json>; Returns: Json }
+      lifttrack_read_history_overview_v2: { Args: Record<string, Json>; Returns: Json }
+      lifttrack_read_sessions_page_v3: { Args: Record<string, Json>; Returns: Json }
+      lifttrack_read_exercise_progress_v2: { Args: Record<string, Json>; Returns: Json }
+      lifttrack_read_last_performance_v2: { Args: Record<string, Json>; Returns: Json }
+
       sync_revision: { Args: { p_user_id: string; p_resource: string }; Returns: string }
       sync_session_versions: { Args: { p_user_id: string }; Returns: Json }
       apply_sync_operation: {

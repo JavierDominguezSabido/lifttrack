@@ -1,3 +1,6 @@
+import type { WorkoutSession } from '../../types'
+import { getWorkoutRepository } from '../../services/workoutService'
+import { useHistoryRead } from '../../services/useHistoryRead'
 import { confirmAction } from '../ui/confirmAction'
 import {
   AlertTriangle,
@@ -140,8 +143,22 @@ function canonicalizeImportedPayload(
 }
 
 export function DataSettings() {
+  const { historyReader, ownerId, sessions } = useWorkouts()
+  const loaded=useHistoryRead(historyReader,'data-tools',()=>getWorkoutRepository(true).getWorkoutSessions(ownerId))
+  const snapshot=useRef<{owner:string;sessions:WorkoutSession[]}>()
+  if(loaded.value)snapshot.current={owner:ownerId,sessions:loaded.value}
+  const available=historyReader ? snapshot.current?.owner===ownerId ? snapshot.current.sessions : undefined : sessions
+  if(!available)return <p role="status" className="p-6">{loaded.error ?? 'Preparando tus datos completos para importar o exportar…'}</p>
+  return <>
+    {historyReader && !loaded.value && <p role="status">{loaded.error ?? 'Actualizando los datos completos. Las operaciones en curso se conservan.'}</p>}
+    <fieldset className="min-w-0" disabled={Boolean(historyReader && !loaded.value)}>
+      <DataSettingsContent key={ownerId} fullSessions={available} />
+    </fieldset>
+  </>
+}
+
+function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] }) {
   const {
-    sessions,
     exercises,
     templates,
     dataMode,
@@ -163,7 +180,7 @@ export function DataSettings() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const importOwner = useRef(ownerId)
-  const exportableSessions = sessions.filter((session) => !isInitialSession(session.id))
+  const exportableSessions = fullSessions.filter((session) => !isInitialSession(session.id))
   const duplicateGroups = useMemo(
     () => findExerciseDuplicateGroups(exercises, templates, exportableSessions),
     [exercises, exportableSessions, templates]

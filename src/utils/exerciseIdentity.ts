@@ -98,34 +98,27 @@ function pickCanonicalId(
 }
 
 export function createCanonicalExerciseIdMap(
-  exercises: Exercise[],
-  templates: WorkoutTemplate[],
-  sessions: WorkoutSession[]
+  exercises: Exercise[], templates: WorkoutTemplate[], sessions: WorkoutSession[],
+  historicalCounts?: Record<string, number>
 ) {
-  const grouped = new Map<string, Set<string>>()
-
-  for (const exercise of exercises) {
-    const normalized = normalizeExerciseName(exercise.name)
-    if (!normalized) continue
-    grouped.set(normalized, (grouped.get(normalized) ?? new Set()).add(exercise.id))
+  const counts = historicalCounts ? new Map(Object.entries(historicalCounts)) : countLogsByExercise(sessions)
+  const catalog = new Map(exercises.map(exercise => [exercise.id, exercise]))
+  const inRoutine = new Set(templates.flatMap(t => t.exercises.map(e => e.exerciseId)))
+  const grouped = new Map<string, string[]>()
+  for (const id of new Set([...catalog.keys(), ...counts.keys()])) {
+    const name = normalizeExerciseName(catalog.get(id)?.name ?? id)
+    if (name) grouped.set(name, [...(grouped.get(name) ?? []), id])
   }
-
-  for (const session of sessions) {
-    for (const log of session.exerciseLogs) {
-      const normalized = normalizeExerciseIdOrName(exercises, log.exerciseId)
-      if (!normalized) continue
-      grouped.set(normalized, (grouped.get(normalized) ?? new Set()).add(log.exerciseId))
-    }
-  }
-
   const aliases = new Map<string, string>()
   for (const ids of grouped.values()) {
-    const values = [...ids]
-    if (values.length <= 1) continue
-    const canonicalId = pickCanonicalId(values, exercises, templates, sessions)
-    for (const id of values) aliases.set(id, canonicalId)
+    if (ids.length < 2) continue
+    const canonical = [...ids].sort((a, b) =>
+      Number(inRoutine.has(b)) - Number(inRoutine.has(a)) ||
+      Number(catalog.get(b)?.active !== false) - Number(catalog.get(a)?.active !== false) ||
+      (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b)
+    )[0]
+    for (const id of ids) aliases.set(id, canonical)
   }
-
   return aliases
 }
 

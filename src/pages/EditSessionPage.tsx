@@ -1,3 +1,5 @@
+import { useHistoryRead } from '../services/useHistoryRead'
+import type { WorkoutSession } from '../types'
 import { AlertCircle, ArrowLeft, Save } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -14,15 +16,21 @@ import {
 
 export function EditSessionPage() {
   const { sessionId } = useParams()
-  const { ownerId } = useWorkouts()
-  return <EditSessionContent key={JSON.stringify([ownerId, sessionId])} />
+  const { ownerId, historyReader, sessions } = useWorkouts()
+  const loaded = useHistoryRead(historyReader, 'edit:' + sessionId, () => historyReader!.session(sessionId!))
+  const [initial, setInitial] = useState<{ key:string; session:WorkoutSession|null }>()
+  const key=JSON.stringify([ownerId,sessionId])
+  // Freeze an open editor; background responses must not replace unsaved input.
+  if (historyReader && initial?.key!==key && loaded.value!==undefined) setInitial({key,session:loaded.value})
+  const session=historyReader ? initial?.key===key ? initial.session : undefined : sessions.find(s=>s.id===sessionId)
+  if(historyReader && session===undefined) return <p role="status" className="p-6">{loaded.error ?? 'Cargando sesión…'}</p>
+  return <EditSessionContent key={key} initialSession={session ?? undefined} />
 }
 
-function EditSessionContent() {
-  const { sessionId } = useParams()
+function EditSessionContent({ initialSession }: { initialSession?: WorkoutSession }) {
   const navigate = useNavigate()
-  const { sessions, saveSession, getExerciseById } = useWorkouts()
-  const [session] = useState(() => sessions.find((item) => item.id === sessionId))
+  const { saveSession, getExerciseById } = useWorkouts()
+  const [session] = useState(initialSession)
   const [logs, setLogs] = useState<DraftExerciseLog[]>(
     () => session ? createDraftFromSession(session) : []
   )

@@ -1,3 +1,5 @@
+import { useHistoryRead } from '../services/useHistoryRead'
+import { searchExerciseIds, type SessionFilters, type HistoryPager } from '../services/historyReads'
 import { confirmAction } from '../components/ui/confirmAction'
 import { useModalFocus } from '../components/ui/useModalFocus'
 import { moveViewFocus } from '../components/ui/moveViewFocus'
@@ -57,6 +59,7 @@ interface ExerciseProgressSummary {
   bestWeight: number
   sessionCount: number
   accumulatedVolume: number
+  latestDate?: string
   latestEntry?: ProgressEntry
   latestReps: string
   latestWeight: number
@@ -82,6 +85,7 @@ export function HistoryPage() {
   const location = useLocation()
   const {
     sessions,
+    historyReader, overview,
     sessionsError,
     deleteSession,
     exercises,
@@ -114,17 +118,25 @@ export function HistoryPage() {
     [sessions]
   )
   const canonicalExerciseIds = useMemo(
-    () => createCanonicalExerciseIdMap(exercises, templates, realSessions),
-    [exercises, realSessions, templates]
+    () => createCanonicalExerciseIdMap(exercises, templates, realSessions, historyReader ? overview?.exerciseLogCounts ?? {} : undefined),
+    [exercises, realSessions, templates, historyReader, overview]
   )
   const exerciseOptions = useMemo(
-    () => getExerciseOptions(exercises, realSessions, canonicalExerciseIds),
-    [canonicalExerciseIds, exercises, realSessions]
+    () => getExerciseOptions(exercises, realSessions, canonicalExerciseIds, historyReader ? overview?.exerciseLogCounts ?? {} : undefined),
+    [canonicalExerciseIds, exercises, realSessions, historyReader, overview]
   )
-  const exerciseProgressSummaries = useMemo(
-    () => getExerciseProgressSummaries(exerciseOptions, realSessions, exercises, canonicalExerciseIds),
-    [canonicalExerciseIds, exerciseOptions, exercises, realSessions]
+  const localExerciseProgressSummaries = useMemo(
+    () => historyReader ? [] : getExerciseProgressSummaries(exerciseOptions, realSessions, exercises, canonicalExerciseIds),
+    [canonicalExerciseIds, exerciseOptions, exercises, realSessions, historyReader]
   )
+  const cloudSummaries = useHistoryRead(historyTab === 'progress' ? historyReader : undefined, JSON.stringify(['summaries',exerciseOptions, [...canonicalExerciseIds]]), async () => {
+    const summaries = await Promise.all(exerciseOptions.map(async exercise => {
+      const r = await historyReader!.progress([...getEquivalentIdsForExercise(exercise.id, exercises, canonicalExerciseIds)], 1)
+      return { exercise, entries: [], bestWeight: r.bestWeight, sessionCount: r.sessionCount, accumulatedVolume: r.accumulatedVolume, latestReps: r.latest?.reps.join('-') ?? '', latestWeight: r.latest?.weightKg ?? 0, latestDate: r.latest?.date } satisfies ExerciseProgressSummary
+    }))
+    return summaries.filter(s => s.sessionCount > 0).sort((a,b) => (b.latestDate ?? '').localeCompare(a.latestDate ?? '') || b.sessionCount-a.sessionCount || a.exercise.name.localeCompare(b.exercise.name))
+  })
+  const exerciseProgressSummaries = useMemo(() => historyReader ? cloudSummaries.value ?? [] : localExerciseProgressSummaries, [historyReader,cloudSummaries.value,localExerciseProgressSummaries])
   const filteredExerciseProgressSummaries = useMemo(() => {
     const normalized = progressSearch.trim().toLowerCase()
     if (!normalized) return exerciseProgressSummaries
@@ -144,12 +156,22 @@ export function HistoryPage() {
       : new Set<string>(),
     [canonicalExerciseIds, exercises, selectedExercise]
   )
-  const progressEntries = useMemo(
+  const localProgressEntries = useMemo(
     () => selectedExercise
       ? getProgressEntries(realSessions, selectedEquivalentIds, canonicalExerciseIds)
       : [],
     [canonicalExerciseIds, realSessions, selectedEquivalentIds, selectedExercise]
   )
+  const progressPagerRef = useRef<{key:string;pager:HistoryPager}>()
+  const progressPagerKey = JSON.stringify([historyReader?.owner,historyReader?.generation,[...selectedEquivalentIds]])
+  if(historyReader && progressPagerRef.current?.key !== progressPagerKey) progressPagerRef.current = {key:progressPagerKey,pager:historyReader.pager({exerciseIds:[...selectedEquivalentIds],searchIds:null,day:null,from:null,to:null,templateDays:{}})}
+  const activeProgressPager = progressPagerRef.current?.pager
+  const progressRead = useHistoryRead(historyTab === 'progress' && selectedExercise ? historyReader : undefined, JSON.stringify(['progress', [...selectedEquivalentIds], visibleProgressCount]), async signal => {
+    const pager = activeProgressPager!
+    await pager.more(Math.max(0, Math.max(8,visibleProgressCount)-pager.items.length),signal)
+    return getProgressEntries(pager.items,selectedEquivalentIds,canonicalExerciseIds)
+  },JSON.stringify([...selectedEquivalentIds]))
+  const progressEntries = historyReader ? progressRead.value ?? [] : localProgressEntries
   const chartEntries = [...progressEntries].reverse().slice(-8)
   const selectedSummary = selectedExercise
     ? exerciseProgressSummaries.find((item) => item.exercise.id === selectedExercise.id)
@@ -171,8 +193,28 @@ export function HistoryPage() {
     }),
     [canonicalExerciseIds, exercises, filterDay, filterExerciseId, rangeFilter, realSessions, search, templates]
   )
-  const visibleSessions = filteredSessions.slice(0, visibleCount)
-  const historySummary = useMemo(() => getHistorySummary(realSessions), [realSessions])
+  const cloudFilters: SessionFilters = {
+    exerciseIds: filterExerciseId === 'all' ? null : [...canonicalExerciseIds.keys(), ...exercises.map(e=>e.id)].filter(id => (canonicalExerciseIds.get(id) ?? id) === (canonicalExerciseIds.get(filterExerciseId) ?? filterExerciseId)),
+    searchIds: searchExerciseIds(exercises, overview?.exerciseLogCounts ?? {}, search),
+    day: filterDay === 'all' ? null : Number(filterDay),
+    from: rangeFilter === 'all' ? null : (rangeFilter === 'week' ? getWeekStart() : new Date(new Date().getFullYear(),new Date().getMonth(),1)).toISOString(),
+    to: rangeFilter === 'all' ? null : (rangeFilter === 'week' ? getNextWeekStart() : new Date(new Date().getFullYear(),new Date().getMonth()+1,1)).toISOString(),
+    templateDays: Object.fromEntries(templates.map(t=>[t.id,t.dayOfWeek]))
+  }
+  const filterKey = JSON.stringify(cloudFilters)
+  const readGeneration=historyReader?.generation
+  useEffect(()=>{setVisibleCount(INITIAL_VISIBLE_SESSIONS);setVisibleProgressCount(8)},[filterKey,readGeneration])
+  const sessionPagerRef = useRef<{key:string;pager:HistoryPager}>()
+  const sessionPagerKey = JSON.stringify([historyReader?.owner,historyReader?.generation,filterKey])
+  if(historyReader && sessionPagerRef.current?.key !== sessionPagerKey) sessionPagerRef.current = {key:sessionPagerKey,pager:historyReader.pager(cloudFilters)}
+  const activeSessionPager = sessionPagerRef.current?.pager
+  const sessionRead = useHistoryRead(historyTab === 'sessions' && overview ? historyReader : undefined, JSON.stringify(['sessions',filterKey,visibleCount]), async signal => {
+    const pager=activeSessionPager!
+    await pager.more(Math.max(0,visibleCount-pager.items.length),signal)
+    return {items:pager.items,totalCount:pager.totalCount,filteredCount:pager.filteredCount,hasMore:pager.hasMore}
+  },filterKey)
+  const visibleSessions = historyReader ? sessionRead.value?.items ?? [] : filteredSessions.slice(0, visibleCount)
+  const historySummary = useMemo(() => historyReader ? overview : getHistorySummary(realSessions), [realSessions,historyReader,overview])
   const activeFilterCount = [
     filterExerciseId !== 'all',
     filterDay !== 'all',
@@ -214,7 +256,7 @@ export function HistoryPage() {
     setActionError(null)
     setActionMessage(null)
     try {
-      await deleteSession(session.id)
+      await deleteSession(session.id, session.syncRevision)
       setExpandedSessionId(null)
       setActionMessage('Entrenamiento borrado correctamente.')
     } catch (error) {
@@ -229,7 +271,12 @@ export function HistoryPage() {
       ? 'Entrenamiento actualizado correctamente.'
       : actionMessage
 
-  if (realSessions.length === 0 && !sessionsError) return <section className="card p-6 md:p-8">
+  if (historyReader && (!historySummary || (historyTab === 'sessions' && !sessionRead.value) || (historyTab === 'progress' && (!cloudSummaries.value || (selectedExercise && !progressRead.value))))) return <section className="space-y-4 p-6">
+    <p role="status">{sessionRead.error ?? cloudSummaries.error ?? progressRead.error ?? sessionsError ?? 'Actualizando el historial… Los cambios locales se conservan.'}</p>
+    {historyReader.snapshot().local.filter(s=>!isInitialSession(s.id)).map(session=><SessionCard key={session.id} session={session} expanded={expandedSessionId===session.id} onToggle={()=>setExpandedSessionId(expandedSessionId===session.id?null:session.id)} onDelete={()=>void removeSession(session)} getExerciseById={getExerciseById} templates={templates} />)}
+  </section>
+  if (!historySummary) return null
+  if (historySummary.sessionCount === 0 && !sessionsError) return <section className="card p-6 md:p-8">
     <h2 className="display-title">Tu progreso empieza con una sesión</h2>
     <p className="mt-3 max-w-xl text-secondary">Aquí podrás revisar tus entrenamientos, editar registros y comparar tus marcas por ejercicio.</p>
     <Link to={templates.some(template => template.exercises.length) ? '/' : '/rutina/editar'} className="btn-primary mt-5 w-full sm:w-auto">
@@ -399,9 +446,10 @@ export function HistoryPage() {
                     </div>
                   ))}
                 </div>
-                {visibleProgressCount < progressEntries.length && (
+                {visibleProgressCount < (selectedSummary?.sessionCount ?? progressEntries.length) && (
                   <button
                     type="button"
+                    disabled={Boolean(historyReader && progressRead.pending)}
                     onClick={() => setVisibleProgressCount((current) => current + 8)}
                     className="btn-secondary m-4 w-[calc(100%-2rem)]"
                   >
@@ -430,7 +478,7 @@ export function HistoryPage() {
           <EmptyHistoryState
             title="No hay ejercicios con progreso"
             message="Guarda una sesión para ver aquí la evolución por ejercicio."
-            showAction={realSessions.length === 0}
+            showAction={historySummary.sessionCount === 0}
           />
         )}
       </section>
@@ -555,7 +603,7 @@ export function HistoryPage() {
             </h2>
           </div>
           <p className="text-sm font-semibold text-secondary">
-            {filteredSessions.length} de {realSessions.length} sesiones
+            {historyReader ? sessionRead.value?.filteredCount : filteredSessions.length} de {historyReader ? sessionRead.value?.totalCount : realSessions.length} sesiones
           </p>
         </div>
 
@@ -574,9 +622,10 @@ export function HistoryPage() {
                 templates={templates}
               />
             ))}
-            {visibleCount < filteredSessions.length && (
+            {(historyReader ? sessionRead.value?.hasMore : visibleCount < filteredSessions.length) && (
               <button
                 type="button"
+                disabled={Boolean(historyReader && sessionRead.pending)}
                 onClick={() => setVisibleCount((current) => current + INITIAL_VISIBLE_SESSIONS)}
                 className="btn-secondary w-full"
               >
@@ -586,11 +635,11 @@ export function HistoryPage() {
           </div>
         ) : (
           <EmptyHistoryState
-            title={realSessions.length === 0 ? 'Todavía no hay sesiones' : 'No hay sesiones para estos filtros'}
-            message={realSessions.length === 0
+            title={historySummary.sessionCount === 0 ? 'Todavía no hay sesiones' : 'No hay sesiones para estos filtros'}
+            message={historySummary.sessionCount === 0
               ? 'Completa tu primer entrenamiento para empezar a construir el historial.'
               : 'Prueba a quitar algún filtro o cambia el texto de búsqueda.'}
-            showAction={realSessions.length === 0}
+            showAction={historySummary.sessionCount === 0}
           />
         )}
       </section>
@@ -1065,7 +1114,8 @@ export function getHistorySummary(sessions: WorkoutSession[]) {
 function getExerciseOptions(
   exercises: Exercise[],
   sessions: WorkoutSession[],
-  canonicalExerciseIds: Map<string, string>
+  canonicalExerciseIds: Map<string, string>,
+  historicalCounts?: Record<string, number>
 ) {
   const loggedIds = new Set<string>()
   const logCounts = new Map<string, number>()
@@ -1078,6 +1128,13 @@ function getExerciseOptions(
     }
   }
 
+  if (historicalCounts) {
+    loggedIds.clear(); logCounts.clear()
+    for (const [id,count] of Object.entries(historicalCounts)) {
+      const canonical = canonicalExerciseIds.get(id) ?? id
+      loggedIds.add(canonical); logCounts.set(canonical,(logCounts.get(canonical) ?? 0)+count)
+    }
+  }
   const shownIds = new Set<string>()
   return exercises
     .filter((exercise) => {

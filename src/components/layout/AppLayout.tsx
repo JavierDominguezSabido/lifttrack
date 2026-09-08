@@ -24,7 +24,7 @@ const pageTitles: Record<string, string> = {
 
 export function AppLayout() {
   const location = useLocation()
-  const { sessions, templates, sessionsError, initialLoading, ownerId, syncError, syncOperations, retrySync, resolveConflict } = useWorkouts()
+  const { overview, historyReader, sessions, templates, sessionsError, initialLoading, ownerId, syncError, syncOperations, retrySync, resolveConflict } = useWorkouts()
   const [syncActionError, setSyncActionError] = useState<string | null>(null)
   const [resolving, setResolving] = useState(false)
   const currentError = syncError ?? sessionsError ?? syncOperations.find(op => op.status === 'error')?.error ?? null
@@ -67,7 +67,7 @@ export function AppLayout() {
     hasLocalDraft: hasLocalWorkoutDraft
   })
   const activeTemplateCount = templates.filter((template) => template.exercises.length > 0).length
-  const completedDays = getCompletedRoutineDaysForWeek(sessions, templates)
+  const completedDays = historyReader ? new Set(overview?.currentWeekCompletedDays ?? []) : getCompletedRoutineDaysForWeek(sessions, templates)
   const weeklySessionCount = templates.filter(template => template.exercises.length > 0 && completedDays.has(template.dayOfWeek)).length
   const weeklyProgress = activeTemplateCount
     ? Math.min(100, (weeklySessionCount / activeTemplateCount) * 100)
@@ -123,7 +123,7 @@ export function AppLayout() {
         {activeTemplateCount > 0 && <div className="mt-auto border-t border-line/50 px-2 pt-6">
           <p className="text-xs font-bold uppercase tracking-wider text-brand">Tu ritmo semanal</p>
           <p className="mt-1 text-xl font-extrabold text-ink">
-            {weeklySessionCount} / {activeTemplateCount}
+            {historyReader && !overview ? '—' : `${weeklySessionCount} / ${activeTemplateCount}`}
           </p>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
             <div

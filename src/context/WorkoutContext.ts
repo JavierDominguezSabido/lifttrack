@@ -1,9 +1,14 @@
+import type { HistoryReader } from '../services/historyReader'
+import type { HistoryOverview } from '../services/historyReads'
 import { createContext, useContext } from 'react'
 import type { Exercise, WorkoutSession, WorkoutTemplate } from '../types'
 import type { SyncStatus } from '../utils/syncStatus'
 import type { SyncOperation } from '../services/syncOutbox'
 
 export interface WorkoutContextValue {
+  historyReader?: HistoryReader
+  overview?: HistoryOverview
+  cacheSessions?: (sessions: WorkoutSession[]) => void
   sessions: WorkoutSession[]
   exercises: Exercise[]
   templates: WorkoutTemplate[]
@@ -28,7 +33,7 @@ export interface WorkoutContextValue {
   resolveConflict: (operationId: string, keepLocal: boolean) => Promise<void>
   ownerId: string
   saveSession: (session: WorkoutSession) => Promise<void>
-  deleteSession: (sessionId: string) => Promise<void>
+  deleteSession: (sessionId: string, expectedRevision?: string) => Promise<void>
   clearLocalSessions: () => Promise<void>
   createExercise: (exercise: Omit<Exercise, 'id'>) => Exercise
   updateExercise: (exercise: Exercise) => void

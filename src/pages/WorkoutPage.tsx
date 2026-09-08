@@ -1,3 +1,4 @@
+import { useHistoryRead } from '../services/useHistoryRead'
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { moveViewFocus } from '../components/ui/moveViewFocus'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -25,6 +26,7 @@ import {
   applyWorkingWeight,
   createExerciseLogs,
   createWorkoutSession,
+  getWorkoutSessionId,
   getWorkingWeight,
   normalizeRepsInput,
   reconcileUntouchedExerciseWeights,
@@ -268,8 +270,24 @@ function createFreshWorkoutLogs(
 }
 
 export function WorkoutPage() {
-  const { ownerId, templates, syncReady } = useWorkouts()
+  const { ownerId, templates, syncReady, exercises, historyReader, cacheSessions } = useWorkouts()
   const { templateId } = useParams()
+  const preparedTemplate = templates.find(t=>t.id===templateId) ?? (!templateId ? getTodayTemplate(templates) : undefined)
+  const draftHints = readWorkoutDrafts(ownerId === 'local' ? 'local' : `user:${ownerId}`, toLocalDateKey(new Date())).filter(d => !templateId || d.templateId === templateId)
+  const preparationKey = JSON.stringify([ownerId,templateId,preparedTemplate,exercises])
+  const prepared = useHistoryRead(historyReader,preparationKey,async()=>{
+    const candidates = await Promise.all((preparedTemplate?.exercises ?? []).map(async item=>{
+      const result = await historyReader!.performance(item.exerciseId,getEquivalentExerciseIds(exercises,item.exerciseId))
+      return result ? historyReader!.session(result.sessionId) : null
+    }))
+    const completedDrafts = await Promise.all(draftHints.map(d => historyReader!.session(getWorkoutSessionId(d.templateId,d.startedAt))))
+    return [...candidates,...completedDrafts].filter((s): s is NonNullable<typeof s>=>s!==null)
+  })
+  const [preparedKey,setPreparedKey]=useState('')
+  const cacheRef=useRef(cacheSessions);cacheRef.current=cacheSessions
+  useEffect(()=>{
+    if(prepared.value) {cacheRef.current?.(prepared.value);setPreparedKey(JSON.stringify([ownerId,templateId]))}
+  },[prepared.value,ownerId,templateId])
   const [resolved, setResolved] = useState(0)
   useEffect(() => {
     const resolve = (event: Event) => {
@@ -290,6 +308,7 @@ export function WorkoutPage() {
       <Link to="/rutina" className="btn-primary mt-4">Ver rutina</Link>
     </section>
   }
+  if(historyReader && !draftHints.length && preparedKey!==JSON.stringify([ownerId,templateId])) return <p role="status" className="p-6">{prepared.error ?? 'Preparando el último rendimiento…'}</p>
   return <WorkoutPageContent key={JSON.stringify([ownerId, templateId, resolved])} />
 }
 
@@ -297,7 +316,7 @@ function WorkoutPageContent() {
   const { templateId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { sessions, saveSession, templates, exercises, getExerciseById, syncReady } = useWorkouts()
+  const { sessions, saveSession, templates, exercises, getExerciseById, syncReady, historyReader } = useWorkouts()
   const userKey = getDraftUserKey(user?.id)
   const localDate = toLocalDateKey(new Date())
   const localDraftHint = readWorkoutDrafts(userKey, localDate).find((draft) =>
@@ -487,8 +506,14 @@ function WorkoutPageContent() {
         step.log.id === currentGuidedStep.log.id && step.set.id === currentGuidedStep.set.id
       )
     : -1
+  const performances = useHistoryRead(historyReader, JSON.stringify(['workout-performance',template.exercises.map(e=>e.exerciseId),exercises,[...canonicalExerciseIds]]), async () => Object.fromEntries(await Promise.all(template.exercises.map(async item => {
+    const ids = new Set(getEquivalentExerciseIds(exercises,item.exerciseId))
+    for (const [from,to] of canonicalExerciseIds) if(to===item.exerciseId) ids.add(from)
+    return [item.exerciseId,await historyReader!.performance(item.exerciseId,[...ids])] as const
+  }))))
   const guidedPreviousPerformance = useMemo(() => {
     if (!currentGuidedStep) return null
+    if (historyReader) return performances.value?.[currentGuidedStep.templateExercise.exerciseId] ?? null
     const equivalentIds = new Set(getEquivalentExerciseIds(exercises, currentGuidedStep.templateExercise.exerciseId))
     for (const [from, to] of canonicalExerciseIds) {
       if (to === currentGuidedStep.templateExercise.exerciseId) equivalentIds.add(from)
@@ -498,7 +523,7 @@ function WorkoutPageContent() {
       currentGuidedStep.templateExercise.exerciseId,
       [...equivalentIds]
     )
-  }, [canonicalExerciseIds, currentGuidedStep, exercises, sessions])
+  }, [canonicalExerciseIds, currentGuidedStep, exercises, sessions, historyReader, performances.value])
   const completedVolume = useMemo(() => logs.reduce(
     (total, log) => total + log.sets.reduce(
       (sum, set) => sum + (set.completed ? Number(set.reps || 0) * set.weightKg : 0),
@@ -1565,7 +1590,7 @@ function WorkoutPageContent() {
             if (to === item.exerciseId) equivalentIds.add(from)
           }
           const exercise = getExerciseById(item.exerciseId)
-          const previousPerformance = getLastExercisePerformanceFromSessions(
+          const previousPerformance = historyReader ? performances.value?.[item.exerciseId] ?? null : getLastExercisePerformanceFromSessions(
             sessions,
             item.exerciseId,
             [...equivalentIds]

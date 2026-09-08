@@ -1,3 +1,5 @@
+import { HistoryReader } from '../services/historyReader'
+import type { HistoryOverview } from '../services/historyReads'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getStoredSessions, localWorkoutRepository } from '../services/mock/workoutService'
 import { getWorkoutRepository } from '../services/workoutService'
@@ -36,6 +38,8 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const userId = user?.id
   const owner = userId ?? 'local'
+  const historyReader = useMemo(() => userId ? new HistoryReader(userId) : undefined, [userId])
+  const [overview, setOverview] = useState<HistoryOverview>()
   const ownerRef = useRef(owner)
   ownerRef.current = owner
   const requestRevision = useRef(0)
@@ -82,7 +86,14 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
     else setSessionsLoading(true)
     setSessionsError(null)
     try {
-      const remoteSessions = await activeRepository.getWorkoutSessions(userId)
+      let remoteSessions: WorkoutSession[]
+      if (historyReader) {
+        const pager = historyReader.pager({ exerciseIds: null, searchIds: null, day: null, from: null, to: null, templateDays: {} })
+        const [summary] = await Promise.all([historyReader.overview(), pager.more()])
+        if (!isCurrent()) return
+        setOverview(summary)
+        remoteSessions = pager.items
+      } else remoteSessions = await activeRepository.getWorkoutSessions(userId)
       if (!isCurrent()) return
       setSessions(remoteSessions)
       writeSessionCache(owner, remoteSessions)
@@ -100,7 +111,7 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
         setSessionsLoading(false)
       }
     }
-  }, [activeRepository, authLoading, dataMode, owner, userId])
+  }, [activeRepository, authLoading, dataMode, owner, userId, historyReader])
 
   useEffect(() => {
     ownerRef.current = owner
@@ -108,10 +119,22 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
     if (!userId || authLoading) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
+    let readTimer: ReturnType<typeof setTimeout> | undefined
+    const scheduleRead = () => { clearTimeout(readTimer); readTimer = setTimeout(() => { if (active) void reloadSessions(true) }, 100) }
     const flush = () => { void flushSyncOperations(owner).catch(error => { if (active) setWriteError(String(error)) }) }
+    let pendingReadKey = JSON.stringify(pendingOperations(owner).filter(op => op.resource.startsWith('session:')))
     const change = (event: Event) => {
       if (event instanceof CustomEvent && event.detail.owner !== owner) return
       if (event instanceof StorageEvent && event.key && !event.key.startsWith('lifttrack.outbox.v1.')) return
+      const readBefore = historyReader?.version()
+      const nextPendingKey = JSON.stringify(pendingOperations(owner).filter(op => op.resource.startsWith('session:')))
+      if (nextPendingKey !== pendingReadKey) {
+        pendingReadKey = nextPendingKey
+        historyReader?.invalidate()
+        setOverview(undefined)
+        setSessions(items => overlayPendingSessions(owner, items))
+        if (readBefore !== historyReader?.version()) scheduleRead()
+      }
       setSyncInfo({ operations: pendingOperations(owner), sending: isSendingSync(owner) })
       if (event instanceof StorageEvent) {
         requestRevision.current += 1
@@ -134,8 +157,10 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
     const refresh = (event: Event) => {
       if (!(event instanceof CustomEvent) || event.detail.owner !== owner) return
       if (event.detail.resource.startsWith('draft:')) return
+      historyReader?.invalidate()
+      setOverview(undefined)
       requestRevision.current += 1
-      void reloadSessions(true)
+      scheduleRead()
       if (event.detail.resource === 'routine') {
         const revision = routineRevision.current
         const readRevision = ++routineReadRevision.current
@@ -167,6 +192,7 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
       ownerRef.current = ''
       activateSyncOwner(null)
       clearTimeout(timer)
+      clearTimeout(readTimer)
       clearInterval(interval)
       window.removeEventListener('lifttrack-sync', change)
       window.removeEventListener('storage', change)
@@ -174,7 +200,7 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('lifttrack-sync-confirmed', refresh)
       window.removeEventListener('lifttrack-sync-resolved', refresh)
     }
-  }, [authLoading, owner, reloadSessions, userId])
+  }, [authLoading, owner, reloadSessions, userId, historyReader])
 
   useEffect(() => {
     if (authLoading) return
@@ -247,8 +273,12 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return
     let refreshQueued = false
+    let lastFocusRead = Date.now()
     const refreshInBackground = () => {
-      if (document.visibilityState === 'hidden' || refreshQueued) return
+      if (!navigator.onLine || document.visibilityState === 'hidden' || refreshQueued || (historyReader && Date.now() - lastFocusRead < 60000)) return
+      lastFocusRead = Date.now()
+      historyReader?.invalidate()
+      setOverview(undefined)
       refreshQueued = true
       window.queueMicrotask(() => {
         refreshQueued = false
@@ -259,17 +289,31 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === 'visible') refreshInBackground()
     }
 
+    const contextKey = () => Intl.DateTimeFormat().resolvedOptions().timeZone + '|' + new Date().toDateString()
+    let currentContext = contextKey()
+    const checkContext = () => {
+      const next = contextKey()
+      if (next === currentContext) return
+      currentContext = next
+      historyReader?.invalidate()
+      setOverview(undefined)
+      void reloadSessions(true)
+    }
+    const contextTimer = window.setInterval(checkContext, 30000)
+    window.addEventListener('focus', checkContext)
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', refreshInBackground)
     window.addEventListener('pageshow', refreshInBackground)
-    window.addEventListener('online', refreshInBackground)
+    // Reconnection is handled once by the sync effect above.
     return () => {
+      window.clearInterval(contextTimer)
+      window.removeEventListener('focus', checkContext)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', refreshInBackground)
       window.removeEventListener('pageshow', refreshInBackground)
-      window.removeEventListener('online', refreshInBackground)
+
     }
-  }, [authLoading, reloadSessions])
+  }, [authLoading, reloadSessions, historyReader])
 
   const persist = useCallback((exercises: Exercise[], templates: WorkoutTemplate[]) => {
     if (ownerRef.current !== owner) throw new Error('La cuenta ha cambiado.')
@@ -281,6 +325,15 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
     setRoutineError(null)
   }, [owner, user])
   const value = useMemo<WorkoutContextValue>(() => ({
+    historyReader,
+    overview,
+    cacheSessions: (loaded) => setSessions(items => {
+      const byId = new Map(items.map(s => [s.id, s]))
+      for (const session of loaded) byId.set(session.id, session)
+      const next = overlayPendingSessions(owner, [...byId.values()])
+      writeSessionCache(owner, next)
+      return next
+    }),
     sessions,
     exercises: currentRoutine.exercises,
     templates: currentRoutine.templates,
@@ -336,13 +389,13 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    deleteSession: async (id) => {
+    deleteSession: async (id, expectedRevision) => {
       if (ownerRef.current !== owner) throw new Error('La cuenta ha cambiado.')
       requestRevision.current += 1
       setPendingWrites((count) => count + 1)
       setWriteError(null)
       try {
-        await activeRepository.deleteWorkoutSession(id, userId, sessions.find(session => session.id === id)?.syncRevision)
+        await activeRepository.deleteWorkoutSession(id, userId, expectedRevision ?? sessions.find(session => session.id === id)?.syncRevision)
         if (ownerRef.current !== owner) return
         requestRevision.current += 1
         setSessions((items) => {
@@ -401,7 +454,7 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
       return count
     },
     reloadSessions
-  }), [activeRepository, authLoading, online, pendingWrites, writeError, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, routineRefreshing, sessions, sessionsError, sessionsLoading, userId, syncInfo, remoteChecked])
+  }), [activeRepository, authLoading, online, pendingWrites, writeError, backgroundRefreshing, currentRoutine, dataMode, historyLoaded, initialLoading, owner, persist, reloadSessions, routineError, routineLoading, routineRefreshing, sessions, sessionsError, sessionsLoading, userId, syncInfo, remoteChecked, historyReader, overview])
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>
 }

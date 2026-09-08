@@ -7,15 +7,15 @@ import { getCompletedRoutineDaysForWeek, getNextPendingTemplate, isInitialSessio
 import { hasCompletedSessionForDraft } from '../utils/workoutLifecycle'
 
 export function DashboardPage() {
-  const { sessions, templates, ownerId, getExerciseById } = useWorkouts()
+  const { overview, historyReader, sessions, templates, ownerId, getExerciseById } = useWorkouts()
   const today = new Date()
   const activeTemplates = templates.filter(template => template.exercises.length > 0)
-  const completed = getCompletedRoutineDaysForWeek(sessions, templates, today)
+  const completed = historyReader ? new Set(overview?.currentWeekCompletedDays ?? []) : getCompletedRoutineDaysForWeek(sessions, templates, today)
   const next = getNextPendingTemplate(activeTemplates, completed, today)
   const draft = readWorkoutDrafts(ownerId === 'local' ? 'local' : 'user:' + ownerId, toLocalDateKey(today))
     .find(item => !hasCompletedSessionForDraft(sessions, item))
   const recent = sessions.filter(session => !isInitialSession(session.id)).sort((a, b) => getSessionDate(b).localeCompare(getSessionDate(a))).slice(0, 3)
-  const title = draft ? 'Tu entrenamiento sigue aquí' : !activeTemplates.length ? 'Prepara tu primera rutina' : next ? next.name : 'Semana completada'
+  const title = draft ? 'Tu entrenamiento sigue aquí' : !activeTemplates.length ? 'Prepara tu primera rutina' : historyReader && !overview ? 'Tu entrenamiento' : next ? next.name : 'Semana completada'
   const action = draft ? 'Continuar entrenamiento' : !activeTemplates.length ? 'Crear rutina' : next ? 'Empezar entrenamiento' : 'Revisar progreso'
   const target = draft ? '/entrenamiento/' + encodeURIComponent(draft.templateId) : !activeTemplates.length ? '/rutina/editar' : next ? '/entrenamiento/' + encodeURIComponent(next.id) : '/progreso'
   return <div className="today-page space-y-6 lg:space-y-8">
@@ -40,11 +40,11 @@ export function DashboardPage() {
       </section>}
     </div>
     {activeTemplates.length > 0 && <section>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="section-title">Tu semana</h2><p className="text-sm text-secondary">{activeTemplates.filter(t => completed.has(t.dayOfWeek)).length} de {activeTemplates.length} días completados</p></div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="section-title">Tu semana</h2><p className="text-sm text-secondary">{historyReader && !overview ? 'Actualizando tu semana…' : `${activeTemplates.filter(t => completed.has(t.dayOfWeek)).length} de ${activeTemplates.length} días completados`}</p></div>
       <div className="week-track">
         {[1,2,3,4,5,6,0].map(day => {
           const planned = activeTemplates.find(t => t.dayOfWeek === day)
-          const state = !planned ? 'Descanso' : completed.has(day) ? 'Completado' : 'Pendiente'
+          const state = !planned ? 'Descanso' : historyReader && !overview ? 'Por actualizar' : completed.has(day) ? 'Completado' : 'Pendiente'
           return <Link key={day} aria-label={`${dayNames[day]}: ${state}`} to={planned ? '/entrenamiento/' + encodeURIComponent(planned.id) : '/rutina'} className={'rounded-xl px-4 py-3 ' + (planned ? 'bg-surface hover:bg-raised' : 'bg-transparent')}>
             <p className="text-xs font-semibold text-secondary"><span className="sm:hidden">{dayNames[day].slice(0, 3)}</span><span className="hidden sm:inline">{dayNames[day]}</span></p>
             <span aria-hidden="true" className={'week-indicator sm:hidden ' + (state === 'Completado' ? 'text-success-text' : 'text-secondary')}>{state === 'Completado' ? <Check /> : state === 'Pendiente' ? <Circle /> : <Minus />}</span>
