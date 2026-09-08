@@ -11,7 +11,7 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
@@ -32,6 +32,7 @@ const createId = () => typeof globalThis.crypto?.randomUUID === 'function'
   : `template-exercise-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 const weekOrder = [1, 2, 3, 4, 5, 6, 0]
 type SettingsSection = 'account' | 'data'
+type RoutineFields = Record<string, { target?: string; rest?: string }>
 
 function parseTarget(value: string) {
   const match = value.trim().match(/^([1-9]\d*)\s*[xX×]\s*([1-9]\d*)$/)
@@ -72,16 +73,33 @@ function SettingsPageContent() {
     } catch { return null }
   })
   const [drafts, setDrafts] = useState(() => recovered ?? cloneTemplates(templates.length ? templates : getEmptyRoutine()))
+  const [fields, setFields] = useState<RoutineFields>(() => {
+    try { return JSON.parse(sessionStorage.getItem(routineDraftKey + '.fields') ?? '{}') ?? {} } catch { return {} }
+  })
   const [routineDirty, setRoutineDirty] = useState(Boolean(recovered))
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const exerciseParam = params.get('ejercicio')
   const editingExercise = exercises.find(exercise => exercise.id === exerciseParam) ?? null
   const showExerciseForm = settingsView === 'library' && (exerciseParam === 'nuevo' || Boolean(editingExercise))
-  const setEditingExercise = (exercise: Exercise | null) => setParams(current => { current.set('ejercicio', exercise?.id ?? 'nuevo'); return current })
-  const setShowExerciseForm = (show: boolean) => { if (!show) setParams(current => { current.delete('ejercicio'); return current }) }
+  const exerciseFormRef = useRef<HTMLFormElement>(null)
+  const revealExerciseForm = () => {
+    exerciseFormRef.current?.scrollIntoView({ block: 'start' })
+    exerciseFormRef.current?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
+  }
+  const openExerciseForm = (exercise: Exercise | null) => {
+    const next = new URLSearchParams(params)
+    next.set('ejercicio', exercise?.id ?? 'nuevo')
+    setParams(next)
+  }
+  const closeExerciseForm = () => {
+    const next = new URLSearchParams(params)
+    next.delete('ejercicio')
+    setParams(next)
+  }
   const [exerciseFormDirty, setExerciseFormDirty] = useState(false)
   const exerciseDraftKey = `lifttrack.exerciseForm.${ownerId}.${editingExercise?.id ?? 'new'}`
+  useEffect(() => { if (showExerciseForm) revealExerciseForm() }, [showExerciseForm, exerciseDraftKey])
 
   async function discardExerciseForm() {
     if (!showExerciseForm) return true
@@ -99,9 +117,9 @@ function SettingsPageContent() {
   useEffect(() => { if (!routineDirty) setDrafts(cloneTemplates(templates.length ? templates : getEmptyRoutine())) }, [templates, routineDirty])
   useLayoutEffect(() => {
     if (!routineDirty) return
-    try { sessionStorage.setItem(routineDraftKey, JSON.stringify(drafts)) }
+    try { sessionStorage.setItem(routineDraftKey, JSON.stringify(drafts)); sessionStorage.setItem(routineDraftKey + '.fields', JSON.stringify(fields)) }
     catch { setError('No se pudo conservar el borrador. Guarda la rutina antes de salir.') }
-  }, [drafts, routineDirty, routineDraftKey])
+  }, [drafts, fields, routineDirty, routineDraftKey])
   useEffect(() => {
     if (!routineDirty) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
@@ -176,6 +194,7 @@ function SettingsPageContent() {
   }
 
   function removeItem(templateId: string, itemId: string) {
+    setFields(current => Object.fromEntries(Object.entries(current).filter(([id]) => id !== itemId)))
     updateTemplate(templateId, (template) => ({
       ...template,
       exercises: template.exercises
@@ -199,9 +218,15 @@ function SettingsPageContent() {
 
   function persistRoutine() {
     setError(null)
+    for (const item of drafts.flatMap(day => day.exercises)) {
+      const values = fields[item.id]
+      if (values?.target !== undefined && !parseTarget(values.target)) { setError('El objetivo debe tener formato como 8x4, 12x3 o 15x4.'); return }
+      if (values?.rest !== undefined && parseRest(values.rest) === null) { setError('El descanso debe tener formato m:ss, por ejemplo 1:30 o 2:30.'); return }
+    }
     try {
       saveTemplates(drafts)
-      try { sessionStorage.removeItem(routineDraftKey) } catch { /* Guardado realizado. */ }
+      try { sessionStorage.removeItem(routineDraftKey); sessionStorage.removeItem(routineDraftKey + '.fields') } catch { /* Guardado realizado. */ }
+      setFields({})
       setRoutineDirty(false)
       setMessage('Rutina guardada.')
     } catch (error) {
@@ -231,7 +256,7 @@ function SettingsPageContent() {
 
   if (settingsView === 'routine') {
     return (
-      <div className="routine-editor space-y-4 md:space-y-5">
+      <div className="routine-editor space-y-4 md:space-y-5 pb-[calc(12rem+env(safe-area-inset-bottom))] lg:pb-28">
         <SettingsSubpageHeader
           eyebrow="Rutina"
           title="Editar rutina"
@@ -244,7 +269,7 @@ function SettingsPageContent() {
         {routineDirty && <p role="status" className="text-sm text-secondary">Tienes cambios sin guardar. El borrador se conserva al volver a esta pantalla.</p>}
         <Link to="/rutina/ejercicios" className="btn-secondary">Gestionar ejercicios</Link>
 
-        <section aria-label="Editar entrenamientos por día" className="grid items-start gap-4 xl:grid-cols-2">
+        <section aria-label="Editar entrenamientos por día" className="grid grid-cols-1 items-start gap-4">
           {orderedDrafts.map((template) => (
             <article id={template.id} key={template.id} className="card scroll-mt-24 overflow-hidden">
               <header className="border-b border-line/70 p-3.5 sm:p-4">
@@ -267,6 +292,17 @@ function SettingsPageContent() {
                     onRemove={() => removeItem(template.id, item.id)}
                     onChange={(changes) => updateItem(template.id, item.id, changes)}
                     onError={setError}
+                    fields={fields[item.id]}
+                    onFieldChange={(field, value) => {
+                      setFields(current => ({...current,[item.id]:{...current[item.id],[field]:value}}))
+                      setRoutineDirty(true)
+                      setMessage(null)
+                      const parsed = field === 'target' ? parseTarget(value) : parseRest(value)
+                      if (parsed !== null) {
+                        updateItem(template.id,item.id,typeof parsed === 'number' ? {restSeconds:parsed} : parsed)
+                        setError(null)
+                      }
+                    }}
                   />
                 ))}
                 {template.exercises.length === 0 && (
@@ -319,7 +355,10 @@ function SettingsPageContent() {
         <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 grid gap-2 rounded-xl border border-line/70 bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4 lg:left-[264px] lg:right-8">
           <button type="button" disabled={!routineDirty} onClick={async () => {
             if (!await confirmAction('¿Descartar los cambios sin guardar de la rutina?')) return
-            try { sessionStorage.removeItem(routineDraftKey) } catch { /* Continúa en memoria. */ }
+            try { sessionStorage.removeItem(routineDraftKey); sessionStorage.removeItem(routineDraftKey + '.fields') } catch { /* Continúa en memoria. */ }
+            setFields({})
+            setError(null)
+            setMessage(null)
             setRoutineDirty(false)
           }} className="btn-secondary w-full">
             Descartar cambios
@@ -364,10 +403,9 @@ function SettingsPageContent() {
             <button
               type="button"
               onClick={async () => {
-                if (showExerciseForm && !editingExercise) return
+                if (showExerciseForm && !editingExercise) { revealExerciseForm(); return }
                 if (!await discardExerciseForm()) return
-                setEditingExercise(null)
-                setShowExerciseForm(true)
+                openExerciseForm(null)
               }}
               className="btn-primary w-full self-end lg:w-auto"
             >
@@ -401,15 +439,16 @@ function SettingsPageContent() {
           <ExerciseForm
             key={exerciseDraftKey}
             draftKey={exerciseDraftKey}
+            formRef={exerciseFormRef}
             onDirtyChange={setExerciseFormDirty}
             exercise={editingExercise}
-            onCancel={async () => { if (await discardExerciseForm()) setShowExerciseForm(false) }}
+            onCancel={async () => { if (await discardExerciseForm()) closeExerciseForm() }}
             onSave={(values) => {
               if (editingExercise) updateExercise({ ...editingExercise, ...values })
               else createExercise({ ...values, active: true })
               try { window.sessionStorage.removeItem(exerciseDraftKey) } catch { /* No impide guardar. */ }
               setExerciseFormDirty(false)
-              setShowExerciseForm(false)
+              closeExerciseForm()
               setMessage(editingExercise ? 'Ejercicio actualizado.' : 'Ejercicio creado.')
             }}
           />
@@ -437,10 +476,9 @@ function SettingsPageContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (showExerciseForm && editingExercise?.id === exercise.id) return
+                    if (showExerciseForm && editingExercise?.id === exercise.id) { revealExerciseForm(); return }
                     if (!await discardExerciseForm()) return
-                    setEditingExercise(exercise)
-                    setShowExerciseForm(true)
+                    openExerciseForm(exercise)
                   }}
                   className="btn-secondary !min-h-11 !py-2"
                 >
@@ -572,7 +610,9 @@ function RoutineExerciseEditor({
   onMove,
   onRemove,
   onChange,
-  onError
+  onError,
+  fields,
+  onFieldChange
 }: {
   item: WorkoutTemplateExercise
   exercise?: Exercise
@@ -582,6 +622,8 @@ function RoutineExerciseEditor({
   onRemove: () => void
   onChange: (changes: Partial<WorkoutTemplateExercise>) => void
   onError: (message: string | null) => void
+  fields?: RoutineFields[string]
+  onFieldChange: (field: 'target' | 'rest', value: string) => void
 }) {
   return (
     <div className="rounded-xl border border-line/70 bg-raised p-3">
@@ -601,46 +643,42 @@ function RoutineExerciseEditor({
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 lg:gap-4">
         <label className="text-xs font-bold text-secondary">
           Objetivo
           <input
-            key={`${item.id}-${item.targetReps}-${item.targetSets}`}
-            defaultValue={`${item.targetReps}x${item.targetSets}`}
+            value={fields?.target ?? `${item.targetReps}x${item.targetSets}`}
+            onChange={event => onFieldChange('target',event.target.value)}
+            aria-invalid={fields?.target !== undefined && !parseTarget(fields.target)}
             className="input mt-1 !text-left"
-            inputMode="numeric"
             placeholder="8x4"
             aria-label={`Objetivo de ${exercise?.name ?? 'ejercicio'}: repeticiones por series, por ejemplo 8x4`}
             onBlur={(event) => {
               const parsed = parseTarget(event.target.value)
               if (!parsed) {
                 onError('El objetivo debe tener formato como 8x4, 12x3 o 15x4.')
-                event.target.value = `${item.targetReps}x${item.targetSets}`
                 return
               }
               onError(null)
-              onChange(parsed)
             }}
           />
         </label>
         <label className="text-xs font-bold text-secondary">
           Descanso
           <input
-            key={`${item.id}-${item.restSeconds}`}
-            defaultValue={formatRestSeconds(item.restSeconds)}
+            value={fields?.rest ?? (item.restSeconds ? formatRestSeconds(item.restSeconds) : '0:00')}
+            onChange={event => onFieldChange('rest',event.target.value)}
+            aria-invalid={fields?.rest !== undefined && parseRest(fields.rest) === null}
             className="input mt-1 !text-left"
-            inputMode="numeric"
             placeholder="1:30"
             aria-label={`Descanso de ${exercise?.name ?? 'ejercicio'} en minutos y segundos, por ejemplo 1:30`}
             onBlur={(event) => {
               const parsed = parseRest(event.target.value)
               if (parsed === null) {
                 onError('El descanso debe tener formato m:ss, por ejemplo 1:30 o 2:30.')
-                event.target.value = formatRestSeconds(item.restSeconds)
                 return
               }
               onError(null)
-              onChange({ restSeconds: parsed })
             }}
           />
         </label>
@@ -664,12 +702,14 @@ function RoutineExerciseEditor({
 function ExerciseForm({
   exercise,
   draftKey,
+  formRef,
   onDirtyChange,
   onCancel,
   onSave
 }: {
   exercise: Exercise | null
   draftKey: string
+  formRef: React.RefObject<HTMLFormElement>
   onDirtyChange: (dirty: boolean) => void
   onCancel: () => void
   onSave: (exercise: Omit<Exercise, 'id' | 'active'>) => void
@@ -737,7 +777,7 @@ function ExerciseForm({
   }
 
   return (
-    <form onSubmit={submit} className="card space-y-3 p-4 sm:p-5">
+    <form ref={formRef} onSubmit={submit} className="card scroll-mt-24 space-y-3 p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-extrabold">{exercise ? 'Editar ejercicio' : 'Nuevo ejercicio'}</h3>
         <button type="button" onClick={onCancel} className="grid size-11 place-items-center rounded-xl" aria-label="Cerrar">
