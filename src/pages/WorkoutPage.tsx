@@ -1,3 +1,4 @@
+import { readWorkoutDrafts, WORKOUT_DRAFT_VERSION, WORKOUT_DRAFT_PREFIX, type StoredWorkoutDraft } from '../services/workoutDraftStorage'
 import { useHistoryRead } from '../services/useHistoryRead'
 import { AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { moveViewFocus } from '../components/ui/moveViewFocus'
@@ -82,34 +83,17 @@ function normalizeGuidedPosition(
     : null
 }
 
-const WORKOUT_DRAFT_VERSION = 2
-const WORKOUT_DRAFT_PREFIX = 'lifttrack.workoutDraft'
 const WORKOUT_FULL_SCROLL_PREFIX = 'lifttrack.workoutFullScroll'
-
-interface StoredWorkoutDraft {
-  confirmed?: true
-  version: number
-  userKey: string
-  templateId: string
-  dayOfWeek: number
-  localDate: string
-  status: 'active' | 'completed'
-  startedAt: string
-  logs: DraftExerciseLog[]
-  updatedAt: string
-  viewMode?: WorkoutViewMode
-  guidedPosition?: GuidedPosition
-}
 
 function getDraftUserKey(userId?: string) {
   return userId ? `user:${userId}` : 'local'
 }
 
-export function getWorkoutDraftKey(userKey: string, localDate: string, template: WorkoutTemplate) {
+function getWorkoutDraftKey(userKey: string, localDate: string, template: WorkoutTemplate) {
   return getDatedLocalDraftKey(userKey, localDate, template.id)
 }
 
-export function getWorkoutRemoteDraftKey(localDate: string, template: WorkoutTemplate) {
+function getWorkoutRemoteDraftKey(localDate: string, template: WorkoutTemplate) {
   return getDatedRemoteDraftKey(localDate, template.id)
 }
 
@@ -161,35 +145,6 @@ function readWorkoutDraft(userKey: string, localDate: string, template: WorkoutT
     console.error('[workout] No se pudo leer el borrador local:', error)
     return null
   }
-}
-
-export function readWorkoutDrafts(userKey: string, localDate: string) {
-  const drafts: StoredWorkoutDraft[] = []
-  try {
-    const keyPrefix = `${WORKOUT_DRAFT_PREFIX}.${userKey}.`
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index)
-      if (!key?.startsWith(keyPrefix)) continue
-      const raw = window.localStorage.getItem(key)
-      if (!raw) continue
-      const parsed = JSON.parse(raw) as Partial<StoredWorkoutDraft>
-      if (
-        parsed.version === WORKOUT_DRAFT_VERSION &&
-        parsed.userKey === userKey &&
-      isActiveDraftForDate(parsed, localDate) &&
-      typeof parsed.templateId === 'string' &&
-      typeof parsed.dayOfWeek === 'number' &&
-      typeof parsed.startedAt === 'string' &&
-      typeof parsed.updatedAt === 'string' &&
-      Array.isArray(parsed.logs)
-      ) {
-        drafts.push(parsed as StoredWorkoutDraft)
-      }
-    }
-  } catch (error) {
-    console.error('[workout] No se pudieron leer los borradores locales:', error)
-  }
-  return drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 function writeWorkoutDraft(

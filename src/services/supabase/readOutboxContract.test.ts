@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 import type { WorkoutSession } from '../../types'
-import { filterSessions, getProgressEntryWeight } from '../../pages/HistoryPage'
+import { filterSessions, getProgressEntryWeight } from '../../utils/historyPresentation'
 import { getLastExercisePerformanceFromSessions } from '../../utils/workoutHistory'
 import { getSessionVolume } from '../../utils/workout'
 

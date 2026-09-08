@@ -13,6 +13,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true
       },
       manifest: {
+        lang: 'es',
         name: 'LiftTrack',
         short_name: 'LiftTrack',
         description: 'Registra tus entrenamientos de fuerza y sigue tu progreso.',

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkoutSession } from '../types'
-import { filterSessions, getHistorySummary, getProgressEntryWeight, getSessionDeletionMessage } from './HistoryPage'
+import { filterSessions, getHistorySummary, getProgressEntryWeight, getSessionDeletionMessage } from '../utils/historyPresentation'
 
 function session(id: string, date: string, volumeKg: number): WorkoutSession {
   return {

@@ -102,22 +102,6 @@ function parseTargetSetCount(value: string) {
   return match ? Number(match[1]) : null
 }
 
-function logCsvDiagnostics(sessions: WorkoutSession[], exerciseMap: Map<string, Exercise>) {
-  if (!import.meta.env.DEV) return
-
-  for (const session of sessions) {
-    for (const log of session.exerciseLogs) {
-      const exerciseName = exerciseMap.get(log.exerciseId)?.name ?? log.exerciseId
-      const reps = log.sets.map((set) => set.reps).join('-')
-      const weights = [...new Set(log.sets.map((set) => set.weightKg))]
-      const weightLabel = weights.length === 1 ? `${weights[0]}` : weights.join('/')
-      console.info(
-        `[import:csv] ${session.id} / ${exerciseName} / ${log.sets.length} series / ${reps} / ${weightLabel} kg`
-      )
-    }
-  }
-}
-
 export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
   const rows = parseCsvRows(text.replace(/^\uFEFF/, ''))
   if (rows.length === 0) {
@@ -294,7 +278,6 @@ export function parseWorkoutCsv(text: string, filename: string): ImportPayload {
     errors.push('Volumen fuera de rango o identificadores generados duplicados.')
   }
   if (errors.length) return { source: 'csv', filename, sessions: [], exercises: [], errors }
-  logCsvDiagnostics(sessions, exerciseMap)
 
   return {
     source: 'csv',

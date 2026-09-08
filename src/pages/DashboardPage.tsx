@@ -1,7 +1,7 @@
 import { ArrowRight, Check, Circle, Minus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useWorkouts } from '../context/WorkoutContext'
-import { readWorkoutDrafts } from './WorkoutPage'
+import { readWorkoutDrafts } from '../services/workoutDraftStorage'
 import { toLocalDateKey } from '../utils/date'
 import { getCompletedRoutineDaysForWeek, getNextPendingTemplate, isInitialSession, dayNames, getSessionDate, formatDate } from '../utils/workout'
 import { hasCompletedSessionForDraft } from '../utils/workoutLifecycle'

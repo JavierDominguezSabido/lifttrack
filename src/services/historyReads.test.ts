@@ -130,3 +130,21 @@ describe('caché, cuentas y generaciones',()=>{
     expect(client.rpc.mock.lastCall?.[1].p_excluded_session_ids).toEqual([])
   })
 })
+
+it('progreso offline recupera la misma base y rechaza una nueva edición hasta reconectar',async()=>{
+  const data={sessionCount:1,bestWeight:60,accumulatedVolume:480,entries:[{sessionId:'s',logId:'s-log',date:'2026-09-07T10:00:00Z',startedAt:'2026-09-07T10:00:00Z',weightKg:60,reps:[8],volumeKg:480}],hasMore:false}
+  client.rpc.mockResolvedValue({data,error:null})
+  const online=new HistoryReader('a')
+  expect((await online.progress(['press'])).accumulatedVolume).toBe(480)
+  vi.spyOn(navigator,'onLine','get').mockReturnValue(false)
+  const offline=new HistoryReader('a')
+  expect((await offline.progress(['press'])).bestWeight).toBe(60)
+  enqueueSyncOperation('a','session:s',{action:'save',session:session('s',80)},'confirmed')
+  offline.invalidate()
+  await expect(offline.progress(['press'])).rejects.toThrow('Sin conexión')
+  expect((await offline.session('s'))?.exerciseLogs[0].sets[0].weightKg).toBe(80)
+  vi.spyOn(navigator,'onLine','get').mockReturnValue(true)
+  client.rpc.mockResolvedValue({data:{sessionCount:0,bestWeight:0,accumulatedVolume:0,entries:[],hasMore:false},error:null})
+  expect(await offline.progress(['press'])).toMatchObject({bestWeight:80,accumulatedVolume:640,sessionCount:1})
+  expect(client.rpc.mock.lastCall?.[1].p_excluded_session_ids).toEqual(['s'])
+})
