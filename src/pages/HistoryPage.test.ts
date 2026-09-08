@@ -21,7 +21,7 @@ describe('resumen compacto del historial', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('mantiene todas las sesiones y suma el volumen existente', () => {
+  it('mantiene sesiones y calcula volumen desde series, no desde el agregado almacenado', () => {
     const sessions = [
       session('latest', '2026-08-17T18:00:00.000Z', 4000),
       session('previous', '2026-08-10T18:00:00.000Z', 3500)
@@ -31,7 +31,7 @@ describe('resumen compacto del historial', () => {
       sessionCount: 2,
       activeWeeks: 2,
       streakWeeks: 2,
-      totalVolume: 7500,
+      totalVolume: 0,
       latestSession: sessions[0]
     })
   })

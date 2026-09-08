@@ -4,7 +4,7 @@ import type { WorkoutSession } from '../types'
 import { pendingOperations } from './syncOutbox'
 import { HistoryPager, pendingHistory, reconcileOverview, reconcilePerformance, reconcileProgress, sessionWeek, type HistoryOverview, type HistoryPageResult, type ReadPerformance, type ReadProgress, type SessionFilters } from './historyReads'
 
-type ReadName='lifttrack_read_session_v1'|'lifttrack_read_history_overview_v2'|'lifttrack_read_sessions_page_v3'|'lifttrack_read_exercise_progress_v2'|'lifttrack_read_last_performance_v2'
+type ReadName='lifttrack_read_session_v1'|'lifttrack_read_history_overview_v3'|'lifttrack_read_sessions_page_v3'|'lifttrack_read_exercise_progress_v4'|'lifttrack_read_last_performance_v2'
 export class ReadContractError extends Error {}
 export class StaleHistoryRead extends Error {}
 function normalize(value:unknown):unknown {
@@ -21,7 +21,7 @@ export function validateRead(name:ReadName,value:unknown) {
   const numeric=(o:Record<string,unknown>,keys:string[])=>keys.every(k=>typeof o[k]==='number'&&Number.isFinite(o[k]))
   const valid=name==='lifttrack_read_session_v1' ? value===null||validSession(value)
     :name==='lifttrack_read_last_performance_v2' ? value===null || object(value)&&typeof value.sessionId==='string'&&typeof value.startedAt==='string'&&typeof value.performedAt==='string'&&numeric(value,['weightKg'])&&Array.isArray(value.reps)
-    :name==='lifttrack_read_history_overview_v2' ? object(value)&&numeric(value,['sessionCount','totalVolume','activeWeeks','streakWeeks'])&&object(value.exerciseLogCounts)&&Array.isArray(value.weekProbes)&&Array.isArray(value.currentWeekCompletedDays)&&(value.latestSession===null||validSession(value.latestSession))
+    :name==='lifttrack_read_history_overview_v3' ? object(value)&&numeric(value,['sessionCount','totalVolume','activeWeeks','streakWeeks'])&&object(value.exerciseLogCounts)&&Array.isArray(value.weekProbes)&&Array.isArray(value.currentWeekCompletedDays)&&(value.latestSession===null||validSession(value.latestSession))
     :name==='lifttrack_read_sessions_page_v3' ? object(value)&&numeric(value,['totalCount','filteredCount'])&&Array.isArray(value.items)&&value.items.every(validSession)&&typeof value.hasMore==='boolean'&&(!value.hasMore||object(value.nextCursor))
     :object(value)&&numeric(value,['sessionCount','bestWeight','accumulatedVolume'])&&Array.isArray(value.entries)&&value.entries.every(e=>object(e)&&typeof e.sessionId==='string'&&typeof e.startedAt==='string'&&typeof e.date==='string'&&numeric(e,['weightKg','volumeKg'])&&Array.isArray(e.reps))
   if(!valid)throw new ReadContractError(`${name}: respuesta incompatible con docs/read-outbox-contract.md`)
@@ -72,7 +72,7 @@ export class HistoryReader {
   }
   async overview() {
     const p=this.snapshot(),now=new Date()
-    const raw=await this.raw<HistoryOverview>('lifttrack_read_history_overview_v2',{p_user_id:this.owner,p_timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,p_excluded_session_ids:p.excluded,p_local_week_starts:[...new Set(p.local.filter(s=>!s.id.startsWith('initial-')).map(sessionWeek))],p_now:new Date(now.getFullYear(),now.getMonth(),now.getDate(),12).toISOString()},p.key)
+    const raw=await this.raw<HistoryOverview>('lifttrack_read_history_overview_v3',{p_user_id:this.owner,p_timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,p_excluded_session_ids:p.excluded,p_local_week_starts:[...new Set(p.local.filter(s=>!s.id.startsWith('initial-')).map(sessionWeek))],p_now:new Date(now.getFullYear(),now.getMonth(),now.getDate(),12).toISOString()},p.key)
     return reconcileOverview({...raw,latestSession:normalize(raw.latestSession) as WorkoutSession|undefined},p.local,now)
   }
   pager(filters:SessionFilters,size=10,signal?:AbortSignal) {
@@ -91,7 +91,7 @@ export class HistoryReader {
   }
   async progress(ids:string[],limit=8) {
     const p=this.snapshot()
-    const r=await this.raw<ReadProgress>('lifttrack_read_exercise_progress_v2',{p_user_id:this.owner,p_exercise_ids:ids,p_limit:limit,p_excluded_session_ids:p.excluded},p.key)
+    const r=await this.raw<ReadProgress>('lifttrack_read_exercise_progress_v4',{p_user_id:this.owner,p_exercise_ids:ids,p_limit:limit,p_excluded_session_ids:p.excluded},p.key)
     return reconcileProgress(r,p.local,ids,limit)
   }
   async performance(id:string,ids:string[]) {

@@ -1,7 +1,7 @@
 import type { Exercise, LastExercisePerformance, WorkoutSession, WorkoutTemplate } from '../types'
 import type { SyncOperation } from './syncOutbox'
 import { getSessionDate, getWeekStart, toLocalDateKey } from '../utils/date'
-import { getSessionVolume } from '../utils/workout'
+import { getSessionVolume, getPerformedWeight } from '../utils/workout'
 import { getLastExercisePerformanceFromSessions } from '../utils/workoutHistory'
 import { getSessionRoutineIdentity } from '../utils/historySession'
 
@@ -50,7 +50,7 @@ export function reconcileOverview(remote: HistoryOverview, local: WorkoutSession
     if(s.completedAt && sessionWeek(s)===toLocalDateKey(getWeekStart(now))) days.add(s.dayOfWeek)
   }
   for(const w of weeks) if(!probes.has(w)) throw new Error(`Overview incompatible: falta weekProbe ${w}`)
-  return {...remote,sessionCount:remote.sessionCount+sessions.length,totalVolume:remote.totalVolume+sessions.reduce((n,s)=>n+(s.volumeKg??getSessionVolume(s)),0),activeWeeks:remote.activeWeeks+[...weeks].filter(w=>!probes.get(w)!.active).length,streakWeeks:streak,exerciseLogCounts:counts,currentWeekCompletedDays:[...days].sort(),latestSession:[...(remote.latestSession?[remote.latestSession]:[]),...sessions].sort(compareSessions)[0]}
+  return {...remote,sessionCount:remote.sessionCount+sessions.length,totalVolume:remote.totalVolume+sessions.reduce((n,s)=>n+getSessionVolume(s),0),activeWeeks:remote.activeWeeks+[...weeks].filter(w=>!probes.get(w)!.active).length,streakWeeks:streak,exerciseLogCounts:counts,currentWeekCompletedDays:[...days].sort(),latestSession:[...(remote.latestSession?[remote.latestSession]:[]),...sessions].sort(compareSessions)[0]}
 }
 export interface SessionFilters { exerciseIds: string[] | null; searchIds: string[] | null; day: number | null; from: string | null; to: string | null; templateDays: Record<string,number>; includeInitial?: boolean }
 export function matchesSession(s: WorkoutSession, f: SessionFilters) {
@@ -107,11 +107,11 @@ export function reconcileProgress(remote: ReadProgress, local:WorkoutSession[], 
   const entries=local.filter(realSession).flatMap(s=>{
     const log=s.exerciseLogs.find(l=>ids.includes(l.exerciseId));if(!log)return []
     const sets=log.sets.filter(s=>s.completed).sort((a,b)=>a.setNumber-b.setNumber)
-    return [{sessionId:s.id,logId:log.id,date:getSessionDate(s),startedAt:s.startedAt,weightKg:log.workingWeightKg??sets[0]?.weightKg??0,reps:sets.map(s=>s.reps),volumeKg:getSessionVolume({...s,exerciseLogs:[log]})}]
+    return [{sessionId:s.id,logId:log.id,date:getSessionDate(s),startedAt:s.startedAt,performedWeight:getPerformedWeight(log),weightKg:log.workingWeightKg??sets[0]?.weightKg??0,reps:sets.map(s=>s.reps),volumeKg:getSessionVolume({...s,exerciseLogs:[log]})}]
   })
   const recent=[...remote.entries,...entries].sort(entryOrder).slice(0,limit)
   const count=remote.sessionCount+entries.length
-  return {sessionCount:count,bestWeight:Math.max(remote.bestWeight,0,...entries.map(e=>e.weightKg)),accumulatedVolume:remote.accumulatedVolume+entries.reduce((n,e)=>n+e.volumeKg,0),latest:recent[0],entries:recent,hasMore:count>recent.length}
+  return {sessionCount:count,bestWeight:Math.max(remote.bestWeight,0,...entries.map(e=>e.performedWeight)),accumulatedVolume:remote.accumulatedVolume+entries.reduce((n,e)=>n+e.volumeKg,0),latest:recent[0],entries:recent,hasMore:count>recent.length}
 }
 export interface ReadPerformance extends LastExercisePerformance {startedAt:string}
 export function reconcilePerformance(remote:ReadPerformance|null,local:WorkoutSession[],id:string,ids:string[]) {

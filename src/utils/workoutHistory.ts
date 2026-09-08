@@ -16,7 +16,7 @@ export function getLastExercisePerformanceFromSessions(
     .sort((a, b) => {
       const sourceDifference =
         Number(isInitialSession(a.id)) - Number(isInitialSession(b.id))
-      return sourceDifference || getSessionDate(b).localeCompare(getSessionDate(a))
+      return sourceDifference || Date.parse(getSessionDate(b)) - Date.parse(getSessionDate(a))
     })
 
   for (const session of sortedSessions) {

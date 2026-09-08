@@ -17,7 +17,7 @@ beforeEach(()=>{
   mock.context={sessions:[],exercises:[exercise],templates:[],ownerId:'a',historyReader:new HistoryReader('a'),overview:{sessionCount:35,activeWeeks:6,streakWeeks:6,totalVolume:16800,exerciseLogCounts:{press:35},currentWeekCompletedDays:[1],weekProbes:[]},getExerciseById:()=>exercise,deleteSession:vi.fn(),saveSession:mock.save}
   mock.rpc.mockImplementation(async(name,args)=>{
     if(name==='lifttrack_read_session_v1')return {data:sessions.find(s=>s.id===args.p_session_id)??null,error:null}
-    if(name==='lifttrack_read_exercise_progress_v2')return {data:{sessionCount:35,bestWeight:60,accumulatedVolume:16800,latest:{sessionId:'s0',logId:'l0',date:sessions[0].completedAt,startedAt:sessions[0].startedAt,weightKg:60,reps:[8]},entries:[{sessionId:'s0',logId:'l0',date:sessions[0].completedAt,startedAt:sessions[0].startedAt,weightKg:60,reps:[8],volumeKg:480}],hasMore:true},error:null}
+    if(name==='lifttrack_read_exercise_progress_v4')return {data:{sessionCount:35,bestWeight:60,accumulatedVolume:16800,latest:{sessionId:'s0',logId:'l0',date:sessions[0].completedAt,startedAt:sessions[0].startedAt,weightKg:60,reps:[8]},entries:[{sessionId:'s0',logId:'l0',date:sessions[0].completedAt,startedAt:sessions[0].startedAt,weightKg:60,reps:[8],volumeKg:480}],hasMore:true},error:null}
     const filtered=args.p_search_exercise_ids?.length===0?[]:sessions
     const offset=args.p_cursor?Number(args.p_cursor.id.slice(1))+1:0
     const items=filtered.slice(offset,offset+args.p_limit),more=offset+items.length<filtered.length
@@ -50,7 +50,7 @@ it('cambiar búsqueda reinicia cursor y muestra conteo filtrado exacto',async()=
 })
 it('Por ejercicio usa agregados y detalle paginado; la gráfica conserva sus registros',async()=>{
   mount('/progreso?vista=progress');await screen.findByRole('img',{name:/Evolución del peso de trabajo/})
-  expect(mock.rpc.mock.calls.some(([name])=>name==='lifttrack_read_exercise_progress_v2')).toBe(true)
+  expect(mock.rpc.mock.calls.some(([name])=>name==='lifttrack_read_exercise_progress_v4')).toBe(true)
   expect(mock.rpc.mock.calls.filter(([name])=>name==='lifttrack_read_sessions_page_v3')).toHaveLength(1)
 })
 it('edición histórica directa no requiere la rutina ni el historial descargado y preserva cambios sin guardar',async()=>{

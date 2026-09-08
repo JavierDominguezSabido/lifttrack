@@ -1,5 +1,6 @@
+import { weightChartModel } from '../utils/weightChart'
 import { useHistoryRead } from '../services/useHistoryRead'
-import { searchExerciseIds, type SessionFilters, type HistoryPager } from '../services/historyReads'
+import { compareSessions, searchExerciseIds, type SessionFilters, type HistoryPager } from '../services/historyReads'
 import { confirmAction } from '../components/ui/confirmAction'
 import { useModalFocus } from '../components/ui/useModalFocus'
 import { moveViewFocus } from '../components/ui/moveViewFocus'
@@ -38,6 +39,7 @@ import {
   getSessionDate,
   getSessionDateObject,
   getSessionVolume,
+  getPerformedWeight,
   getWeekStart,
   isInitialSession
 } from '../utils/workout'
@@ -114,7 +116,7 @@ export function HistoryPage() {
   const realSessions = useMemo(
     () => [...sessions]
       .filter((session) => !isInitialSession(session.id))
-      .sort((a, b) => getSessionDate(b).localeCompare(getSessionDate(a))),
+      .sort(compareSessions),
     [sessions]
   )
   const canonicalExerciseIds = useMemo(
@@ -134,7 +136,7 @@ export function HistoryPage() {
       const r = await historyReader!.progress([...getEquivalentIdsForExercise(exercise.id, exercises, canonicalExerciseIds)], 1)
       return { exercise, entries: [], bestWeight: r.bestWeight, sessionCount: r.sessionCount, accumulatedVolume: r.accumulatedVolume, latestReps: r.latest?.reps.join('-') ?? '', latestWeight: r.latest?.weightKg ?? 0, latestDate: r.latest?.date } satisfies ExerciseProgressSummary
     }))
-    return summaries.filter(s => s.sessionCount > 0).sort((a,b) => (b.latestDate ?? '').localeCompare(a.latestDate ?? '') || b.sessionCount-a.sessionCount || a.exercise.name.localeCompare(b.exercise.name))
+    return summaries.filter(s => s.sessionCount > 0).sort((a,b) => (Date.parse(b.latestDate ?? '') - Date.parse(a.latestDate ?? '')) || b.sessionCount-a.sessionCount || a.exercise.name.localeCompare(b.exercise.name))
   })
   const exerciseProgressSummaries = useMemo(() => historyReader ? cloudSummaries.value ?? [] : localExerciseProgressSummaries, [historyReader,cloudSummaries.value,localExerciseProgressSummaries])
   const filteredExerciseProgressSummaries = useMemo(() => {
@@ -398,7 +400,7 @@ export function HistoryPage() {
                 </div>
 
                 <div className="exercise-metrics mt-3 grid grid-cols-2 gap-3">
-                  <HistoryStat icon={Trophy} label="Mejor peso" value={`${bestWeight} kg`} compact />
+                  <HistoryStat icon={Trophy} label="Mejor peso realizado" value={`${bestWeight} kg`} compact />
                   <HistoryStat
                     icon={CalendarDays}
                     label="Última vez"
@@ -671,7 +673,7 @@ function SessionCard({
     0
   )
   const totalSets = session.exerciseLogs.reduce((sum, log) => sum + log.sets.length, 0)
-  const volume = session.volumeKg ?? getSessionVolume(session)
+  const volume = getSessionVolume(session)
   const status = completedSets >= totalSets ? 'Completada' : 'Parcial'
   const sessionDate = getSessionDateObject(session)
   const routine = getSessionRoutineIdentity(session, templates, sessionDate.getDay())
@@ -903,108 +905,37 @@ function ExerciseProgressSelector({
   )
 }
 
-function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
+export function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   const weights = entries.map(getProgressEntryWeight)
-  const minWeight = Math.min(...weights)
-  const maxWeight = Math.max(...weights)
-  const range = Math.max(1, maxWeight - minWeight)
-  const maintainedWeight = minWeight === maxWeight && entries.length > 1
-  const pointTop = 18
-  const pointBottom = 78
-  const points = entries.map((entry, index) => {
-    const weight = getProgressEntryWeight(entry)
-    const x = entries.length === 1 ? 50 : 4 + (index / (entries.length - 1)) * 92
-    const y = pointBottom - ((weight - minWeight) / range) * (pointBottom - pointTop)
-    const label = `${weight} kg`
-    const labelOffset = 24
-    const reps = formatSetReps(entry.log.sets)
-    return {
-      x,
-      y,
-      entry,
-      label,
-      labelOffset,
-      reps
-    }
-  })
-  const path = points.map((point, index) =>
-    `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`
-  ).join(' ')
-
+  const model = weightChartModel(weights)
+  const points = model.points
+  const path = points.map((p,i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`).join(' ')
+  const number = (value:number) => new Intl.NumberFormat('es-ES',{maximumFractionDigits:1}).format(value)
   return (
     <div className="px-1 py-4 sm:px-3">
-      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h4 className="font-extrabold text-ink">Peso de trabajo</h4>
-          <p className="text-xs font-semibold text-secondary">Últimas {entries.length} sesiones registradas</p>
-        </div>
-        <p className="rounded-md bg-muted px-2 py-1 text-xs font-bold text-secondary">{minWeight} - {maxWeight} kg</p>
-      </div>
-
-      {maintainedWeight && (
-        <p className="mb-1 rounded-lg bg-brand-soft px-3 py-2 text-xs font-bold text-brand">
-          Peso mantenido en {minWeight} kg durante {entries.length} sesiones.
-        </p>
-      )}
-      <div className="relative mt-2 h-56 overflow-visible sm:h-64" role="img" aria-label={`Evolución del peso de trabajo: ${entries.map(entry => `${formatDate(getSessionDateObject(entry.session), { day: 'numeric', month: 'long', year: 'numeric' })}: ${getProgressEntryWeight(entry)} kg`).join('; ')}`}>
-        <div className="absolute inset-x-1 top-12 bottom-10 sm:inset-x-2">
-          <span className="absolute inset-x-0 top-1/4 border-t border-dashed border-line" aria-hidden="true" />
-          <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-line" aria-hidden="true" />
-          <span className="absolute inset-x-0 top-3/4 border-t border-dashed border-line" aria-hidden="true" />
-          <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <path
-              d={path}
-              className="fill-none stroke-brand"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
+      <h4 className="font-extrabold text-ink">Peso de trabajo</h4>
+      <p className="text-xs text-secondary">Últimas {entries.length} sesiones · puntos separados por sesión</p>
+      <p className="mt-2 text-xs text-secondary">
+        Último: <strong className="text-ink">{number(weights[weights.length-1] ?? 0)} kg</strong>
+        {weights.length > 1 && <> · {model.flat ? 'Peso estable' : `Máximo visible: ${number(Math.max(...weights))} kg`}</>}
+      </p>
+      <p className="mt-1 text-xs text-secondary">Peso base registrado; el récord realizado se muestra en las métricas.</p>
+      <div className="relative mt-3 h-44 sm:h-52" role="img" aria-label={`Evolución del peso de trabajo, escala de ${number(model.min)} a ${number(model.max)} kg. ${entries.map((entry,i)=>`${formatDate(getSessionDateObject(entry.session),{day:'numeric',month:'long',year:'numeric'})}: ${weights[i]} kg`).join('; ')}`}>
+        <div className="absolute inset-y-0 left-10 right-2">
+          {[model.max,(model.max+model.min)/2,model.min].map((value,i)=><div key={i} className="absolute inset-x-0 border-t border-dashed border-line" style={{top:`${10+i*40}%`}} aria-hidden="true"><span className="absolute right-full -translate-y-1/2 pr-2 text-[10px] text-secondary">{number(value)}</span></div>)}
+          <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path d={path} className="fill-none stroke-brand" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </svg>
-
-          {points.map(({ x, y, entry, label, labelOffset, reps }) => {
-            const date = formatDate(getSessionDateObject(entry.session), { day: '2-digit', month: '2-digit', year: '2-digit' })
-            return (
-              <div
-                key={entry.session.id}
-                className="absolute"
-                style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
-                title={[
-                  date,
-                  label,
-                  reps ? `${reps} reps` : undefined
-                ].filter(Boolean).join('\n')}
-                aria-label={[
-                  date,
-                  label,
-                  reps ? `${reps} reps` : undefined
-                ].filter(Boolean).join(', ')}
-              >
-                <span
-                  className="absolute left-1/2 whitespace-nowrap rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-ink shadow-sm"
-                  style={{ bottom: `${labelOffset}px`, transform: 'translateX(-50%)' }}
-                >
-                  {label}
-                </span>
-                <span className={`block rounded-full border-[2.5px] border-brand bg-surface shadow-sm ${
-                  entry.session.id === entries[entries.length - 1]?.session.id ? 'size-5' : 'size-3.5'
-                }`} />
-                <span className="absolute left-1/2 top-1/2 block size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand" />
-                <span
-                  className="absolute left-1/2 top-7 whitespace-nowrap text-[10px] font-bold leading-none text-secondary"
-                  style={{ transform: 'translateX(-50%)' }}
-                >
-                  {formatDate(getSessionDateObject(entry.session), { day: '2-digit', month: '2-digit' })}
-                </span>
-              </div>
-            )
-          })}
+          {points.map((point,i)=><div key={entries[i].session.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{left:`${point.x}%`,top:`${point.y}%`}} title={`${formatDate(getSessionDateObject(entries[i].session))}: ${point.weight} kg`} aria-hidden="true">
+            {point.label && <span className="absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface px-1 text-[10px] font-bold text-ink">{number(point.weight)} kg</span>}
+            <span className={`block rounded-full border-2 border-brand ${point.last ? 'size-3 bg-brand' : 'size-2 bg-surface'}`} />
+          </div>)}
         </div>
       </div>
+      {entries.length > 0 && <div className="ml-10 flex justify-between text-[10px] text-secondary" aria-hidden="true"><span>{formatDate(getSessionDateObject(entries[0].session))}</span>{entries.length>1 && <span>{formatDate(getSessionDateObject(entries[entries.length-1].session))}</span>}</div>}
     </div>
   )
 }
-
 function HistoryStat({
   icon: Icon,
   label,
@@ -1087,7 +1018,7 @@ export function getSessionDeletionMessage(session: WorkoutSession, templates: Wo
     'Vas a eliminar:',
     routineLabel,
     `Fecha registrada: ${registeredDate}`,
-    `${session.exerciseLogs.length} ejercicios · ${countCompletedSets(session)} series · ${formatCompactNumber(session.volumeKg ?? getSessionVolume(session))} kg`,
+    `${session.exerciseLogs.length} ejercicios · ${countCompletedSets(session)} series · ${formatCompactNumber(getSessionVolume(session))} kg`,
     '',
     'Esta acción no se puede deshacer. ¿Continuar?'
   ].join('\n')
@@ -1106,7 +1037,7 @@ export function getHistorySummary(sessions: WorkoutSession[]) {
     sessionCount: sessions.length,
     activeWeeks: weekStarts.length,
     streakWeeks: calculateWeeklyStreak(sessions),
-    totalVolume: sessions.reduce((total, session) => total + (session.volumeKg ?? getSessionVolume(session)), 0),
+    totalVolume: sessions.reduce((total, session) => total + (getSessionVolume(session)), 0),
     latestSession: sessions[0]
   }
 }
@@ -1163,7 +1094,7 @@ function getExerciseProgressSummaries(
       return {
         exercise,
         entries,
-        bestWeight: Math.max(0, ...entries.map(getProgressEntryWeight)),
+        bestWeight: Math.max(0, ...entries.map(entry => getPerformedWeight(entry.log))),
         sessionCount: entries.length,
         accumulatedVolume: entries.reduce(
           (sum, entry) => sum + getSessionVolume({ ...entry.session, exerciseLogs: [entry.log] }),

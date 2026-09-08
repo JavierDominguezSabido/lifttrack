@@ -1,5 +1,5 @@
 import { exercises } from '../data/mockData'
-import type { WorkoutSession, WorkoutTemplate } from '../types'
+import type { WorkoutSession, WorkoutTemplate, ExerciseLog } from '../types'
 import {
   getNextWeekStart,
   getSessionDate,
@@ -112,7 +112,7 @@ export function getSessionVolume(session: WorkoutSession) {
     (total, log) =>
       total +
       log.sets.reduce(
-        (exerciseTotal, set) => exerciseTotal + (set.completed ? set.reps * set.weightKg : 0),
+        (exerciseTotal, set) => exerciseTotal + (set.completed ? set.reps * (set.weightOverrideKg ?? set.weightKg) : 0),
         0
       ),
     0
@@ -124,4 +124,10 @@ export function formatCompactNumber(value: number) {
     notation: value >= 1000 ? 'compact' : 'standard',
     maximumFractionDigits: 1
   }).format(value)
+}
+
+/** Récord realizado; independiente del peso base de la gráfica. */
+export function getPerformedWeight(log: ExerciseLog) {
+  return log.sets.reduce((best, set) => set.completed && !set.isWarmup
+    ? Math.max(best, set.weightOverrideKg ?? set.weightKg) : best, 0)
 }
