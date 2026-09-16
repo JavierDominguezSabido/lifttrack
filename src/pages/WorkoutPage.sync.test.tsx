@@ -1,3 +1,4 @@
+import type { HistoryReader } from '../services/historyReader'
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -17,7 +18,7 @@ const template = { id: 'lunes', name: 'Lunes', dayOfWeek: 1, exercises: [{
   id: 'template-press', templateId: 'lunes', exerciseId: 'press', order: 1, targetSets: 1, targetReps: '8'
 }] }
 const context = {
-  ownerId: 'user:user-a', sessions: [], templates: [template], exercises: [exercise],
+  historyReader: undefined as HistoryReader | undefined, ownerId: 'user:user-a', sessions: [], templates: [template], exercises: [exercise],
   getExerciseById: () => exercise, saveSession: mocks.save, syncReady: true
 }
 vi.mock('../context/WorkoutContext', () => ({ useWorkouts: () => context }))
@@ -43,6 +44,8 @@ async function settle() { await act(async () => { await Promise.resolve() }) }
 
 describe('persistencia del entrenamiento ante fallos y respuestas tardías', () => {
   beforeEach(() => {
+    context.historyReader = undefined
+    template.exercises[0].targetSets = 1
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-09-01T10:00:00Z'))
     localStorage.clear()
@@ -172,4 +175,43 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     expect(mocks.remove).not.toHaveBeenCalled()
     expect(screen.queryByText('Historial guardado')).toBeNull()
   })
+  it('guiado reserva Última vez durante carga y vacío; no monta avisos remotos visibles', async () => {
+    const performance = deferred<null>()
+    context.historyReader = { owner:'user-a', subscribe:()=>()=>{},version:()=>0,performance:vi.fn().mockResolvedValueOnce(null).mockImplementation(()=>performance.promise) } as unknown as HistoryReader
+    mocks.get.mockRejectedValue(new Error('Supabase no disponible'))
+    const page=mount();await settle()
+    fireEvent.click(screen.getByRole('button',{name:'Modo guiado'}))
+    const slot=page.container.querySelector('.guided-previous')!
+    expect(slot.textContent).toContain('Última vez: —')
+    expect(slot.classList.contains('h-8')).toBe(true)
+    await act(async()=>{performance.resolve(null);await vi.advanceTimersByTimeAsync(16000)})
+    expect(page.container.querySelector('.guided-previous')).toBe(slot)
+    expect(screen.queryByText('Reintentar')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Reps reales'),{target:{value:'12'}})
+    expect(stored().logs[0].sets[0].reps).toBe('12')
+    fireEvent(window,new Event('offline'));fireEvent(document,new Event('visibilitychange'));fireEvent(window,new Event('online'))
+    await settle()
+    expect(page.container.querySelector('.guided-previous')).toBe(slot)
+  })
+
+  it('guiado sustituye el placeholder sin remount; completar y Anterior conservan valores',async()=>{
+    const performance=deferred<{sessionId:string;performedAt:string;weightKg:number;reps:number[]}>()
+    context.historyReader={owner:'user-a',subscribe:()=>()=>{},version:()=>0,performance:vi.fn().mockResolvedValueOnce(null).mockImplementation(()=>performance.promise)} as unknown as HistoryReader
+    template.exercises[0].targetSets=3
+    const page=mount();await settle();fireEvent.click(screen.getByRole('button',{name:'Modo guiado'}))
+    const slot=page.container.querySelector('.guided-previous')!
+    await act(async()=>{performance.resolve({sessionId:'old',performedAt:'2026-08-31Z',weightKg:65,reps:[8,7,6]})})
+    expect(page.container.querySelector('.guided-previous')).toBe(slot)
+    expect(slot.textContent).toContain('8-7-6')
+    fireEvent.change(screen.getByLabelText('Reps reales'),{target:{value:'9'}})
+    fireEvent.click(screen.getByRole('button',{name:'Completar serie'}))
+    expect(page.container.querySelector('.guided-previous')).toBe(slot)
+    expect(page.container.querySelector('[role="status"].sr-only')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button',{name:'Anterior'}))
+    expect(stored().logs[0].sets[0]).toMatchObject({completed:false,reps:'9'})
+    fireEvent.click(screen.getByRole('button',{name:'Completar serie'}))
+    fireEvent.click(screen.getByRole('button',{name:'Completar serie'}))
+    expect(stored().logs[0].sets.slice(0,2).every((s:{completed:boolean})=>s.completed)).toBe(true)
+  })
+
 })

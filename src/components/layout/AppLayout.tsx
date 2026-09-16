@@ -145,7 +145,7 @@ export function AppLayout() {
 
         <main id="main-content" tabIndex={-1} className="app-main mx-auto w-full max-w-[1600px] px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
           {(latestConflict || visibleError) && (
-            <section aria-label="Operaciones pendientes de sincronización" className="card mb-4 space-y-2 p-3">
+            <section aria-label="Operaciones pendientes de sincronización" className="app-sync-notice card mb-4 space-y-2 p-3">
               {!latestConflict && <p role="alert" className="status-error">{visibleError}</p>}
               {latestConflict ? <>
                 <p role="alert" className="text-sm">Hay cambios distintos en {conflictLabel}. La cola está pausada y tu copia local se conserva.</p>

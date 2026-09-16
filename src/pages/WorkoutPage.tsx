@@ -331,7 +331,6 @@ function WorkoutPageContent() {
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
   const [guidedPosition, setGuidedPosition] = useState<GuidedPosition | null>(() => initialStateRef.current!.guidedPosition)
   const [guidedFeedback, setGuidedFeedback] = useState<GuidedFeedback | null>(null)
-  const [guidedStepAnimationKey, setGuidedStepAnimationKey] = useState(0)
   const [, setDraftSyncStatus] = useState<DraftSyncStatus>(
     initialStateRef.current!.draftActive ? (user ? 'pending' : 'local') : 'idle'
   )
@@ -947,7 +946,6 @@ function WorkoutPageContent() {
 
   function showGuidedFeedback(feedback: GuidedFeedback) {
     setGuidedFeedback(feedback)
-    setGuidedStepAnimationKey((current) => current + 1)
     if (guidedFeedbackTimeoutRef.current) {
       window.clearTimeout(guidedFeedbackTimeoutRef.current)
     }
@@ -1233,7 +1231,7 @@ function WorkoutPageContent() {
         {guidedFeedback && (
           <div
             role="status"
-            className="w-fit max-w-md animate-[guidedToast_1100ms_ease-in-out_both] rounded-xl border border-success/30 bg-surface/95 px-4 py-2.5 text-center shadow-card backdrop-blur-xl"
+            className={viewMode === 'guided' ? 'sr-only' : 'w-fit max-w-md animate-[guidedToast_1100ms_ease-in-out_both] rounded-xl border border-success/30 bg-surface/95 px-4 py-2.5 text-center shadow-card backdrop-blur-xl'}
           >
             <p className="text-sm font-extrabold text-success-text">{guidedFeedback.message}</p>
             {guidedFeedback.detail && (
@@ -1294,10 +1292,10 @@ function WorkoutPageContent() {
       </section>
 
       {localSaveError && <p role="alert" className="status-error">{localSaveError}</p>}
-      {(visibleDraftError || localSaveError) && (
+      {(localSaveError || (viewMode !== 'guided' && visibleDraftError)) && (
         <p role="alert" className="status-error">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{visibleDraftError ?? 'El guardado local requiere atención.'}</span>
+          <span>{localSaveError ? 'El guardado local requiere atención.' : visibleDraftError}</span>
           <button type="button" className="underline" onClick={() => setHydrationRetry((current) => current + 1)}>Reintentar</button>
         </p>
       )}
@@ -1370,8 +1368,7 @@ function WorkoutPageContent() {
           ) : currentGuidedStep ? (
             <div className="guided-stage p-4 sm:p-6">
               <div
-                key={guidedStepAnimationKey}
-                className="guided-step animate-[guidedStepIn_220ms_ease-out]"
+                className="guided-step"
               >
                 <div className="guided-heading text-center">
                   <p className="text-xs font-bold uppercase tracking-wider text-secondary">
@@ -1473,18 +1470,18 @@ function WorkoutPageContent() {
                   </label>
                 </div>
 
-                {guidedPreviousPerformance && (
-                  <div className="px-1 text-center text-xs font-semibold text-secondary">
-                    {guidedPreviousPerformance && (
-                      <p>
-                        Última vez: <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
-                        {guidedPreviousPerformance.weightKg > 0
-                          ? ` con ${guidedPreviousPerformance.weightKg} kg`
-                          : ' sin peso añadido'}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <div className="guided-previous h-8 min-w-0 px-1 text-center text-xs font-semibold leading-4 text-secondary">
+                  <p className="line-clamp-2" title={guidedPreviousPerformance
+                    ? `Última vez: ${guidedPreviousPerformance.reps.join('-')} con ${guidedPreviousPerformance.weightKg} kg`
+                    : 'Última vez: —'}>
+                    Última vez: {guidedPreviousPerformance ? <>
+                      <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
+                      {guidedPreviousPerformance.weightKg > 0
+                        ? ` con ${guidedPreviousPerformance.weightKg} kg`
+                        : ' sin peso añadido'}
+                    </> : '—'}
+                  </p>
+                </div>
 
               {saveError && (
                 <p id="guided-save-error" role="alert" className="status-error">
@@ -1503,7 +1500,7 @@ function WorkoutPageContent() {
                       : '!bg-success-solid hover:!bg-success-solid-hover'
                   }`}
                 >
-                  <CheckCircle2 className={guidedFeedback ? 'size-6' : 'size-5'} aria-hidden="true" />
+                  <CheckCircle2 className="size-5" aria-hidden="true" />
                   {currentGuidedStep.set.completed ? 'Continuar' : 'Completar serie'}
                 </button>
                 <button
