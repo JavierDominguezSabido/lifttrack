@@ -377,3 +377,8 @@ aside nav a.text-brand { background: transparent; box-shadow: inset 3px 0 rgb(va
 /* Los avisos remotos se atienden fuera del guiado; no desplazan sus controles.
    Los errores de guardado local y de entrenamiento siguen visibles en la página. */
 .app-main:has(.workout-view[data-guided='true']) > .app-sync-notice { display: none; }
+
+/* Vista completa: avisos remotos fuera de la sesión; errores locales visibles. */
+.app-main:has(.workout-view[data-guided='false']) > .app-sync-notice,
+.workout-view[data-guided='false'] > [data-remote-only='true'] { display: none; }
+.workout-view[data-guided='false'] .full-workout-feedback { @apply sr-only; }

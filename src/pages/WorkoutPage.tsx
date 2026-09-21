@@ -1231,7 +1231,7 @@ function WorkoutPageContent() {
         {guidedFeedback && (
           <div
             role="status"
-            className={viewMode === 'guided' ? 'sr-only' : 'w-fit max-w-md animate-[guidedToast_1100ms_ease-in-out_both] rounded-xl border border-success/30 bg-surface/95 px-4 py-2.5 text-center shadow-card backdrop-blur-xl'}
+            className={viewMode === 'guided' ? 'sr-only' : 'full-workout-feedback w-fit max-w-md animate-[guidedToast_1100ms_ease-in-out_both] rounded-xl border border-success/30 bg-surface/95 px-4 py-2.5 text-center shadow-card backdrop-blur-xl'}
           >
             <p className="text-sm font-extrabold text-success-text">{guidedFeedback.message}</p>
             {guidedFeedback.detail && (
@@ -1293,7 +1293,7 @@ function WorkoutPageContent() {
 
       {localSaveError && <p role="alert" className="status-error">{localSaveError}</p>}
       {(localSaveError || (viewMode !== 'guided' && visibleDraftError)) && (
-        <p role="alert" className="status-error">
+        <p role="alert" data-remote-only={!localSaveError} className="status-error">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>{localSaveError ? 'El guardado local requiere atención.' : visibleDraftError}</span>
           <button type="button" className="underline" onClick={() => setHydrationRetry((current) => current + 1)}>Reintentar</button>
@@ -1557,6 +1557,7 @@ function WorkoutPageContent() {
               onChange={updateLog}
               exercise={exercise}
               showWeightIncrement={false}
+              stableLayout
             />
           )
         })}

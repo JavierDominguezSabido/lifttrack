@@ -27,6 +27,7 @@ interface ExerciseLoggerProps {
   onChange: (log: DraftExerciseLog) => void
   exercise?: Exercise
   showWeightIncrement?: boolean
+  stableLayout?: boolean
 }
 
 export function ExerciseLogger({
@@ -35,7 +36,8 @@ export function ExerciseLogger({
   previousPerformance,
   onChange,
   exercise,
-  showWeightIncrement = true
+  showWeightIncrement = true,
+  stableLayout = false
 }: ExerciseLoggerProps) {
   if (!exercise) return null
 
@@ -89,7 +91,7 @@ export function ExerciseLogger({
                 {exercise.name}
               </h3>
               {isCompleted && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-0.5 text-[11px] font-extrabold text-success-text">
+                <span className={stableLayout ? 'sr-only' : 'inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-0.5 text-[11px] font-extrabold text-success-text'}>
                   <Check className="size-3.5" aria-hidden="true" />
                   Completado
                 </span>
@@ -106,17 +108,19 @@ export function ExerciseLogger({
           )}
         </div>
 
-        {previousPerformance && (
-          <div className="mt-2 rounded-lg bg-muted/70 px-3 py-2 text-sm">
-            <p className="leading-5 text-secondary">
-              <span className="font-semibold text-subtle">Última vez:</span>{' '}
+        {(stableLayout || previousPerformance) && <div className={`exercise-previous mt-2 rounded-lg bg-muted/70 px-3 py-2 text-sm ${stableLayout ? 'h-14' : ''}`}>
+          <p className={`leading-5 text-secondary ${stableLayout ? 'line-clamp-2' : ''}`} title={previousPerformance
+            ? `Última vez: ${previousPerformance.reps.join('-')} con ${previousPerformance.weightKg} kg`
+            : 'Última vez: —'}>
+            <span className="font-semibold text-subtle">Última vez:</span>{' '}
+            {previousPerformance ? <>
               <strong className="text-ink">{previousPerformance.reps.join('-')}</strong>
               {previousPerformance.weightKg > 0
                 ? ` con ${previousPerformance.weightKg} kg`
                 : ' sin peso añadido'}
-            </p>
-          </div>
-        )}
+            </> : '—'}
+          </p>
+        </div>}
 
         {(exercise.notes || templateExercise.notes) && (
           <div className="mt-2 space-y-1.5">
@@ -240,14 +244,16 @@ export function ExerciseLogger({
                   aria-label={`${set.completed ? 'Marcar como pendiente' : 'Marcar como hecha'} la serie ${set.setNumber}`}
                   aria-pressed={set.completed}
                   onClick={() => updateSet(set.id, { completed: !set.completed })}
-                  className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1.5 text-xs font-extrabold transition active:scale-95 sm:gap-1.5 sm:px-2 ${
+                  className={`min-h-11 items-center rounded-lg border font-extrabold transition ${stableLayout
+                    ? 'grid grid-cols-[12px_minmax(0,1fr)] gap-0.5 px-0.5 text-[11px] sm:grid-cols-[16px_minmax(0,1fr)] sm:gap-1 sm:px-1 sm:text-xs'
+                    : 'inline-flex justify-center gap-1 px-1.5 text-xs active:scale-95 sm:gap-1.5 sm:px-2'} ${
                     set.completed
                       ? 'border-success-solid bg-success-solid text-on-brand shadow-sm'
                       : 'border-control bg-raised text-secondary hover:border-success hover:text-success'
                   }`}
                 >
-                  <Check className="size-4" strokeWidth={3} aria-hidden="true" />
-                  {set.completed ? 'Hecha' : 'Pendiente'}
+                  <Check className={stableLayout ? 'size-3 shrink-0 sm:size-4' : 'size-4'} strokeWidth={3} aria-hidden="true" />
+                  <span>{set.completed ? 'Hecha' : 'Pendiente'}</span>
                 </button>
               </div>
             ))}
