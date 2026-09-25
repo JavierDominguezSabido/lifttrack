@@ -6,6 +6,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { RoutinePage } from './pages/RoutinePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WorkoutPage } from './pages/WorkoutPage'
+import { PendingWorkoutsPage } from './pages/PendingWorkoutsPage'
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
         <Route path="/progreso/sesion/:sessionId/editar" element={<EditSessionPage />} />
         <Route path="/progreso/:exerciseId" element={<HistoryPage />} />
         <Route path="/entrenamiento" element={<WorkoutPage />} />
+        <Route path="/pendientes" element={<PendingWorkoutsPage />} />
         <Route path="/entrenamiento/:templateId" element={<WorkoutPage />} />
         <Route path="/historial" element={<HistoryPage />} />
         <Route path="/historial/sesion/:sessionId/editar" element={<EditSessionPage />} />

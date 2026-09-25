@@ -4,12 +4,12 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkoutPage } from './WorkoutPage'
-import { getDatedLocalDraftKey } from '../utils/workoutLifecycle'
-import { toLocalDateKey } from '../utils/date'
+import { readWorkoutDrafts, workoutDraftLocalKey, workoutDraftUrl } from '../services/workoutDraftStorage'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), upsert: vi.fn(), remove: vi.fn(), save: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), list: vi.fn(), upsert: vi.fn(), remove: vi.fn(), save: vi.fn() }))
 vi.mock('../services/supabase/supabaseWorkoutDraftRepository', () => ({
-  getRemoteWorkoutDraft: mocks.get, upsertRemoteWorkoutDraft: mocks.upsert, deleteRemoteWorkoutDraft: mocks.remove
+  getRemoteWorkoutDraft: mocks.get, listRemoteWorkoutDrafts: mocks.list,
+  upsertRemoteWorkoutDraft: mocks.upsert, deleteRemoteWorkoutDraft: mocks.remove
 }))
 const user = { id: 'user-a' }
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user }) }))
@@ -18,7 +18,7 @@ const template = { id: 'lunes', name: 'Lunes', dayOfWeek: 1, exercises: [{
   id: 'template-press', templateId: 'lunes', exerciseId: 'press', order: 1, targetSets: 1, targetReps: '8'
 }] }
 const context = {
-  historyReader: undefined as HistoryReader | undefined, ownerId: 'user:user-a', sessions: [], templates: [template], exercises: [exercise],
+  historyReader: undefined as HistoryReader | undefined, ownerId: 'user-a', sessions: [], templates: [template], exercises: [exercise],
   getExerciseById: () => exercise, saveSession: mocks.save, syncReady: true
 }
 vi.mock('../context/WorkoutContext', () => ({ useWorkouts: () => context }))
@@ -29,14 +29,14 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
   return { promise, resolve, reject }
 }
-function mount() {
-  return render(<MemoryRouter initialEntries={['/entrenamiento/lunes']}><Routes>
+function mount(path = '/entrenamiento/lunes') {
+  return render(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/entrenamiento/:templateId" element={<WorkoutPage />} />
     <Route path="/historial" element={<p>Historial guardado</p>} />
   </Routes></MemoryRouter>)
 }
-function localKey() { return getDatedLocalDraftKey('user:user-a', toLocalDateKey(new Date()), 'lunes') }
-function stored() { return JSON.parse(localStorage.getItem(localKey())!) }
+function localKey() { const draft = readWorkoutDrafts('user:user-a')[0]; return draft ? workoutDraftLocalKey('user:user-a', draft) : '' }
+function stored() { return readWorkoutDrafts('user:user-a')[0] }
 function edit(reps: string) {
   fireEvent.change(screen.getByLabelText('Repeticiones de la serie 1 de Press banca'), { target: { value: reps } })
 }
@@ -53,6 +53,7 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     mocks.get.mockResolvedValue(null)
+    mocks.list.mockResolvedValue([])
     mocks.remove.mockResolvedValue(undefined)
     mocks.upsert.mockImplementation(async (_day, _key, payload) => ({ payload, updatedAt: new Date().toISOString() }))
     mocks.save.mockResolvedValue(undefined)
@@ -64,10 +65,12 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     mount()
     await settle()
     edit('12')
+    expect(stored()).toBeUndefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
     expect(stored().logs[0].sets[0].reps).toBe('12')
     expect(screen.queryByText('Guardado en este dispositivo · nube pendiente')).toBeNull()
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
-    expect(mocks.upsert).not.toHaveBeenCalled()
+    expect(mocks.upsert).toHaveBeenCalled()
     fireEvent(window, new Event('online'))
     await settle()
     await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
@@ -80,6 +83,7 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     mocks.get.mockReturnValueOnce(read.promise)
     mount()
     edit('12')
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
     const older = structuredClone(stored())
     older.logs[0].sets[0].reps = '3'
     await act(async () => { read.resolve({ payload: older, updatedAt: '2026-09-01T11:00:00Z' }) })
@@ -93,6 +97,7 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     mount()
     await settle()
     edit('10')
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
     await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     edit('12')
     await act(async () => { first.resolve({ updatedAt: new Date().toISOString() }) })
@@ -112,10 +117,11 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     await settle()
     const first = mocks.save.mock.calls[0][0]
     expect(stored().startedAt).toBe(first.startedAt)
+    const route = workoutDraftUrl(stored())
     expect(mocks.remove).not.toHaveBeenCalled()
     page.unmount()
     vi.setSystemTime(new Date('2026-09-01T10:05:00Z'))
-    mount()
+    mount(route)
     await settle()
     fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' }))
     await settle()
@@ -130,6 +136,7 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     mount()
     await settle()
     edit('10')
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
     const original = Storage.prototype.setItem
     const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
       if (key.startsWith('lifttrack.workoutDraft')) throw new DOMException('Quota', 'QuotaExceededError')
@@ -166,8 +173,9 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     await settle()
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
     fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' }))
+    const route = workoutDraftUrl(stored())
     page.unmount()
-    mount()
+    mount(route)
     await settle()
     edit('12')
     await act(async () => { save.resolve() })
@@ -188,7 +196,7 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     expect(page.container.querySelector('.guided-previous')).toBe(slot)
     expect(screen.queryByText('Reintentar')).toBeNull()
     fireEvent.change(screen.getByLabelText('Reps reales'),{target:{value:'12'}})
-    expect(stored().logs[0].sets[0].reps).toBe('12')
+    expect(stored()).toBeUndefined()
     fireEvent(window,new Event('offline'));fireEvent(document,new Event('visibilitychange'));fireEvent(window,new Event('online'))
     await settle()
     expect(page.container.querySelector('.guided-previous')).toBe(slot)
@@ -196,7 +204,7 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
 
   it('guiado sustituye el placeholder sin remount; completar y Anterior conservan valores',async()=>{
     const performance=deferred<{sessionId:string;performedAt:string;weightKg:number;reps:number[]}>()
-    context.historyReader={owner:'user-a',subscribe:()=>()=>{},version:()=>0,performance:vi.fn().mockResolvedValueOnce(null).mockImplementation(()=>performance.promise)} as unknown as HistoryReader
+    context.historyReader={owner:'user-a',subscribe:()=>()=>{},version:()=>0,performance:vi.fn().mockImplementation(()=>performance.promise)} as unknown as HistoryReader
     template.exercises[0].targetSets=3
     const page=mount();await settle();fireEvent.click(screen.getByRole('button',{name:'Modo guiado'}))
     const slot=page.container.querySelector('.guided-previous')!

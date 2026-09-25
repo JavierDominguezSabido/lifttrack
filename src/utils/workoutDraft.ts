@@ -213,10 +213,6 @@ export function createWorkoutSession({
     dayOfWeek: template.dayOfWeek,
     startedAt,
     completedAt: completedAt.toISOString(),
-    durationMinutes: Math.max(
-      1,
-      Math.round((completedAt.getTime() - new Date(startedAt).getTime()) / 60000)
-    ),
     volumeKg,
     exerciseLogs
   }

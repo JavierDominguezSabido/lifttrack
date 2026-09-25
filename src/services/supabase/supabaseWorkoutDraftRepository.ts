@@ -97,3 +97,18 @@ export async function upsertRemoteWorkoutDraft<TPayload extends object>(
 export async function deleteRemoteWorkoutDraft(dayOfWeek: number, draftKey: string, expectedUserId: string) {
   enqueueSyncOperation(expectedUserId, `draft:${draftKey}`, { action: 'delete', dayOfWeek })
 }
+
+export async function listRemoteWorkoutDrafts<TPayload>(expectedUserId: string): Promise<RemoteWorkoutDraft<TPayload>[]> {
+  const client = requireClient()
+  const userId = await requireUserId(client, expectedUserId)
+  const drafts: RemoteWorkoutDraft<TPayload>[] = []
+  for (let offset = 0; ; offset += 100) {
+    const { data, error } = await client.from('workout_drafts').select('*')
+      .eq('user_id', userId).eq('payload->>status', 'active')
+      .order('draft_key').range(offset, offset + 99)
+    throwIfError(error)
+    drafts.push(...(data ?? []).map(row => mapRow<TPayload>(row)))
+    if (!data || data.length < 100) break
+  }
+  return drafts
+}

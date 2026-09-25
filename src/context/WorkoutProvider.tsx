@@ -69,8 +69,8 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
   const [initialLoading, setInitialLoading] = useState(authLoading)
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false)
   const [routine, setRoutine] = useState<RoutineState>(() => ({
-    owner: 'local', exercises: getStoredExercises('local'), templates: getStoredTemplates('local'),
-    customized: getHasCustomRoutine('local')
+    owner, exercises: getStoredExercises(owner), templates: getStoredTemplates(owner),
+    customized: getHasCustomRoutine(owner)
   }))
   const dataMode = user ? 'cloud' : 'local'
   const activeRepository = getWorkoutRepository(Boolean(user))
@@ -122,14 +122,22 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
     let readTimer: ReturnType<typeof setTimeout> | undefined
     const scheduleRead = () => { clearTimeout(readTimer); readTimer = setTimeout(() => { if (active) void reloadSessions(true) }, 100) }
     const flush = () => { void flushSyncOperations(owner).catch(error => { if (active) setWriteError(String(error)) }) }
-    let pendingReadKey = JSON.stringify(pendingOperations(owner).filter(op => op.resource.startsWith('session:')))
+    const initialSessionOps = pendingOperations(owner).filter(op => op.resource.startsWith('session:'))
+    let pendingReadKey = JSON.stringify(initialSessionOps)
+    let knownSessionOpIds = new Set(initialSessionOps.map(op => op.id))
     const change = (event: Event) => {
       if (event instanceof CustomEvent && event.detail.owner !== owner) return
       if (event instanceof StorageEvent && event.key && !event.key.startsWith('lifttrack.outbox.v1.')) return
       const readBefore = historyReader?.version()
-      const nextPendingKey = JSON.stringify(pendingOperations(owner).filter(op => op.resource.startsWith('session:')))
+      const sessionOps = pendingOperations(owner).filter(op => op.resource.startsWith('session:'))
+      const nextPendingKey = JSON.stringify(sessionOps)
       if (nextPendingKey !== pendingReadKey) {
         pendingReadKey = nextPendingKey
+        if (sessionOps.some(op => !knownSessionOpIds.has(op.id) &&
+          (op.payload.action === 'delete' || op.payload.action === 'save' && op.expected !== 'empty'))) {
+          historyReader?.invalidatePerformanceCache()
+        }
+        knownSessionOpIds = new Set(sessionOps.map(op => op.id))
         historyReader?.invalidate()
         setOverview(undefined)
         setSessions(items => overlayPendingSessions(owner, items))
@@ -157,6 +165,12 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
     const refresh = (event: Event) => {
       if (!(event instanceof CustomEvent) || event.detail.owner !== owner) return
       if (event.detail.resource.startsWith('draft:')) return
+      if (event.detail.resource.startsWith('session:')) {
+        if (event.type === 'lifttrack-sync-resolved' && !event.detail.keepLocal) {
+          historyReader?.forgetSavedSession(event.detail.resource.slice(8))
+          historyReader?.invalidatePerformanceCache()
+        }
+      }
       historyReader?.invalidate()
       setOverview(undefined)
       requestRevision.current += 1
@@ -368,10 +382,20 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
       setPendingWrites((count) => count + 1)
       setWriteError(null)
       try {
-        const saved = sessions.some((item) => item.id === session.id)
+        const previous = sessions.find((item) => item.id === session.id)
+        const updating = Boolean(previous || session.syncRevision)
+        const samePerformance = Boolean(previous && previous.startedAt === session.startedAt &&
+          previous.completedAt === session.completedAt && JSON.stringify(previous.exerciseLogs) === JSON.stringify(session.exerciseLogs))
+        const rememberingRetry = samePerformance && historyReader?.hasSavedSession(session.id)
+        if (updating && !samePerformance) {
+          historyReader?.forgetSavedSession(session.id)
+          historyReader?.invalidatePerformanceCache()
+        }
+        const saved = updating
           ? await activeRepository.updateWorkoutSession(session, userId)
           : await activeRepository.saveWorkoutSession(session, userId)
         if (ownerRef.current !== owner) return
+        if (!updating || rememberingRetry) historyReader?.rememberSavedSession(saved)
         requestRevision.current += 1
         setSessions((items) => {
           const next = [saved, ...items.filter((item) => item.id !== saved.id)]
@@ -395,6 +419,8 @@ function AccountWorkoutProvider({ children }: { children: ReactNode }) {
       setPendingWrites((count) => count + 1)
       setWriteError(null)
       try {
+        historyReader?.forgetSavedSession(id)
+        historyReader?.invalidatePerformanceCache()
         await activeRepository.deleteWorkoutSession(id, userId, expectedRevision ?? sessions.find(session => session.id === id)?.syncRevision)
         if (ownerRef.current !== owner) return
         requestRevision.current += 1

@@ -45,6 +45,80 @@ export class HistoryReader {
   refreshIfStale=()=>{if(Date.now()-this.lastInvalidated>60000)this.invalidate()}
   dispose=()=>{this.disposed=true;this.generation++;this.listeners.clear();this.requests.clear()}
   private get storageKey(){return `lifttrack:history-reads:v1:${this.owner}`}
+  private performanceKey(ids:string[]){return `lifttrack:performance:v1:${this.owner}:${JSON.stringify([...new Set(ids)].sort())}`}
+  private get savedPerformanceKey(){return `lifttrack:saved-performance:v1:${this.owner}`}
+  private savedPerformanceSessions(ids:string[]):WorkoutSession[] {
+    try {
+      const stored:unknown=JSON.parse(localStorage.getItem(this.savedPerformanceKey)??'{}')
+      if(!object(stored))return []
+      const bySession=new Map<string,WorkoutSession>()
+      for(const value of ids.map(id=>stored[id])) {
+        if(!validSession(value))continue
+        const session=value as WorkoutSession
+        const current=bySession.get(session.id)
+        bySession.set(session.id,current
+          ? {...current,exerciseLogs:[...current.exerciseLogs,...session.exerciseLogs]
+              .filter((log,index,logs)=>logs.findIndex(item=>item.id===log.id)===index)
+              .sort((a,b)=>a.order-b.order)}
+          : session)
+      }
+      return [...bySession.values()]
+    } catch {return []}
+  }
+  hasSavedSession(id:string) {
+    try {
+      const stored:unknown=JSON.parse(localStorage.getItem(this.savedPerformanceKey)??'{}')
+      return object(stored)&&Object.values(stored).some(session=>validSession(session)&&(session as WorkoutSession).id===id)
+    } catch {return false}
+  }
+  rememberSavedSession(session:WorkoutSession) {
+    try {
+      const raw:unknown=JSON.parse(localStorage.getItem(this.savedPerformanceKey)??'{}')
+      const stored:Record<string,WorkoutSession>=object(raw)?raw as Record<string,WorkoutSession>:{}
+      for(const log of session.exerciseLogs) {
+        if(!log.sets.some(set=>set.completed&&!set.isWarmup))continue
+        const previous=stored[log.exerciseId]
+        if(validSession(previous)&&Date.parse(previous.completedAt??previous.startedAt)>Date.parse(session.completedAt??session.startedAt))continue
+        stored[log.exerciseId]={...session,exerciseLogs:[log]}
+      }
+      localStorage.setItem(this.savedPerformanceKey,JSON.stringify(stored))
+    } catch { /* El guardado de la sesión no depende de la caché de lectura. */ }
+  }
+  forgetSavedSession(id:string) {
+    try {
+      const raw:unknown=JSON.parse(localStorage.getItem(this.savedPerformanceKey)??'{}')
+      if(!object(raw))return
+      const stored={...raw}
+      for(const [exerciseId,session] of Object.entries(stored))if(validSession(session)&&(session as WorkoutSession).id===id)delete stored[exerciseId]
+      localStorage.setItem(this.savedPerformanceKey,JSON.stringify(stored))
+    } catch { /* La invalidación de lecturas sigue funcionando sin este dato auxiliar. */ }
+  }
+  invalidatePerformanceCache() {
+    try {
+      const prefix=`lifttrack:performance:v1:${this.owner}:`
+      const keys:string[]=[]
+      for(let index=0;index<localStorage.length;index++){
+        const key=localStorage.key(index)
+        if(key?.startsWith(prefix))keys.push(key)
+      }
+      for(const key of keys)localStorage.removeItem(key)
+    } catch { /* La invalidez del historial sigue teniendo prioridad aunque falle el almacenamiento. */ }
+  }
+  cachedPerformance(id:string,ids:string[]) {
+    try {
+      const pending=this.snapshot()
+      const raw=localStorage.getItem(this.performanceKey(ids))
+      const saved=this.savedPerformanceSessions(ids).filter(session=>
+        !pending.excluded.includes(session.id)||pending.local.some(local=>local.id===session.id))
+      if(raw===null&&!saved.length)return undefined
+      const value:unknown=raw===null?null:JSON.parse(raw)
+      validateRead('lifttrack_read_last_performance_v2',value)
+      const remote=value===null||pending.excluded.includes((value as ReadPerformance).sessionId)
+        ? null:{...value as ReadPerformance,exerciseId:id}
+      if(!remote&&!saved.length)return undefined
+      return reconcilePerformance(remote,saved,id,ids)
+    } catch {return undefined}
+  }
   snapshot() {return pendingHistory(pendingOperations(this.owner))}
   private async raw<T>(name:ReadName,args:Record<string,Json>,pendingKey:string):Promise<T> {
     const generation=this.generation
@@ -95,8 +169,11 @@ export class HistoryReader {
     return reconcileProgress(r,p.local,ids,limit)
   }
   async performance(id:string,ids:string[]) {
-    const p=this.snapshot()
+    const p=this.snapshot(),generation=this.generation
     const r=await this.raw<ReadPerformance|null>('lifttrack_read_last_performance_v2',{p_user_id:this.owner,p_exercise_ids:ids,p_excluded_session_ids:p.excluded},p.key)
-    return reconcilePerformance(r&&{...r,exerciseId:id},p.local,id,ids)
+    if(generation!==this.generation||p.key!==this.snapshot().key)throw new StaleHistoryRead()
+    if(!p.excluded.length)try{localStorage.setItem(this.performanceKey(ids),JSON.stringify(r))}catch{/* La lectura sigue funcionando sin caché. */}
+    const saved=this.savedPerformanceSessions(ids).filter(session=>!p.local.some(local=>local.id===session.id))
+    return reconcilePerformance(r&&{...r,exerciseId:id},[...p.local,...saved],id,ids)
   }
 }

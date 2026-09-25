@@ -178,7 +178,7 @@ describe('peso de trabajo', () => {
       createId: () => `id-${++nextId}`
     })
 
-    expect(session.durationMinutes).toBe(60)
+    expect(session).not.toHaveProperty('durationMinutes')
     expect(session.dayOfWeek).toBe(1)
     expect(session.volumeKg).toBe(1087.5)
     expect(session.exerciseLogs[0].sessionId).toBe(session.id)
