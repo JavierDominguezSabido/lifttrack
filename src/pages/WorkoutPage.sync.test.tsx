@@ -222,4 +222,38 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     expect(stored().logs[0].sets.slice(0,2).every((s:{completed:boolean})=>s.completed)).toBe(true)
   })
 
+  it('vuelve a revisar un entrenamiento completo sin alterar sus 19 series y permite guardarlo', async () => {
+    template.exercises[0].targetSets = 19
+    mount()
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Modo guiado' }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Peso, en kilogramos' }), { target: { value: '42' } })
+    fireEvent.change(screen.getByLabelText('Reps reales'), { target: { value: '11' } })
+    for (let index = 0; index < 19; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Completar serie' }))
+    }
+
+    expect(screen.getByRole('heading', { name: 'Entrenamiento completado' })).toBeTruthy()
+    expect(screen.getByRole('progressbar', { name: 'Progreso de series realizadas' }).getAttribute('aria-valuenow')).toBe('19')
+    const completedLogs = structuredClone(stored().logs)
+    expect(completedLogs[0].sets).toHaveLength(19)
+    expect(completedLogs[0].sets.every((set: { completed: boolean }) => set.completed)).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a revisar' }))
+    expect(screen.queryByRole('heading', { name: 'Entrenamiento completado' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeTruthy()
+    expect(screen.getByRole('progressbar', { name: 'Progreso de series realizadas' }).getAttribute('aria-valuenow')).toBe('19')
+    expect((screen.getByRole('spinbutton', { name: 'Peso, en kilogramos' }) as HTMLInputElement).value).toBe('42')
+    expect((screen.getByLabelText('Reps reales') as HTMLInputElement).value).toBe('11')
+    expect(stored().logs).toEqual(completedLogs)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(screen.getByRole('heading', { name: 'Entrenamiento completado' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' }))
+    await settle()
+    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(mocks.save.mock.calls[0][0].exerciseLogs[0].sets).toHaveLength(19)
+    expect(screen.getByText('Historial guardado')).toBeTruthy()
+  })
+
 })

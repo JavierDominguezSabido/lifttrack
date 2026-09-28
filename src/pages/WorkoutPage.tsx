@@ -969,6 +969,11 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
     scrollToPageTop()
   }
 
+  function reviewCompletedWorkout() {
+    reviewingCompletedGuidedStepRef.current = true
+    goToGuidedStep(0)
+  }
+
   function goToPreviousGuidedStep() {
     if (currentGuidedIndex <= 0) return
     const previousStep = guidedSteps[currentGuidedIndex - 1]
@@ -1354,7 +1359,7 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
                   <CheckCircle2 className="size-5" aria-hidden="true" />
                   {saving ? 'Guardando...' : 'Finalizar y guardar'}
                 </button>
-                <button type="button" onClick={() => goToGuidedStep(0)} className="btn-secondary !min-h-12">
+                <button type="button" onClick={reviewCompletedWorkout} className="btn-secondary !min-h-12">
                   Volver a revisar
                 </button>
               </div>
