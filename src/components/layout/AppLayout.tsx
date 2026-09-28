@@ -5,6 +5,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { getCompletedRoutineDaysForWeek } from '../../utils/workout'
 import { shouldShowInitialWorkoutLoader } from '../../utils/workoutLifecycle'
+import { DeferredRoute } from './DeferredRoute'
 
 const navigation = [
   { label: 'Hoy', path: '/', icon: LayoutDashboard },
@@ -162,9 +163,9 @@ export function AppLayout() {
               Cargando entrenamientos…
             </p>
           ) : (
-            <>
+            <DeferredRoute resetKey={location.pathname}>
               <Outlet />
-            </>
+            </DeferredRoute>
           )}
         </main>
       </div>

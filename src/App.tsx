@@ -1,12 +1,14 @@
+import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { DashboardPage } from './pages/DashboardPage'
-import { EditSessionPage } from './pages/EditSessionPage'
-import { HistoryPage } from './pages/HistoryPage'
 import { RoutinePage } from './pages/RoutinePage'
-import { SettingsPage } from './pages/SettingsPage'
-import { WorkoutPage } from './pages/WorkoutPage'
 import { PendingWorkoutsPage } from './pages/PendingWorkoutsPage'
+
+const HistoryPage = lazy(() => import('./pages/deferredPages').then(module => ({ default: module.HistoryPage })))
+const SettingsPage = lazy(() => import('./pages/deferredPages').then(module => ({ default: module.SettingsPage })))
+const WorkoutPage = lazy(() => import('./pages/deferredPages').then(module => ({ default: module.WorkoutPage })))
+const EditSessionPage = lazy(() => import('./pages/deferredPages').then(module => ({ default: module.EditSessionPage })))
 
 export function App() {
   return (
