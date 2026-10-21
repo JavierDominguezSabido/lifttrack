@@ -58,20 +58,22 @@ it('completar/desmarcar no remonta filas; pesos individuales y reps permanecen',
   const article = page.container.querySelector('article')!
   const inputs = [...article.querySelectorAll('input')]
   const first = within(article)
-  const status = first.getByRole('button', { name: 'Marcar como hecha la serie 2' })
-  const iconClass = status.querySelector('svg')!.getAttribute('class')
+  const status = first.getByRole('button', { name: /^Marcar como hecha la serie 2 de / })
+  // El icono cambia (círculo → check) pero conserva su tamaño.
+  const iconSize = () => status.querySelector('svg')!.getAttribute('class')!.replace(/\blucide\S*/g, '').trim()
+  const iconClass = iconSize()
   for (const n of [1, 2, 3]) {
-    fireEvent.click(first.getByRole('button', { name: 'Marcar como hecha la serie ' + n }))
+    fireEvent.click(first.getByRole('button', { name: new RegExp('^Marcar como hecha la serie ' + n + ' de ') }))
   }
   expect(first.getByText('Completado').className).toBe('sr-only')
   expect([...article.querySelectorAll('input')]).toEqual(inputs)
-  expect(status.querySelector('svg')!.getAttribute('class')).toBe(iconClass)
-  fireEvent.click(first.getByRole('button', { name: 'Marcar como pendiente la serie 2' }))
+  expect(iconSize()).toBe(iconClass)
+  fireEvent.click(first.getByRole('button', { name: /^Marcar como pendiente la serie 2 de / }))
   fireEvent.change(first.getByLabelText('Repeticiones de la serie 2 de Press banca con mancuernas'), {
     target: { value: '10' }
   })
   expect(first.getByText('65')).toBeTruthy()
   expect((first.getByLabelText('Repeticiones de la serie 2 de Press banca con mancuernas') as HTMLInputElement).value).toBe('10')
-  expect(first.getByRole('button', { name: 'Marcar como pendiente la serie 1' }).getAttribute('aria-pressed')).toBe('true')
-  expect(first.getByRole('button', { name: 'Marcar como hecha la serie 2' }).getAttribute('aria-pressed')).toBe('false')
+  expect(first.getByRole('button', { name: /^Marcar como pendiente la serie 1 de / }).getAttribute('aria-pressed')).toBe('true')
+  expect(first.getByRole('button', { name: /^Marcar como hecha la serie 2 de / }).getAttribute('aria-pressed')).toBe('false')
 })

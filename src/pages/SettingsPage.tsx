@@ -17,7 +17,7 @@ import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
 import { useWorkouts } from '../context/WorkoutContext'
 import type { Exercise, MuscleGroup, WorkoutTemplate, WorkoutTemplateExercise } from '../types'
-import { dayNames, formatRestSeconds } from '../utils/workout'
+import { dayNames, formatRestSeconds, formatTarget } from '../utils/workout'
 import { getEmptyRoutine } from '../services/routineStorage'
 
 const muscleGroups: MuscleGroup[] = [
@@ -36,7 +36,7 @@ type RoutineFields = Record<string, { target?: string; rest?: string }>
 
 function parseTarget(value: string) {
   const match = value.trim().match(/^([1-9]\d*)\s*[xX×]\s*([1-9]\d*)$/)
-  return match ? { targetReps: match[1], targetSets: Number(match[2]) } : null
+  return match ? { targetSets: Number(match[1]), targetReps: match[2] } : null
 }
 
 function parseRest(value: string) {
@@ -220,7 +220,7 @@ function SettingsPageContent() {
     setError(null)
     for (const item of drafts.flatMap(day => day.exercises)) {
       const values = fields[item.id]
-      if (values?.target !== undefined && !parseTarget(values.target)) { setError('El objetivo debe tener formato como 8x4, 12x3 o 15x4.'); return }
+      if (values?.target !== undefined && !parseTarget(values.target)) { setError('El objetivo debe tener formato series×reps, como 3×8, 4×12 o 3×15.'); return }
       if (values?.rest !== undefined && parseRest(values.rest) === null) { setError('El descanso debe tener formato m:ss, por ejemplo 1:30 o 2:30.'); return }
     }
     try {
@@ -466,7 +466,7 @@ function SettingsPageContent() {
                   </p>
                   {exercise.notes && <p className="mt-2 text-sm text-secondary">{exercise.notes}</p>}
                 </div>
-                <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${
+                <span className={`rounded-full px-2 py-1 text-xs font-bold ${
                   exercise.active ? 'bg-success-soft text-success-text' : 'bg-muted text-secondary'
                 }`}>
                   {exercise.active ? 'Activo' : 'Inactivo'}
@@ -572,7 +572,7 @@ function SettingsAccordionHeader({
         <span className="block font-extrabold text-ink">{title}</span>
         <span className="mt-0.5 block truncate text-xs font-semibold text-secondary">{summary}</span>
       </span>
-      <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-extrabold text-secondary">
+      <span className="rounded-md bg-muted px-2 py-1 text-xs font-extrabold text-secondary">
         {open ? 'Abierto' : 'Abrir'}
       </span>
     </button>
@@ -647,16 +647,16 @@ function RoutineExerciseEditor({
         <label className="text-xs font-bold text-secondary">
           Objetivo
           <input
-            value={fields?.target ?? `${item.targetReps}x${item.targetSets}`}
+            value={fields?.target ?? formatTarget(item.targetSets, item.targetReps)}
             onChange={event => onFieldChange('target',event.target.value)}
             aria-invalid={fields?.target !== undefined && !parseTarget(fields.target)}
             className="input mt-1 !text-left"
-            placeholder="8x4"
-            aria-label={`Objetivo de ${exercise?.name ?? 'ejercicio'}: repeticiones por series, por ejemplo 8x4`}
+            placeholder="3×8"
+            aria-label={`Objetivo de ${exercise?.name ?? 'ejercicio'}: series por repeticiones, por ejemplo 3×8`}
             onBlur={(event) => {
               const parsed = parseTarget(event.target.value)
               if (!parsed) {
-                onError('El objetivo debe tener formato como 8x4, 12x3 o 15x4.')
+                onError('El objetivo debe tener formato series×reps, como 3×8, 4×12 o 3×15.')
                 return
               }
               onError(null)

@@ -1,11 +1,13 @@
 import {
   Check,
   CheckCheck,
+  Circle,
   Minus,
   Plus,
   RotateCcw
 } from 'lucide-react'
-import { formatRestSeconds } from '../../utils/workout'
+import { formatRestSeconds, formatTarget, formatWeight } from '../../utils/workout'
+import { WeightInput } from './WeightInput'
 import {
   applyWorkingWeight,
   getWorkingWeight,
@@ -44,7 +46,7 @@ export function ExerciseLogger({
   const workingWeight = getWorkingWeight(log)
   const completedSets = log.sets.filter((set) => set.completed).length
   const isCompleted = log.sets.length > 0 && completedSets === log.sets.length
-  const targetLabel = `${templateExercise.targetReps}x${templateExercise.targetSets}`
+  const targetLabel = formatTarget(templateExercise.targetSets, templateExercise.targetReps)
 
   function setWorkingWeight(value: number) {
     onChange(applyWorkingWeight(log, value))
@@ -91,7 +93,7 @@ export function ExerciseLogger({
                 {exercise.name}
               </h3>
               {isCompleted && (
-                <span className={stableLayout ? 'sr-only' : 'inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-0.5 text-[11px] font-extrabold text-success-text'}>
+                <span className={stableLayout ? 'sr-only' : 'inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-0.5 text-xs font-extrabold text-success-text'}>
                   <Check className="size-3.5" aria-hidden="true" />
                   Completado
                 </span>
@@ -102,7 +104,7 @@ export function ExerciseLogger({
             </p>
           </div>
           {exercise.equipment && (
-            <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-secondary">
+            <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs font-bold text-secondary">
               {exercise.equipment}
             </span>
           )}
@@ -110,13 +112,13 @@ export function ExerciseLogger({
 
         {(stableLayout || previousPerformance) && <div className={`exercise-previous mt-2 rounded-lg bg-muted/70 px-3 py-2 text-sm ${stableLayout ? 'h-14' : ''}`}>
           <p className={`leading-5 text-secondary ${stableLayout ? 'line-clamp-2' : ''}`} title={previousPerformance
-            ? `Última vez: ${previousPerformance.reps.join('-')} con ${previousPerformance.weightKg} kg`
+            ? `Última vez: ${previousPerformance.reps.join('-')} con ${formatWeight(previousPerformance.weightKg)} kg`
             : 'Última vez: —'}>
             <span className="font-semibold text-subtle">Última vez:</span>{' '}
             {previousPerformance ? <>
               <strong className="text-ink">{previousPerformance.reps.join('-')}</strong>
               {previousPerformance.weightKg > 0
-                ? ` con ${previousPerformance.weightKg} kg`
+                ? ` con ${formatWeight(previousPerformance.weightKg)} kg`
                 : ' sin peso añadido'}
             </> : '—'}
           </p>
@@ -150,16 +152,12 @@ export function ExerciseLogger({
                 Peso de trabajo
               </span>
               <span className="relative block">
-                <input
+                <WeightInput
                   id={`weight-${log.id}`}
                   className="min-h-11 w-full rounded-xl border border-control bg-raised py-2 pl-3 pr-10 text-base font-extrabold text-ink outline-none transition placeholder:text-subtle focus:border-brand focus:ring-4 focus:ring-brand-soft"
                   aria-label={`Peso de trabajo para ${exercise.name}, en kilogramos`}
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.25"
-                  value={String(workingWeight)}
-                  onChange={(event) => setWorkingWeight(Number(event.target.value))}
+                  value={workingWeight}
+                  onChange={setWorkingWeight}
                 />
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
                   kg
@@ -173,7 +171,7 @@ export function ExerciseLogger({
                 className="min-h-11 whitespace-nowrap rounded-lg bg-brand-solid px-3 text-sm font-extrabold text-on-brand shadow-sm transition hover:bg-brand-solid-hover active:scale-[0.98]"
                 aria-label={`Sumar 1,25 kg al peso de ${exercise.name}`}
               >
-                +1.25 kg
+                +{formatWeight(1.25)} kg
               </button>
             )}
           </div>
@@ -207,12 +205,12 @@ export function ExerciseLogger({
             </div>
           </div>
 
-          <div aria-hidden="true" className="mb-2 grid grid-cols-[24px_52px_minmax(0,1fr)_76px] gap-2 px-2 text-center text-[10px] font-semibold uppercase tracking-wider text-subtle sm:grid-cols-[28px_64px_minmax(0,1fr)_92px] sm:px-2.5"><span>Serie</span><span>kg</span><span>Reps</span><span>Estado</span></div>
+          <div aria-hidden="true" className="mb-2 grid grid-cols-[24px_52px_minmax(0,1fr)_96px] gap-2 px-2 text-center text-xs font-semibold uppercase tracking-wider text-subtle sm:grid-cols-[28px_64px_minmax(0,1fr)_104px] sm:px-2.5"><span>Serie</span><span>kg</span><span>Reps</span><span>Estado</span></div>
           <div className="space-y-1.5">
             {log.sets.map((set) => (
               <div
                 key={set.id}
-                className={`grid grid-cols-[24px_52px_minmax(0,1fr)_76px] items-center gap-2 rounded-xl border px-2 py-1.5 transition sm:grid-cols-[28px_64px_minmax(0,1fr)_92px] sm:px-2.5 ${
+                className={`grid grid-cols-[24px_52px_minmax(0,1fr)_96px] items-center gap-2 rounded-xl border px-2 py-1.5 transition sm:grid-cols-[28px_64px_minmax(0,1fr)_104px] sm:px-2.5 ${
                   set.completed
                     ? 'border-success/25 bg-success-soft/55'
                     : 'border-line/70 bg-raised'
@@ -221,7 +219,7 @@ export function ExerciseLogger({
                 <span className="text-center text-base font-extrabold text-ink">
                   {set.setNumber}
                 </span>
-                <p className="text-center text-sm font-semibold tabular-nums text-secondary">{set.weightOverrideKg ?? set.weightKg}</p>
+                <p className="text-center text-sm font-semibold tabular-nums text-secondary">{formatWeight(set.weightOverrideKg ?? set.weightKg)}<span className="sr-only"> kg</span></p>
                 <div className="relative">
                   <label className="sr-only" htmlFor={`reps-${set.id}`}>
                     Repeticiones de la serie {set.setNumber} de {exercise.name}
@@ -241,18 +239,20 @@ export function ExerciseLogger({
                 </div>
                 <button
                   type="button"
-                  aria-label={`${set.completed ? 'Marcar como pendiente' : 'Marcar como hecha'} la serie ${set.setNumber}`}
+                  aria-label={`${set.completed ? 'Marcar como pendiente' : 'Marcar como hecha'} la serie ${set.setNumber} de ${exercise.name}, ${formatWeight(set.weightOverrideKg ?? set.weightKg)} kg`}
                   aria-pressed={set.completed}
                   onClick={() => updateSet(set.id, { completed: !set.completed })}
                   className={`min-h-11 items-center rounded-lg border font-extrabold transition ${stableLayout
-                    ? 'grid grid-cols-[12px_minmax(0,1fr)] gap-0.5 px-0.5 text-[11px] sm:grid-cols-[16px_minmax(0,1fr)] sm:gap-1 sm:px-1 sm:text-xs'
+                    ? 'grid grid-cols-[14px_minmax(0,1fr)] gap-1 px-1 text-xs sm:grid-cols-[16px_minmax(0,1fr)]'
                     : 'inline-flex justify-center gap-1 px-1.5 text-xs active:scale-95 sm:gap-1.5 sm:px-2'} ${
                     set.completed
                       ? 'border-success-solid bg-success-solid text-on-brand shadow-sm'
                       : 'border-control bg-raised text-secondary hover:border-success hover:text-success'
                   }`}
                 >
-                  <Check className={stableLayout ? 'size-3 shrink-0 sm:size-4' : 'size-4'} strokeWidth={3} aria-hidden="true" />
+                  {set.completed
+                    ? <Check className={stableLayout ? 'size-3.5 shrink-0 sm:size-4' : 'size-4'} strokeWidth={3} aria-hidden="true" />
+                    : <Circle className={stableLayout ? 'size-3.5 shrink-0 sm:size-4' : 'size-4'} strokeWidth={2.5} aria-hidden="true" />}
                   <span>{set.completed ? 'Hecha' : 'Pendiente'}</span>
                 </button>
               </div>

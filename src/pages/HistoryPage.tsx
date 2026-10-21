@@ -31,9 +31,11 @@ import {
 } from '../utils/exerciseIdentity'
 import { getSessionRoutineIdentity } from '../utils/historySession'
 import {
+  countLabel,
   dayNames,
   formatCompactNumber,
   formatDate,
+  formatWeight,
   getNextWeekStart,
   getSessionDateObject,
   getSessionVolume,
@@ -293,7 +295,7 @@ export function HistoryPage() {
             <span className="font-extrabold text-ink">Última sesión:</span>{' '}
             {formatDate(getSessionDateObject(historySummary.latestSession), {
               weekday: 'long', day: 'numeric', month: 'long'
-            })} · {historySummary.latestSession.exerciseLogs.length} ejercicios · {countCompletedSets(historySummary.latestSession)} series
+            })} · {countLabel(historySummary.latestSession.exerciseLogs.length, 'ejercicio', 'ejercicios')} · {countLabel(countCompletedSets(historySummary.latestSession), 'serie', 'series')}
           </p>
         )}
       </header>
@@ -355,7 +357,7 @@ export function HistoryPage() {
                         : 'sin sesiones registradas'}
                     </p>
                     <p className="mt-1 text-sm font-bold text-ink">
-                      {selectedSummary.latestWeight} kg · {selectedSummary.latestReps || 'sin reps'}
+                      {formatWeight(selectedSummary.latestWeight)} kg · {selectedSummary.latestReps || 'sin reps'}
                     </p>
                   </div>
                   <span className="rounded-md bg-raised px-2 py-1 text-xs font-bold text-secondary">
@@ -364,7 +366,7 @@ export function HistoryPage() {
                 </div>
 
                 <div className="exercise-metrics mt-3 grid grid-cols-2 gap-3">
-                  <HistoryStat icon={Trophy} label="Mejor peso realizado" value={`${bestWeight} kg`} compact />
+                  <HistoryStat icon={Trophy} label="Mejor peso realizado" value={`${formatWeight(bestWeight)} kg`} compact />
                   <HistoryStat
                     icon={CalendarDays}
                     label="Última vez"
@@ -404,7 +406,7 @@ export function HistoryPage() {
                       <span className="font-bold text-ink">
                         {formatDate(getSessionDateObject(entry.session), { day: '2-digit', month: '2-digit', year: '2-digit' })}
                       </span>
-                      <span className="font-extrabold text-brand">{getProgressEntryWeight(entry)} kg</span>
+                      <span className="font-extrabold text-brand">{formatWeight(getProgressEntryWeight(entry))} kg</span>
                       <span className="font-semibold text-secondary">{formatSetReps(entry.log.sets)}</span>
                       <span className="col-span-2 text-xs font-semibold text-secondary sm:col-span-1 sm:text-right">
                         {formatCompactNumber(getSessionVolume({ ...entry.session, exerciseLogs: [entry.log] }))} kg
@@ -467,7 +469,7 @@ export function HistoryPage() {
               <span className="block truncate text-xs font-semibold text-secondary">{filterSummary}</span>
             </span>
             {activeFilterCount > 0 && (
-              <span className="ml-auto shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-extrabold text-brand">
+              <span className="ml-auto shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-extrabold text-brand">
                 {activeFilterCount}
               </span>
             )}
@@ -569,7 +571,7 @@ export function HistoryPage() {
             </h2>
           </div>
           <p className="text-sm font-semibold text-secondary">
-            {historyReader ? sessionRead.value?.filteredCount : filteredSessions.length} de {historyReader ? sessionRead.value?.totalCount : realSessions.length} sesiones
+            {historyReader ? sessionRead.value?.filteredCount : filteredSessions.length} de {historyReader ? sessionRead.value?.totalCount : realSessions.length} {(historyReader ? sessionRead.value?.totalCount : realSessions.length) === 1 ? 'sesión' : 'sesiones'}
           </p>
         </div>
 
@@ -660,14 +662,14 @@ function SessionCard({
               })}
             </h3>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-secondary sm:text-sm">
-              <span>{session.exerciseLogs.length} ejercicios</span>
+              <span>{countLabel(session.exerciseLogs.length, 'ejercicio', 'ejercicios')}</span>
               <span aria-hidden="true">·</span>
               <span>{completedSets} series</span>
               <span aria-hidden="true">·</span>
               <span className="whitespace-nowrap">{formatCompactNumber(volume)} kg</span>
             </p>
           </div>
-          <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${
+          <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${
             status === 'Completada'
               ? 'bg-success-soft text-success-text'
               : 'bg-warning-soft text-warning-text'
@@ -762,14 +764,14 @@ function SessionCard({
                       )}
                     </div>
                     <span className="shrink-0 rounded-xl bg-brand-soft px-3 py-1.5 text-sm font-extrabold text-brand">
-                      {weight} kg
+                      {formatWeight(weight)} kg
                     </span>
                   </div>
                   <table className="session-sets mt-3 w-full text-left text-xs">
                     <caption className="sr-only">Series de {loggedExercise?.name ?? log.exerciseId}</caption>
                     <thead><tr><th>Serie</th><th>Reps</th><th>kg</th><th>Estado</th></tr></thead>
                     <tbody>{log.sets.map((set) => <tr key={set.id}>
-                      <td>{set.setNumber}</td><td>{set.reps}</td><td>{set.weightKg}</td>
+                      <td>{set.setNumber}</td><td>{set.reps}</td><td>{formatWeight(set.weightKg)}</td>
                       <td className={set.completed ? 'text-success-text' : 'text-secondary'}>{set.completed ? 'Hecha' : 'Pendiente'}</td>
                     </tr>)}</tbody>
                   </table>
@@ -833,7 +835,7 @@ function ExerciseProgressSelector({
               />
             </span>
           </label>
-          <p className="sr-only" role="status">{summaries.length} ejercicios encontrados</p>
+          <p className="sr-only" role="status">{countLabel(summaries.length, 'ejercicio encontrado', 'ejercicios encontrados')}</p>
 
           <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
             {summaries.map((summary) => {
@@ -852,7 +854,7 @@ function ExerciseProgressSelector({
                 >
                   <span className="block font-extrabold leading-tight text-ink">{summary.exercise.name}</span>
                   <span className="mt-1 block text-xs font-semibold text-secondary">
-                    {summary.bestWeight} kg · {summary.sessionCount} sesiones · última: {summary.latestReps || 'sin reps'}
+                    {formatWeight(summary.bestWeight)} kg · {countLabel(summary.sessionCount, 'sesión', 'sesiones')} · última: {summary.latestReps || 'sin reps'}
                   </span>
                 </button>
               )
@@ -878,25 +880,25 @@ export function ProgressLineChart({ entries }: { entries: ProgressEntry[] }) {
   return (
     <div className="px-1 py-4 sm:px-3">
       <h4 className="font-extrabold text-ink">Peso de trabajo</h4>
-      <p className="text-xs text-secondary">Últimas {entries.length} sesiones · puntos separados por sesión</p>
+      <p className="text-xs text-secondary">{entries.length === 1 ? 'Última sesión' : `Últimas ${entries.length} sesiones`} · puntos separados por sesión</p>
       <p className="mt-2 text-xs text-secondary">
         Último: <strong className="text-ink">{number(weights[weights.length-1] ?? 0)} kg</strong>
         {weights.length > 1 && <> · {model.flat ? 'Peso estable' : `Máximo visible: ${number(Math.max(...weights))} kg`}</>}
       </p>
       <p className="mt-1 text-xs text-secondary">Peso base registrado; el récord realizado se muestra en las métricas.</p>
-      <div className="relative mt-3 h-44 sm:h-52" role="img" aria-label={`Evolución del peso de trabajo, escala de ${number(model.min)} a ${number(model.max)} kg. ${entries.map((entry,i)=>`${formatDate(getSessionDateObject(entry.session),{day:'numeric',month:'long',year:'numeric'})}: ${weights[i]} kg`).join('; ')}`}>
+      <div className="relative mt-3 h-44 sm:h-52" role="img" aria-label={`Evolución del peso de trabajo, escala de ${number(model.min)} a ${number(model.max)} kg. ${entries.map((entry,i)=>`${formatDate(getSessionDateObject(entry.session),{day:'numeric',month:'long',year:'numeric'})}: ${formatWeight(weights[i])} kg`).join('; ')}`}>
         <div className="absolute inset-y-0 left-10 right-2">
-          {[model.max,(model.max+model.min)/2,model.min].map((value,i)=><div key={i} className="absolute inset-x-0 border-t border-dashed border-line" style={{top:`${10+i*40}%`}} aria-hidden="true"><span className="absolute right-full -translate-y-1/2 pr-2 text-[10px] text-secondary">{number(value)}</span></div>)}
+          {[model.max,(model.max+model.min)/2,model.min].map((value,i)=><div key={i} className="absolute inset-x-0 border-t border-dashed border-line" style={{top:`${10+i*40}%`}} aria-hidden="true"><span className="absolute right-full -translate-y-1/2 pr-2 text-xs text-secondary">{number(value)}</span></div>)}
           <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <path d={path} className="fill-none stroke-brand" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </svg>
-          {points.map((point,i)=><div key={entries[i].session.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{left:`${point.x}%`,top:`${point.y}%`}} title={`${formatDate(getSessionDateObject(entries[i].session))}: ${point.weight} kg`} aria-hidden="true">
-            {point.label && <span className="absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface px-1 text-[10px] font-bold text-ink">{number(point.weight)} kg</span>}
+          {points.map((point,i)=><div key={entries[i].session.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{left:`${point.x}%`,top:`${point.y}%`}} title={`${formatDate(getSessionDateObject(entries[i].session))}: ${formatWeight(point.weight)} kg`} aria-hidden="true">
+            {point.label && <span className="absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface px-1 text-xs font-bold text-ink">{number(point.weight)} kg</span>}
             <span className={`block rounded-full border-2 border-brand ${point.last ? 'size-3 bg-brand' : 'size-2 bg-surface'}`} />
           </div>)}
         </div>
       </div>
-      {entries.length > 0 && <div className="ml-10 flex justify-between text-[10px] text-secondary" aria-hidden="true"><span>{formatDate(getSessionDateObject(entries[0].session))}</span>{entries.length>1 && <span>{formatDate(getSessionDateObject(entries[entries.length-1].session))}</span>}</div>}
+      {entries.length > 0 && <div className="ml-10 flex justify-between text-xs text-secondary" aria-hidden="true"><span>{formatDate(getSessionDateObject(entries[0].session))}</span>{entries.length>1 && <span>{formatDate(getSessionDateObject(entries[entries.length-1].session))}</span>}</div>}
     </div>
   )
 }

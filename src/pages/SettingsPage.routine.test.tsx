@@ -78,7 +78,7 @@ it('Objetivo, Descanso y Nota registran dirty y se guardan sin perder foco',()=>
   const save=screen.getByRole('button',{name:'Guardar cambios'}) as HTMLButtonElement
   expect(save.disabled).toBe(true)
   const target=screen.getByLabelText(/Objetivo de Press/);target.focus()
-  fireEvent.change(target,{target:{value:'8x3'}})
+  fireEvent.change(target,{target:{value:'3x8'}})
   expect(document.activeElement).toBe(target);expect(save.disabled).toBe(false)
   const rest=screen.getByLabelText(/Descanso de Press/);rest.focus()
   fireEvent.change(rest,{target:{value:'2:00'}})
@@ -95,7 +95,7 @@ it('retiene texto incompleto, impide guardar inválidos y descarta el borrador',
   expect(mocks.save).not.toHaveBeenCalled();expect((target as HTMLInputElement).value).toBe('8x')
   expect(target.getAttribute('aria-invalid')).toBe('true')
   fireEvent.click(screen.getByRole('button',{name:'Descartar cambios'}))
-  await waitFor(()=>expect((screen.getByLabelText(/Objetivo de Press/) as HTMLInputElement).value).toBe('10x3'))
+  await waitFor(()=>expect((screen.getByLabelText(/Objetivo de Press/) as HTMLInputElement).value).toBe('3×10'))
 })
 it('reordena, quita y añade desde biblioteca manteniendo IDs y orden',()=>{
   mount('/rutina/editar');fireEvent.click(screen.getByRole('button',{name:'Bajar Press'}))
@@ -109,13 +109,13 @@ it('reordena, quita y añade desde biblioteca manteniendo IDs y orden',()=>{
 })
 it('crea desde edición, vuelve y conserva el borrador de rutina',async()=>{
   mount('/rutina/editar')
-  fireEvent.change(screen.getByLabelText(/Objetivo de Press/),{target:{value:'7x3'}})
+  fireEvent.change(screen.getByLabelText(/Objetivo de Press/),{target:{value:'3x7'}})
   fireEvent.click(screen.getAllByRole('button',{name:'¿No está en la lista? Crear ejercicio nuevo'})[0])
   await screen.findByRole('heading',{name:'Nuevo ejercicio'})
   fireEvent.change(screen.getByLabelText('Nombre *'),{target:{value:'Nuevo'}})
   fireEvent.click(screen.getByRole('button',{name:'Guardar cambios'}))
   fireEvent.click(screen.getByRole('link',{name:'Volver a editar rutina'}))
-  await waitFor(()=>expect((screen.getByLabelText(/Objetivo de Press/) as HTMLInputElement).value).toBe('7x3'))
+  await waitFor(()=>expect((screen.getByLabelText(/Objetivo de Press/) as HTMLInputElement).value).toBe('3x7'))
   fireEvent.change(screen.getByLabelText('Ejercicio para Viernes'),{target:{value:'new'}})
   fireEvent.click(screen.getAllByRole('button',{name:'Añadir al día'})[0])
   fireEvent.click(screen.getByRole('button',{name:'Guardar cambios'}))

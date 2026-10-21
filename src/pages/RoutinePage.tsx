@@ -27,7 +27,7 @@ export function RoutinePage() {
         {ordered.map(t => <button key={t.id} type="button" aria-pressed={selected?.id === t.id} onClick={() => setParams({dia:t.id})}
           className={'flex min-h-14 min-w-0 flex-col items-center justify-center rounded-xl px-1 py-3 lg:items-start lg:px-4 ' + (selected?.id === t.id ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-surface')}>
           <span className="font-semibold lg:hidden">{shortDayNames[t.dayOfWeek]}</span><span className="hidden font-semibold lg:block">{dayNames[t.dayOfWeek]}</span>
-          <span className="mt-1 text-[10px] lg:text-xs">{t.exercises.length ? t.exercises.length + ' ej.' : '—'}</span>
+          <span className="mt-1 text-xs">{t.exercises.length ? t.exercises.length + ' ej.' : '—'}</span>
         </button>)}
       </nav>
       {selected && <section className="training-plan">

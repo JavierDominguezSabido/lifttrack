@@ -7,6 +7,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ExerciseLogger } from '../components/workout/ExerciseLogger'
 import { DiscardWorkoutDialog } from '../components/workout/DiscardWorkoutDialog'
+import { WeightInput } from '../components/workout/WeightInput'
+import { confirmAction } from '../components/ui/confirmAction'
 import { useAuth } from '../context/AuthContext'
 import { useWorkouts } from '../context/WorkoutContext'
 import {
@@ -20,8 +22,10 @@ import {
   getEquivalentExerciseIds
 } from '../utils/exerciseIdentity'
 import {
+  countLabel,
   formatCompactNumber,
   formatRestSeconds,
+  formatWeight,
   getTodayTemplate
 } from '../utils/workout'
 import {
@@ -1153,6 +1157,12 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
       return
     }
 
+    const pendingSets = progress.total - progress.completed
+    if (pendingSets > 0 && !await confirmAction(
+      `Te ${pendingSets === 1 ? 'queda' : 'quedan'} ${countLabel(pendingSets, 'serie', 'series')} sin marcar como hecha${pendingSets === 1 ? '' : 's'}. Solo se guardarán las series hechas.`,
+      { title: '¿Finalizar el entrenamiento?', confirmLabel: 'Finalizar igualmente', cancelLabel: 'Seguir entrenando' }
+    )) return
+
     // El snapshot se conserva también si la respuesta del servidor se pierde.
     const savedDraft = writeWorkoutDraft(userKey, template, startedAt, logs, viewMode, guidedPosition, localDate)
     if (!savedDraft) {
@@ -1332,15 +1342,15 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-2xl bg-muted p-3">
                   <p className="text-lg font-extrabold text-ink">{logs.length}</p>
-                  <p className="text-[11px] font-bold text-secondary">ejercicios</p>
+                  <p className="text-xs font-bold text-secondary">{logs.length === 1 ? 'ejercicio' : 'ejercicios'}</p>
                 </div>
                 <div className="rounded-2xl bg-muted p-3">
                   <p className="text-lg font-extrabold text-ink">{progress.completed}</p>
-                  <p className="text-[11px] font-bold text-secondary">series hechas</p>
+                  <p className="text-xs font-bold text-secondary">{progress.completed === 1 ? 'serie hecha' : 'series hechas'}</p>
                 </div>
                 <div className="rounded-2xl bg-muted p-3">
                   <p className="text-lg font-extrabold text-ink">{formatCompactNumber(completedVolume)}</p>
-                  <p className="text-[11px] font-bold text-secondary">kg volumen</p>
+                  <p className="text-xs font-bold text-secondary">kg volumen</p>
                 </div>
               </div>
               {saveError && (
@@ -1435,17 +1445,13 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
                     <label className="min-w-0" htmlFor={`guided-weight-${currentGuidedStep.log.id}`}>
                       <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">Peso</span>
                       <span className="relative block">
-                        <input
+                        <WeightInput
                           id={`guided-weight-${currentGuidedStep.log.id}`}
                           aria-label="Peso, en kilogramos"
                           aria-describedby={saveError ? 'guided-save-error' : undefined}
                           className="min-h-20 w-full rounded-xl border border-line bg-canvas py-2 pl-3 pr-9 text-4xl font-extrabold text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft"
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="0.25"
-                          value={String(getWorkingWeight(currentGuidedStep.log))}
-                          onChange={(event) => updateGuidedWeight(Number(event.target.value))}
+                          value={getWorkingWeight(currentGuidedStep.log)}
+                          onChange={updateGuidedWeight}
                         />
                         <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-secondary">
                           kg
@@ -1471,12 +1477,12 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
 
                 <div className="guided-previous h-8 min-w-0 px-1 text-center text-xs font-semibold leading-4 text-secondary">
                   <p className="line-clamp-2" title={guidedPreviousPerformance
-                    ? `Última vez: ${guidedPreviousPerformance.reps.join('-')} con ${guidedPreviousPerformance.weightKg} kg`
+                    ? `Última vez: ${guidedPreviousPerformance.reps.join('-')} con ${formatWeight(guidedPreviousPerformance.weightKg)} kg`
                     : 'Última vez: —'}>
                     Última vez: {guidedPreviousPerformance ? <>
                       <strong className="text-ink">{guidedPreviousPerformance.reps.join('-')}</strong>
                       {guidedPreviousPerformance.weightKg > 0
-                        ? ` con ${guidedPreviousPerformance.weightKg} kg`
+                        ? ` con ${formatWeight(guidedPreviousPerformance.weightKg)} kg`
                         : ' sin peso añadido'}
                     </> : '—'}
                   </p>
@@ -1594,7 +1600,7 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
           <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
             <div className="rounded-xl bg-muted px-3 py-2 text-center">
               <p className="text-base font-extrabold text-ink">{progress.completed}/{progress.total}</p>
-              <p className="text-[11px] font-bold text-secondary">series</p>
+              <p className="text-xs font-bold text-secondary">series</p>
             </div>
             <button
               type="button"

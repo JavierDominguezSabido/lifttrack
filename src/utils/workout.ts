@@ -107,6 +107,22 @@ export function formatRestSeconds(seconds?: number) {
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+const weightFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2, useGrouping: false })
+
+/** Peso con coma decimal: 22,5 · 1,25. */
+export function formatWeight(value: number) {
+  return weightFormat.format(value)
+}
+
+/** Objetivo como series×reps: 3×8. */
+export function formatTarget(sets: number, reps: string) {
+  return `${sets}×${reps}`
+}
+
+export function countLabel(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
 export function getSessionVolume(session: WorkoutSession) {
   return session.exerciseLogs.reduce(
     (total, log) =>

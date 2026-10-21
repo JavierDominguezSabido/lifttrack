@@ -28,7 +28,7 @@ import {
   normalizeExerciseName
 } from '../../utils/exerciseIdentity'
 import { toLocalDateKey } from '../../utils/date'
-import { isInitialSession } from '../../utils/workout'
+import { countLabel, isInitialSession } from '../../utils/workout'
 import { mergeWeeklyTemplates, normalizeWeeklyTemplates } from '../../services/templateImport'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -262,7 +262,7 @@ function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] 
         templatesToImport = mergeWeeklyTemplates(templates, preview.templates ?? []).templates
       } else return
     } else if (!await confirmAction(
-      `Se va a importar una copia JSON con ${preview.sessionsToImport.length} sesiones nuevas${hasRoutine ? ' y rutina personalizada' : ''}. No se sobrescribirán sesiones existentes. ¿Continuar?`
+      `Se va a importar una copia JSON con ${countLabel(preview.sessionsToImport.length, 'sesión nueva', 'sesiones nuevas')}${hasRoutine ? ' y rutina personalizada' : ''}. No se sobrescribirán sesiones existentes. ¿Continuar?`
     )) return
 
     setImporting(true)
@@ -298,7 +298,7 @@ function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] 
     )
 
     if (!await confirmAction(
-      `Se van a fusionar ${duplicateCount} ejercicios duplicados y actualizar ${logCount} registros. No se borrarán sesiones ni series. ¿Continuar?`
+      `Se van a fusionar ${countLabel(duplicateCount, 'ejercicio duplicado', 'ejercicios duplicados')} y actualizar ${countLabel(logCount, 'registro', 'registros')}. No se borrarán sesiones ni series. ¿Continuar?`
     )) return
 
     setMergingDuplicates(true)
@@ -470,7 +470,7 @@ function DuplicateReview({
                   Duplicados: {group.duplicateNames.join(', ')}
                 </p>
                 <p className="mt-1 text-xs font-medium text-subtle">
-                  {group.affectedSessionCount} sesiones afectadas · {group.affectedLogCount} registros a actualizar
+                  {countLabel(group.affectedSessionCount, 'sesión afectada', 'sesiones afectadas')} · {countLabel(group.affectedLogCount, 'registro', 'registros')} a actualizar
                 </p>
               </div>
             ))}
@@ -552,7 +552,7 @@ function ImportPreviewCard({
       )}
 
       <p className="mt-4 text-sm font-bold text-ink">
-        {preview.sessionsToImport.length} sesiones nuevas listas para importar.
+        {preview.sessionsToImport.length === 1 ? '1 sesión nueva lista' : `${preview.sessionsToImport.length} sesiones nuevas listas`} para importar.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button type="button" onClick={onCancel} disabled={importing} className="btn-secondary w-full">
@@ -570,7 +570,7 @@ function PreviewStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl bg-surface p-2 text-center shadow-sm sm:p-3">
       <p className="text-xl font-extrabold text-ink">{value}</p>
-      <p className="mt-0.5 text-[11px] font-bold text-secondary">{label}</p>
+      <p className="mt-0.5 text-xs font-bold text-secondary">{label}</p>
     </div>
   )
 }

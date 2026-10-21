@@ -7,9 +7,10 @@ export function confirmAction(message: string, options: ConfirmationOptions = {}
   const previousFocus = document.activeElement as HTMLElement | null
   const app = document.getElementById('root')
   const wasInert = app?.inert ?? false
-  const overflow = document.body.style.overflow
+  // En html, no en body: un body con overflow propio rompe la cabecera sticky.
+  const overflow = document.documentElement.style.overflow
   if (app) app.inert = true
-  document.body.style.overflow = 'hidden'
+  document.documentElement.style.overflow = 'hidden'
   document.body.append(host)
   const root = createRoot(host)
   return new Promise(resolve => {
@@ -19,7 +20,7 @@ export function confirmAction(message: string, options: ConfirmationOptions = {}
       finished = true
       root.unmount(); host.remove()
       if (app) app.inert = wasInert
-      document.body.style.overflow = overflow
+      document.documentElement.style.overflow = overflow
       previousFocus?.focus()
       resolve(result)
     }

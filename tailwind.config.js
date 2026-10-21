@@ -36,6 +36,10 @@ export default {
         'warning-soft': 'rgb(var(--color-warning-soft) / <alpha-value>)',
         'warning-text': 'rgb(var(--color-warning-text) / <alpha-value>)'
       },
+      // Mínimo legible a un brazo de distancia en el gimnasio: 13 px.
+      fontSize: {
+        xs: ['0.8125rem', { lineHeight: '1.125rem' }]
+      },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
       },

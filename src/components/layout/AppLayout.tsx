@@ -1,7 +1,7 @@
 import { confirmAction } from '../ui/confirmAction'
 import { Activity, CalendarDays, ChartNoAxesColumnIncreasing, LayoutDashboard, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useWorkouts } from '../../context/WorkoutContext'
 import { getCompletedRoutineDaysForWeek } from '../../utils/workout'
 import { shouldShowInitialWorkoutLoader } from '../../utils/workoutLifecycle'
@@ -78,6 +78,11 @@ export function AppLayout() {
     day: 'numeric',
     month: 'long'
   }).format(new Date())
+  // Entrenamiento cuelga de Hoy e Historial de Progreso; NavLink solo marca su propia ruta.
+  const isSectionActive = (path: string) => path === '/'
+    ? location.pathname === '/' || location.pathname.startsWith('/entrenamiento')
+    : location.pathname === path || location.pathname.startsWith(path + '/') ||
+      (path === '/progreso' && location.pathname.startsWith('/historial'))
   const title =
     Object.entries(pageTitles).find(([path]) =>
       path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
@@ -104,20 +109,17 @@ export function AppLayout() {
 
         <nav aria-label="Navegación principal de escritorio" className="space-y-1">
           {navigation.map(({ label, path, icon: Icon }) => (
-            <NavLink
+            <Link
               key={path}
               to={path}
-              aria-current={(path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial')) ? 'page' : undefined}
-              end={path === '/'}
-              className={({ isActive }) =>
-                `flex min-h-14 items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
-                  (isActive || (path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial'))) ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-muted hover:text-ink'
-                }`
-              }
+              aria-current={isSectionActive(path) ? 'page' : undefined}
+              className={`flex min-h-14 items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
+                isSectionActive(path) ? 'bg-brand-soft text-brand' : 'text-secondary hover:bg-muted hover:text-ink'
+              }`}
             >
               <Icon className="size-5" aria-hidden="true" />
               {label}
-            </NavLink>
+            </Link>
           ))}
         </nav>
 
@@ -138,7 +140,7 @@ export function AppLayout() {
       <div className="min-w-0 lg:col-start-2">
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-line/70 bg-canvas/88 px-4 backdrop-blur-xl md:px-8 lg:h-16">
           <div className="min-w-0">
-            <p className="hidden text-xs font-semibold capitalize text-subtle sm:block">{currentDate}</p>
+            <p className="hidden text-xs font-semibold text-subtle sm:block">{currentDate}</p>
             <h1 className="truncate text-lg font-extrabold tracking-tight lg:text-xl">{title}</h1>
           </div>
           <span className="lifttrack-mark" aria-hidden="true">LT<span>/</span></span>
@@ -172,27 +174,20 @@ export function AppLayout() {
 
       <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-30 grid min-h-[64px] grid-cols-4 border-t border-line bg-canvas/95 px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_24px_rgba(7,11,18,0.14)] backdrop-blur-sm lg:hidden">
         {navigation.map(({ label, path, icon: Icon }) => (
-          <NavLink
+          <Link
             key={path}
             to={path}
-            aria-current={(path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial')) ? 'page' : undefined}
-            end={path === '/'}
-            className={({ isActive }) =>
-              `relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
-                (isActive || (path === '/' && location.pathname.startsWith('/entrenamiento')) || (path === '/progreso' && location.pathname.startsWith('/historial'))) ? 'bg-brand-soft text-brand' : 'text-subtle'
-              }`
-            }
+            aria-current={isSectionActive(path) ? 'page' : undefined}
+            className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-xs font-bold transition ${
+              isSectionActive(path) ? 'bg-brand-soft text-brand' : 'text-subtle'
+            }`}
           >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <span className="absolute top-1 h-0.5 w-5 rounded-full bg-brand" aria-hidden="true" />
-                )}
+            {isSectionActive(path) && (
+              <span className="absolute top-1 h-0.5 w-5 rounded-full bg-brand" aria-hidden="true" />
+            )}
             <Icon className="size-[18px]" strokeWidth={2.3} aria-hidden="true" />
             {label}
-              </>
-            )}
-          </NavLink>
+          </Link>
         ))}
       </nav>
     </div>

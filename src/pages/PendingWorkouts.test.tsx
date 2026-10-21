@@ -71,7 +71,7 @@ it('abrir, cambiar de modo y editar peso/reps sin completar no crea pendiente', 
 
 it('la primera serie fija jueves 24 para la rutina Viernes; el modo no cambia la identidad', async () => {
   const page = mount('/entrenamiento/viernes'); await settle()
-  fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 1 de / }))
   const started = readWorkoutDrafts('local')[0]
   expect(started.template.name).toBe('Viernes')
   expect(started.localDate).toBe('2026-09-24')
@@ -85,7 +85,7 @@ it('la primera serie fija jueves 24 para la rutina Viernes; el modo no cambia la
 it('la fecha se fija al completar la primera serie, no al abrir la pantalla', async () => {
   const page = mount('/entrenamiento/viernes'); await settle()
   vi.setSystemTime(new Date(2026, 8, 25, 0, 5))
-  fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 1 de / }))
   expect(readWorkoutDrafts('local')[0].localDate).toBe('2026-09-25')
   expect(readWorkoutDrafts('local')[0].template.name).toBe('Viernes')
   page.unmount()
@@ -97,7 +97,8 @@ it('dos pendientes aparecen por separado sin sustituir Hoy y se puede escoger un
   writeWorkoutDraft(first); writeWorkoutDraft(second)
   const page = mount(); await settle()
   expect(screen.getByRole('link', { name: /2 entrenamientos pendientes.*Ver pendientes/ })).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'Empezar entrenamiento' })).toBeTruthy()
+  // El viernes de hoy ya está empezado: Hoy lo continúa en vez de empezar otro.
+  expect(screen.getByRole('link', { name: 'Continuar entrenamiento' }).getAttribute('href')).toBe(workoutDraftUrl(second))
   fireEvent.click(screen.getByRole('link', { name: /Ver pendientes/ }))
   expect(screen.getByText('Martes')).toBeTruthy()
   expect(screen.getByText('Viernes')).toBeTruthy()
@@ -121,7 +122,7 @@ it('volver desde Rutina a una rutina iniciada continúa el mismo draft', async (
   expect(screen.getByRole('button', { name: 'Vista completa' })).toBeTruthy()
   expect(readWorkoutDrafts('local')).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: 'Vista completa' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 2' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 2 de / }))
   expect(readWorkoutDrafts('local')).toHaveLength(1)
   expect(readWorkoutDrafts('local')[0].startedAt).toBe(first.startedAt)
   expect(readWorkoutDrafts('local')[0].logs[0].sets[1].completed).toBe(true)
@@ -135,13 +136,13 @@ it('navegar entre rutinas y volver no inicia otro draft de la primera', async ()
     <Routes><Route path="/entrenamiento/:templateId" element={<WorkoutPage />} /></Routes>
   </MemoryRouter>)
   await settle()
-  fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 1 de / }))
   const first = readWorkoutDrafts('local')[0]
   fireEvent.click(screen.getByRole('link', { name: 'Ir a Martes' })); await settle()
   fireEvent.click(screen.getByRole('link', { name: 'Volver a Viernes' })); await settle()
   expect(readWorkoutDrafts('local')).toHaveLength(1)
   expect(readWorkoutDrafts('local')[0].startedAt).toBe(first.startedAt)
-  fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 2' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 2 de / }))
   expect(readWorkoutDrafts('local')).toHaveLength(1)
   page.unmount()
 })
@@ -164,6 +165,12 @@ it('continuar el martes el miércoles conserva fecha, rutina e ID y elimina solo
   expect(screen.getByText('Martes')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Vista completa' }))
   fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' })); await settle()
+  // Queda una serie sin hacer: primero se puede volver atrás sin guardar.
+  expect(screen.getByRole('dialog', { name: '¿Finalizar el entrenamiento?' }).textContent).toContain('Te queda 1 serie sin marcar como hecha.')
+  fireEvent.click(screen.getByRole('button', { name: 'Seguir entrenando' })); await settle()
+  expect(context.saveSession).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' })); await settle()
+  fireEvent.click(screen.getByRole('button', { name: 'Finalizar igualmente' })); await settle()
   await settle()
   expect(screen.getByText('Historial guardado')).toBeTruthy()
   const saved = context.saveSession.mock.calls[0][0] as WorkoutSession
@@ -181,17 +188,26 @@ it('tras terminar uno se puede iniciar otro entrenamiento distinto de la misma r
   writeWorkoutDraft(first)
   const page = mount('/entrenamiento/martes'); await settle()
   fireEvent.click(screen.getByRole('button', { name: 'Vista completa' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' })); await settle(); await settle()
+  fireEvent.click(screen.getByRole('button', { name: 'Finalizar y guardar' })); await settle()
+  fireEvent.click(screen.getByRole('button', { name: 'Finalizar igualmente' })); await settle(); await settle()
   expect(readWorkoutDrafts('local')).toHaveLength(0)
   page.unmount()
   vi.setSystemTime(new Date(2026, 8, 24, 12))
   const secondPage = mount('/entrenamiento/martes'); await settle()
-  fireEvent.click(screen.getByRole('button', { name: 'Marcar como hecha la serie 1' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 1 de / }))
   const second = readWorkoutDrafts('local')[0]
   expect(second.startedAt).not.toBe(first.startedAt)
   expect(second.localDate).toBe(first.localDate)
   expect(context.sessions).toHaveLength(1)
   secondPage.unmount()
+})
+
+it('Hoy ofrece continuar el entrenamiento a medias de la rutina siguiente', async () => {
+  const today = draft(friday, '2026-09-24', 8)
+  writeWorkoutDraft(today)
+  mount(); await settle()
+  expect(screen.getByRole('link', { name: 'Continuar entrenamiento' }).getAttribute('href')).toBe(workoutDraftUrl(today))
+  expect(screen.queryByRole('link', { name: 'Empezar entrenamiento' })).toBeNull()
 })
 
 it('ignora datos legacy y corruptos sin impedir abrir Hoy', async () => {

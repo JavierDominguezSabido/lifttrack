@@ -24,7 +24,7 @@ export function TemplateExerciseRow({
       </div>
       <div className="shrink-0 pl-1 text-right">
         <p className="text-sm font-extrabold text-ink">{item.targetSets} <span className="text-xs font-medium text-secondary">×</span> {item.targetReps}</p>
-        <p className="text-[10px] text-secondary">series × reps</p>
+        <p className="text-xs text-secondary">series × reps</p>
         {item.restSeconds && (
           <p className="mt-1 flex items-center justify-end gap-1 text-xs font-medium text-secondary">
             <Clock3 className="size-3" />

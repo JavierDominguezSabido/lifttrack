@@ -8,7 +8,8 @@ export function useModalFocus(ref: RefObject<HTMLElement>, onClose: () => void, 
     const dialog = ref.current
     if (!dialog) return
     const opener = document.activeElement as HTMLElement | null
-    const overflow = document.body.style.overflow
+    // En html, no en body: un body con overflow propio rompe la cabecera sticky.
+    const overflow = document.documentElement.style.overflow
     const background = new Map<HTMLElement, boolean>()
     let branch: HTMLElement = dialog
     while (branch.parentElement) {
@@ -24,7 +25,7 @@ export function useModalFocus(ref: RefObject<HTMLElement>, onClose: () => void, 
     const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'))
       .filter(element => element.getClientRects().length > 0 && !element.closest('[inert], [hidden]'))
     const focusInitial = () => (dialog.querySelector<HTMLElement>(initialSelector) ?? focusable()[0] ?? dialog).focus({ preventScroll: true })
-    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
     focusInitial()
     const onFocus = (event: FocusEvent) => { if (!dialog.contains(event.target as Node)) focusInitial() }
     const onKey = (event: KeyboardEvent) => {
@@ -42,7 +43,7 @@ export function useModalFocus(ref: RefObject<HTMLElement>, onClose: () => void, 
       document.removeEventListener('focusin', onFocus)
       dialog.removeEventListener('keydown', onKey)
       background.forEach((inert, element) => { element.inert = inert })
-      document.body.style.overflow = overflow
+      document.documentElement.style.overflow = overflow
       if (opener?.isConnected) opener.focus({ preventScroll: true })
     }
   }, [ref, initialSelector])

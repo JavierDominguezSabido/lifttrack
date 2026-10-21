@@ -95,7 +95,7 @@ export const localWorkoutRepository: WorkoutRepository = {
   },
   async mergeExerciseIds(canonicalId, duplicateIds) {
     const storage = getLocalStorage()
-    if (!storage) throw new Error('localStorage no estÃ¡ disponible en este navegador o contexto.')
+    if (!storage) throw new Error('localStorage no está disponible en este navegador o contexto.')
 
     const duplicates = new Set(duplicateIds)
     let updatedLogs = 0

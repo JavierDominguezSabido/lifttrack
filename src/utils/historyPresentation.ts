@@ -1,7 +1,7 @@
 import type { Exercise, ExerciseLog, SetLog, WorkoutSession, WorkoutTemplate } from '../types'
 import { getEquivalentExerciseIds } from './exerciseIdentity'
 import { getSessionRoutineIdentity } from './historySession'
-import { calculateWeeklyStreak, dayNames, formatCompactNumber, formatDate, getNextWeekStart, getSessionDate, getSessionDateObject, getSessionVolume, getPerformedWeight, getWeekStart } from './workout'
+import { calculateWeeklyStreak, countLabel, dayNames, formatCompactNumber, formatDate, getNextWeekStart, getSessionDate, getSessionDateObject, getSessionVolume, getPerformedWeight, getWeekStart } from './workout'
 export type RangeFilter = 'week' | 'month' | 'all'
 export interface ProgressEntry {
   session: WorkoutSession
@@ -54,7 +54,7 @@ export function getSessionDeletionMessage(session: WorkoutSession, templates: Wo
     'Vas a eliminar:',
     routineLabel,
     `Fecha registrada: ${registeredDate}`,
-    `${session.exerciseLogs.length} ejercicios · ${countCompletedSets(session)} series · ${formatCompactNumber(getSessionVolume(session))} kg`,
+    `${countLabel(session.exerciseLogs.length, 'ejercicio', 'ejercicios')} · ${countLabel(countCompletedSets(session), 'serie', 'series')} · ${formatCompactNumber(getSessionVolume(session))} kg`,
     '',
     'Esta acción no se puede deshacer. ¿Continuar?'
   ].join('\n')
