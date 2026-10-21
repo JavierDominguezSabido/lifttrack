@@ -321,15 +321,16 @@ function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] 
 
   return (
     <section className="card overflow-hidden" aria-labelledby="data-settings-title">
-      <header className="border-b border-line/70 p-4 md:p-5">
+      <header className="border-b border-line/40 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="data-settings-title" className="text-xl font-extrabold tracking-tight text-ink">
+          {/* El acordeón ya muestra este título; se conserva para lectores de pantalla. */}
+          <h2 id="data-settings-title" className="sr-only">
             Datos
           </h2>
-          <span className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-extrabold ${
+          <span className={`inline-flex items-center gap-2 text-xs font-bold ${
             dataMode === 'cloud'
-              ? 'bg-success-soft text-success-text'
-              : 'bg-muted text-secondary'
+              ? 'text-success-text'
+              : 'text-secondary'
           }`}>
             {dataMode === 'cloud'
               ? <Cloud className="size-4" aria-hidden="true" />
@@ -342,7 +343,7 @@ function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] 
         </p>
       </header>
 
-      <div className="space-y-4 p-4 md:p-5">
+      <div className="space-y-4 py-4">
         {message && (
           <p role="status" className="status-success">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -397,18 +398,18 @@ function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] 
           </div>
         )}
 
-        <div className="border-t border-line/70 pt-4">
+        <div className="border-t border-line/40 pt-2">
           <button
             type="button"
             onClick={() => setShowAdvanced((current) => !current)}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-bold text-secondary hover:text-ink"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-secondary hover:text-ink"
             aria-expanded={showAdvanced}
           >
             <AlertTriangle className="size-4" aria-hidden="true" />
             Herramientas avanzadas
           </button>
           {showAdvanced && (
-            <div className="mt-3 rounded-xl border border-line/70 bg-muted/50 p-3.5">
+            <div className="mt-2 pl-6">
               <div className="flex items-center gap-2">
                 <FileJson className="size-5 text-brand" aria-hidden="true" />
                 <h3 className="font-extrabold text-ink">Revisar duplicados</h3>
@@ -450,12 +451,12 @@ function DuplicateReview({
   onMerge: () => void
 }) {
   return (
-    <div className="mt-4 rounded-2xl border border-line bg-surface p-4">
+    <div className="mt-4 border-t border-line/40 pt-1">
       {duplicateGroups.length > 0 ? (
         <>
-          <div className="space-y-3">
+          <div className="divide-y divide-line/40">
             {duplicateGroups.map((group) => (
-              <div key={group.normalizedName} className="rounded-xl bg-muted p-3">
+              <div key={group.normalizedName} className="py-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-brand">
                   Canónico
                 </p>
@@ -484,7 +485,7 @@ function DuplicateReview({
           </button>
         </>
       ) : (
-        <p className="text-sm font-semibold text-secondary">
+        <p className="pt-2 text-sm font-semibold text-secondary">
           No se han encontrado duplicados con sesiones asociadas.
         </p>
       )}
@@ -512,26 +513,26 @@ function ImportPreviewCard({
   const canImport = preview.errors.length === 0 && hasRestorableData
 
   return (
-    <div className="rounded-2xl border border-brand/30 bg-brand-soft/60 p-4">
+    <div className="border-t-2 border-brand pt-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-brand">Vista previa</p>
-          <h3 className="mt-1 break-all font-extrabold text-ink">{preview.filename}</h3>
+          <p className="eyebrow !text-brand">Vista previa</p>
+          <h3 className="mt-1 break-all text-lg font-extrabold text-ink">{preview.filename}</h3>
         </div>
-        <button type="button" onClick={onCancel} className="grid size-10 shrink-0 place-items-center rounded-xl" aria-label="Cancelar importación">
+        <button type="button" onClick={onCancel} className="-mr-2 grid size-11 shrink-0 place-items-center rounded-[3px] text-secondary hover:text-ink" aria-label="Cancelar importación">
           <X className="size-5" />
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-1.5 sm:gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-4 border-y border-line/40 py-3">
         <PreviewStat label="Sesiones" value={preview.sessionCount} />
         <PreviewStat label="Ejercicios" value={preview.exerciseCount} />
         <PreviewStat label="Series" value={preview.setCount} />
       </div>
 
       {preview.errors.length > 0 && (
-        <div className="mt-4 rounded-xl border border-danger/30 bg-danger-soft p-3 text-sm text-danger-text">
-          <p className="font-extrabold">Errores detectados</p>
+        <div className="mt-4 border-t border-danger/45 pt-3 text-sm text-danger-text">
+          <p className="flex items-center gap-2 font-extrabold"><AlertTriangle className="size-4 shrink-0" aria-hidden="true" />Errores detectados</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {preview.errors.slice(0, 8).map((item, index) => (
               <li key={`${item}-${index}`}>{item}</li>
@@ -544,7 +545,7 @@ function ImportPreviewCard({
       )}
 
       {preview.hasPossibleDuplicates && (
-        <p className="mt-4 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3 text-sm font-semibold text-warning-text">
+        <p className="status-warning mt-4">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           Se han detectado posibles entrenamientos duplicados. Se omitirán {preview.duplicateSessionIds.length} y no se sobrescribirá ningún dato.
         </p>
@@ -567,8 +568,8 @@ function ImportPreviewCard({
 
 function PreviewStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-surface p-2 text-center shadow-sm sm:p-3">
-      <p className="text-xl font-extrabold text-ink">{value}</p>
+    <div>
+      <p className="text-2xl font-semibold tabular-nums tracking-[-0.04em] text-ink">{value}</p>
       <p className="mt-0.5 text-xs font-bold text-secondary">{label}</p>
     </div>
   )

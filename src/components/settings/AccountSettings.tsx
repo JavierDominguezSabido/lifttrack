@@ -106,17 +106,18 @@ export function AccountSettings() {
 
   return (
     <section className="card overflow-hidden" aria-labelledby="account-settings-title">
-      <div className="flex flex-wrap items-start justify-between gap-4 p-4 md:p-5">
-        <div>
-          <h2 id="account-settings-title" className="text-xl font-extrabold tracking-tight text-ink">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-4">
+        <div className="contents">
+          {/* El acordeón ya muestra este título; se conserva para lectores de pantalla. */}
+          <h2 id="account-settings-title" className="sr-only">
             Cuenta y sincronización
           </h2>
-          {user?.email && <p className="mt-1 break-all text-sm font-semibold text-secondary">{user.email}</p>}
+          {user?.email && <p className="break-all text-sm font-semibold text-secondary">{user.email}</p>}
         </div>
-        <span className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-extrabold ${
+        <span className={`inline-flex items-center gap-2 text-xs font-bold ${
           syncStatus === 'error' || syncStatus === 'offline'
-            ? 'bg-danger-soft text-danger-text'
-            : 'bg-muted text-secondary'
+            ? 'text-danger-text'
+            : 'text-secondary'
         }`}>
           {dataMode === 'cloud'
             ? <Cloud className="size-4" aria-hidden="true" />
@@ -125,12 +126,12 @@ export function AccountSettings() {
         </span>
       </div>
 
-      <div className="space-y-3 border-t border-line/70 p-4 md:p-5">
+      <div className="space-y-4 py-4">
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p id="account-error" role="alert" className="status-error">{error}</p>}
 
         {!configured ? (
-          <p className="rounded-xl border border-warning/30 bg-warning-soft/80 p-3 text-sm font-semibold text-warning-text">
+          <p className="status-warning">
             La sincronización en la nube no está configurada. LiftTrack guarda los datos en este dispositivo.
           </p>
         ) : loading ? (
@@ -151,7 +152,7 @@ export function AccountSettings() {
             </button>
 
             {localCount > 0 && (
-              <div className="rounded-xl border border-brand/20 bg-brand-soft/60 p-3.5 sm:col-span-2">
+              <div className="border-t border-brand/40 pt-3 sm:col-span-2">
                 <p className="font-extrabold text-ink">Datos locales disponibles</p>
                 <p className="mt-1 text-sm leading-6 text-secondary">
                   Hay {localCount} entrenamiento{localCount === 1 ? '' : 's'} local{localCount === 1 ? '' : 'es'}.
@@ -170,12 +171,12 @@ export function AccountSettings() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+            <div className="grid grid-cols-2">
               <button
                 type="button"
                 onClick={() => setMode('signin')}
-                className={`min-h-10 rounded-lg text-sm font-bold ${
-                  mode === 'signin' ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
+                className={`min-h-12 border-b-2 text-sm font-bold ${
+                  mode === 'signin' ? 'border-brand text-brand' : 'border-line text-secondary hover:text-ink'
                 }`}
               >
                 Iniciar sesión
@@ -183,8 +184,8 @@ export function AccountSettings() {
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className={`min-h-10 rounded-lg text-sm font-bold ${
-                  mode === 'signup' ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
+                className={`min-h-12 border-b-2 text-sm font-bold ${
+                  mode === 'signup' ? 'border-brand text-brand' : 'border-line text-secondary hover:text-ink'
                 }`}
               >
                 Crear cuenta
@@ -201,7 +202,7 @@ export function AccountSettings() {
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="input mt-1 !text-left"
+                  className="input input-line mt-1 !text-left"
                   placeholder="tu@email.com"
                 />
               </label>
@@ -215,7 +216,7 @@ export function AccountSettings() {
                   minLength={6}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="input mt-1 !text-left"
+                  className="input input-line mt-1 !text-left"
                   placeholder="Mínimo 6 caracteres"
                 />
               </label>

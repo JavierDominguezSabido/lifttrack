@@ -256,7 +256,8 @@ nav[aria-label='Navegación principal'] a[aria-current='page'] svg { stroke-widt
 .week-legend svg { width: 12px; height: 12px; }
 .week-legend > span:first-child svg { color: rgb(var(--color-success-text)); }
 .account-intro { padding: .5rem 0 1.5rem; border-bottom: 1px solid rgb(var(--color-line) / .6); }
-.account-intro h2 { margin: .5rem 0; font-size: clamp(1.8rem, 3vw, 3rem); line-height: 1.1; font-weight: 700; letter-spacing: -.045em; }
+.account-intro { border-top: 3px solid rgb(var(--color-brand)); padding-top: 1.5rem !important; }
+.account-intro h2 { margin: .75rem 0 .5rem; font-size: clamp(2.4rem, 4vw, 4.5rem); line-height: .98; font-weight: 800; letter-spacing: -.065em; text-wrap: balance; }
 .account-intro > p:last-child { color: rgb(var(--color-secondary)); font-size: .875rem; }
 .account-page > button { padding-inline: 0; border-color: rgb(var(--color-line)) !important; }
 .account-page > button[aria-expanded='true'] { border-color: rgb(var(--color-brand) / .5) !important; }
@@ -270,7 +271,7 @@ nav[aria-label='Navegación principal'] a[aria-current='page'] svg { stroke-widt
   .progress-records > .divide-y > div { grid-template-columns: auto auto minmax(0,1fr); gap: .5rem; }
   .progress-records > .divide-y > div > span:last-child { grid-column: 2 / -1; }
 }
-.routine-page .page-intro { padding-bottom: 1.5rem; border-bottom: 1px solid rgb(var(--color-line)); }
+.routine-page .page-intro { padding: 1.5rem 0; border-top: 3px solid rgb(var(--color-brand)); border-bottom: 1px solid rgb(var(--color-line)); }
 .routine-page .page-intro h2 { font-size: clamp(2.4rem, 4vw, 4.5rem); max-width: 15ch; }
 .routine-page nav[aria-label='Días de rutina'] button { border-radius: 0; background: transparent; border-bottom: 2px solid transparent; }
 .routine-page nav[aria-label='Días de rutina'] button[aria-pressed='true'] { border-color: rgb(var(--color-brand)); color: rgb(var(--color-brand)); }
@@ -382,3 +383,33 @@ aside nav a.text-brand { background: transparent; box-shadow: inset 3px 0 rgb(va
 .app-main:has(.workout-view[data-guided='false']) > .app-sync-notice,
 .workout-view[data-guided='false'] > [data-remote-only='true'] { display: none; }
 .workout-view[data-guided='false'] .full-workout-feedback { @apply sr-only; }
+
+/* Subpáginas (editor, biblioteca, cuenta, progreso): el lenguaje de Hoy, sin tarjetas. */
+.page-head { padding-bottom: 1.5rem; border-bottom: 1px solid rgb(var(--color-line)); }
+.page-title { margin-top: .5rem; max-width: 15ch; font-size: clamp(2.4rem, 4vw, 4.5rem); font-weight: 800; line-height: .98; letter-spacing: -.065em; text-wrap: balance; overflow-wrap: anywhere; }
+.day-editor { border-top: 2px solid rgb(var(--color-brand)); }
+.day-editor > header h2 { font-size: clamp(1.8rem, 3vw, 3rem); font-weight: 800; line-height: 1.05; letter-spacing: -.05em; }
+.exercise-picker { font-size: clamp(1.8rem, 3vw, 3rem); font-weight: 800; line-height: 1.05; letter-spacing: -.05em; }
+.input-line { border-width: 0 0 2px; border-style: solid; border-radius: 0; border-color: rgb(var(--color-control)); background: rgb(var(--color-surface)); }
+.input-line:focus { border-color: rgb(var(--color-brand)); }
+@media (max-width: 1023px) {
+  /* Justo encima de la navegación inferior (54px de contenido + su relleno seguro). */
+  .save-bar { bottom: max(4rem, calc(3.375rem + max(.45rem, env(safe-area-inset-bottom)))); }
+}
+
+/* Avisos: icono y texto de color bajo una línea fina; sin caja ni raya lateral.
+   Solo fuera del entrenamiento, que conserva sus avisos. */
+:where(.routine-editor, .exercise-library, .account-page, .progress-page) :is(.status-success, .status-error),
+.status-warning {
+  display: flex; align-items: flex-start; gap: .5rem; padding: .75rem 0 0; border: 0; border-top: 1px solid; border-radius: 0;
+  background: transparent; font-size: .875rem; font-weight: 600; line-height: 1.45;
+}
+:where(.routine-editor, .exercise-library, .account-page, .progress-page) .status-success { border-color: rgb(var(--color-success) / .45); color: rgb(var(--color-success-text)); --status-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E"); }
+:where(.routine-editor, .exercise-library, .account-page, .progress-page) .status-error { border-color: rgb(var(--color-danger) / .45); color: rgb(var(--color-danger-text)); --status-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E"); }
+.status-warning { border-color: rgb(var(--color-warning) / .45); color: rgb(var(--color-warning-text)); --status-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E"); }
+/* Los avisos que ya traen su icono de lucide no reciben otro. */
+:where(.routine-editor, .exercise-library, .account-page, .progress-page) :is(.status-success, .status-error):not(:has(> svg))::before,
+.status-warning:not(:has(> svg))::before {
+  content: ''; flex-shrink: 0; width: 1rem; height: 1rem; margin-top: .125rem; background-color: currentColor;
+  -webkit-mask: var(--status-icon) center / contain no-repeat; mask: var(--status-icon) center / contain no-repeat;
+}

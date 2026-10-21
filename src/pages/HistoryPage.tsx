@@ -244,7 +244,7 @@ export function HistoryPage() {
     {historyReader.snapshot().local.filter(s=>!isInitialSession(s.id)).map(session=><SessionCard key={session.id} session={session} expanded={expandedSessionId===session.id} onToggle={()=>setExpandedSessionId(expandedSessionId===session.id?null:session.id)} onDelete={()=>void removeSession(session)} getExerciseById={getExerciseById} templates={templates} />)}
   </section>
   if (!historySummary) return null
-  if (historySummary.sessionCount === 0 && !sessionsError) return <section className="card p-6 md:p-8">
+  if (historySummary.sessionCount === 0 && !sessionsError) return <section className="training-headline">
     <h2 className="display-title">Tu progreso empieza con una sesión</h2>
     <p className="mt-3 max-w-xl text-secondary">Aquí podrás revisar tus entrenamientos, editar registros y comparar tus marcas por ejercicio.</p>
     <Link to={templates.some(template => template.exercises.length) ? '/' : '/rutina/editar'} className="btn-primary mt-5 w-full sm:w-auto">
@@ -274,7 +274,7 @@ export function HistoryPage() {
         </p>
       )}
 
-      <header className="border-b border-line/50 pb-5">
+      <header className="border-b border-t-[3px] border-b-line/50 border-t-brand pb-5 pt-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="eyebrow">Cada serie cuenta</p>
@@ -285,7 +285,7 @@ export function HistoryPage() {
               <div><dd>{formatCompactNumber(historySummary.totalVolume)}<small> kg</small></dd><dt>Volumen total</dt></div>
             </dl>
           </div>
-          {historySummary.streakWeeks > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand">
+          {historySummary.streakWeeks > 0 && <span className="inline-flex items-center gap-1.5 text-sm font-extrabold text-brand">
             <Flame className="size-4" aria-hidden="true" />
             {historySummary.streakWeeks} {historySummary.streakWeeks === 1 ? 'semana' : 'semanas'} de racha
           </span>}
@@ -326,18 +326,18 @@ export function HistoryPage() {
         {selectedExercise && selectedSummary ? (
           <div className="space-y-4 p-3.5 sm:p-5">
             <div>
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
+              <span className="eyebrow mb-2 block">
                 Ejercicio seleccionado
               </span>
               <button
                 type="button"
                 onClick={() => setProgressSelectorOpen(true)}
-                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-control bg-raised px-3 py-2 text-left text-sm font-extrabold text-ink outline-none transition hover:bg-muted focus-visible:ring-4 focus-visible:ring-brand-soft sm:max-w-md"
+                className="exercise-picker flex min-h-14 w-full items-center justify-between gap-3 border-b-2 border-control pb-2 text-left text-ink outline-none transition hover:border-brand sm:max-w-xl"
                 aria-haspopup="dialog"
                 aria-expanded={progressSelectorOpen}
               >
-                <span className="min-w-0 truncate">{selectedExercise.name}</span>
-                <ChevronDown className="size-4 shrink-0 text-secondary" aria-hidden="true" />
+                <span className="min-w-0 break-words">{selectedExercise.name}</span>
+                <ChevronDown className="size-6 shrink-0 text-brand" aria-hidden="true" />
               </button>
             </div>
 
@@ -346,7 +346,8 @@ export function HistoryPage() {
                 <div className="exercise-identity flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="eyebrow">{selectedExercise.muscleGroup ?? 'Ejercicio'}</p>
-                    <h3 className="mt-1 text-xl font-extrabold text-ink">{selectedExercise.name}</h3>
+                    {/* El selector de arriba ya muestra el nombre en grande. */}
+                    <h3 className="sr-only">{selectedExercise.name}</h3>
                     <p className="mt-1 text-sm font-medium text-secondary">
                       Última sesión: {latestProgressSession
                         ? formatDate(getSessionDateObject(latestProgressSession), {
@@ -360,7 +361,7 @@ export function HistoryPage() {
                       {formatWeight(selectedSummary.latestWeight)} kg · {selectedSummary.latestReps || 'sin reps'}
                     </p>
                   </div>
-                  <span className="rounded-md bg-raised px-2 py-1 text-xs font-bold text-secondary">
+                  <span className="text-xs font-bold text-secondary">
                     Peso de trabajo por fecha
                   </span>
                 </div>
@@ -388,7 +389,7 @@ export function HistoryPage() {
               {chartEntries.length > 0 ? (
                 <ProgressLineChart entries={chartEntries} />
               ) : (
-                <div className="rounded-xl border border-dashed border-line bg-muted/60 px-4 py-8 text-center">
+                <div className="border-y border-line/50 px-4 py-8 text-center">
                   <BarChart3 className="mx-auto size-7 text-subtle" aria-hidden="true" />
                   <p className="mt-2 text-sm font-semibold text-secondary">
                     Guarda una sesión con este ejercicio para ver su evolución.
@@ -469,7 +470,7 @@ export function HistoryPage() {
               <span className="block truncate text-xs font-semibold text-secondary">{filterSummary}</span>
             </span>
             {activeFilterCount > 0 && (
-              <span className="ml-auto shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-extrabold text-brand">
+              <span className="ml-auto shrink-0 text-sm font-extrabold tabular-nums text-brand">
                 {activeFilterCount}
               </span>
             )}
@@ -487,7 +488,7 @@ export function HistoryPage() {
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Ejercicio</span>
             <select
-              className="input min-h-12 !text-left !font-semibold"
+              className="input input-line min-h-12 !text-left !font-semibold"
               value={filterExerciseId}
               onChange={(event) => {
                 setFilterExerciseId(event.target.value)
@@ -503,7 +504,7 @@ export function HistoryPage() {
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Día</span>
             <select
-              className="input min-h-12 !text-left !font-semibold"
+              className="input input-line min-h-12 !text-left !font-semibold"
               value={filterDay}
               onChange={(event) => {
                 setFilterDay(event.target.value)
@@ -519,7 +520,7 @@ export function HistoryPage() {
           <label>
             <span className="mb-1 block text-xs font-bold text-secondary">Periodo</span>
             <select
-              className="input min-h-12 !text-left !font-semibold"
+              className="input input-line min-h-12 !text-left !font-semibold"
               value={rangeFilter}
               onChange={(event) => {
                 setRangeFilter(event.target.value as RangeFilter)
@@ -669,11 +670,12 @@ function SessionCard({
               <span className="whitespace-nowrap">{formatCompactNumber(volume)} kg</span>
             </p>
           </div>
-          <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${
-            status === 'Completada'
-              ? 'bg-success-soft text-success-text'
-              : 'bg-warning-soft text-warning-text'
+          <span className={`inline-flex shrink-0 items-center gap-1.5 pt-0.5 text-xs font-bold ${
+            status === 'Completada' ? 'text-success-text' : 'text-warning-text'
           }`}>
+            {status === 'Completada'
+              ? <CheckCircle2 className="size-4" aria-hidden="true" />
+              : <AlertCircle className="size-4" aria-hidden="true" />}
             {status}
           </span>
         </div>
@@ -809,25 +811,25 @@ function ExerciseProgressSelector({
   useModalFocus(dialogRef, onClose, window.matchMedia('(min-width: 640px)').matches ? 'input' : 'button')
   return (
     <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-end bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Seleccionar ejercicio">
-      <div className="max-h-[86vh] w-full overflow-hidden rounded-3xl border border-line bg-surface shadow-card sm:max-w-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-line bg-muted/40 p-4 sm:p-5">
+      <div className="max-h-[86vh] w-full overflow-hidden rounded-[8px] bg-surface shadow-card sm:max-w-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-line/50 p-4 sm:p-5">
           <div>
-            <h3 className="text-xl font-extrabold text-ink">Seleccionar ejercicio</h3>
+            <h3 className="text-2xl font-extrabold tracking-[-0.04em] text-ink">Seleccionar ejercicio</h3>
           </div>
-          <button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-raised" aria-label="Cerrar selector">
+          <button type="button" onClick={onClose} className="-mr-2 grid size-11 shrink-0 place-items-center rounded-[3px] text-secondary hover:text-ink" aria-label="Cerrar selector">
             <X className="size-5" aria-hidden="true" />
           </button>
         </div>
 
         <div className="space-y-3 p-4 sm:p-5">
           <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
+            <span className="mb-1 block text-xs font-bold text-secondary">
               Buscar
             </span>
             <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
               <input
-                className="input min-h-12 !text-left !font-semibold pl-9"
+                className="input input-line min-h-12 !text-left !font-semibold pl-9"
                 value={search}
                 placeholder="Buscar ejercicio..."
                 onChange={(event) => onSearchChange(event.target.value)}
@@ -836,7 +838,7 @@ function ExerciseProgressSelector({
           </label>
           <p className="sr-only" role="status">{countLabel(summaries.length, 'ejercicio encontrado', 'ejercicios encontrados')}</p>
 
-          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[52vh] divide-y divide-line/40 overflow-y-auto pr-1">
             {summaries.map((summary) => {
               const selected = summary.exercise.id === selectedExerciseId
               return (
@@ -844,14 +846,12 @@ function ExerciseProgressSelector({
                   key={summary.exercise.id}
                   type="button"
                   onClick={() => onSelect(summary)}
-                  className={`w-full rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
-                    selected
-                      ? 'border-brand bg-brand-soft text-ink ring-2 ring-brand-soft'
-                      : 'border-line bg-raised hover:border-brand/50 hover:bg-muted/60'
+                  className={`w-full px-2 py-3 text-left transition ${
+                    selected ? 'bg-brand-soft/70' : 'hover:bg-raised'
                   }`}
                   aria-pressed={selected}
                 >
-                  <span className="block font-extrabold leading-tight text-ink">{summary.exercise.name}</span>
+                  <span className={`block font-extrabold leading-tight ${selected ? 'text-brand' : 'text-ink'}`}>{summary.exercise.name}</span>
                   <span className="mt-1 block text-xs font-semibold text-secondary">
                     {formatWeight(summary.bestWeight)} kg · {countLabel(summary.sessionCount, 'sesión', 'sesiones')} · última: {summary.latestReps || 'sin reps'}
                   </span>
@@ -859,7 +859,7 @@ function ExerciseProgressSelector({
               )
             })}
             {summaries.length === 0 && (
-              <p className="rounded-2xl border border-dashed border-line p-4 text-center text-sm font-semibold text-secondary">
+              <p className="py-6 text-sm font-semibold text-secondary">
                 No hay ejercicios que coincidan con la búsqueda.
               </p>
             )}
@@ -937,10 +937,8 @@ function EmptyHistoryState({
   showAction?: boolean
 }) {
   return (
-    <div className="card border-dashed px-5 py-10 text-center">
-      <span className="mx-auto grid size-12 place-items-center rounded-xl bg-muted text-subtle">
-        <Dumbbell className="size-7" aria-hidden="true" />
-      </span>
+    <div className="border-y border-line/50 px-5 py-10 text-center">
+      <Dumbbell className="mx-auto size-7 text-subtle" aria-hidden="true" />
       <h3 className="mt-4 text-lg font-extrabold text-ink">{title}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-secondary">
         {message}
@@ -956,9 +954,9 @@ function EmptyHistoryState({
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-brand-soft pl-2.5 pr-1 text-xs font-bold text-brand">
+    <span className="inline-flex min-h-7 items-center gap-1 rounded-[3px] border border-brand/40 pl-2.5 pr-1 text-xs font-bold text-brand">
       {label}
-      <button type="button" onClick={onRemove} className="grid size-6 place-items-center rounded-full hover:bg-brand/10" aria-label={`Quitar filtro ${label}`}>
+      <button type="button" onClick={onRemove} className="grid size-6 place-items-center rounded-[3px] hover:bg-brand/10" aria-label={`Quitar filtro ${label}`}>
         <X className="size-3.5" aria-hidden="true" />
       </button>
     </span>

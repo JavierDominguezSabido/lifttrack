@@ -3,7 +3,9 @@ import {
   Archive,
   ArrowDown,
   ArrowLeft,
+  ArrowRight,
   ArrowUp,
+  ChevronDown,
   Edit3,
   Plus,
   Save,
@@ -11,7 +13,7 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AccountSettings } from '../components/settings/AccountSettings'
 import { DataSettings } from '../components/settings/DataSettings'
@@ -266,22 +268,22 @@ function SettingsPageContent() {
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p role="alert" className="status-error">{error}</p>}
         {routineDirty && <p role="status" className="text-sm text-secondary">Tienes cambios sin guardar. El borrador se conserva al volver a esta pantalla.</p>}
-        <Link to="/rutina/ejercicios" className="btn-secondary">Gestionar ejercicios</Link>
+        <Link to="/rutina/ejercicios" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-secondary hover:text-ink">Gestionar ejercicios<ArrowRight className="size-4" aria-hidden="true" /></Link>
 
-        <section aria-label="Editar entrenamientos por día" className="grid grid-cols-1 items-start gap-4">
+        <section aria-label="Editar entrenamientos por día" className="grid grid-cols-1 items-start gap-10">
           {orderedDrafts.map((template) => (
-            <article id={template.id} key={template.id} className="card scroll-mt-24 overflow-hidden">
-              <header className="border-b border-line/70 p-3.5 sm:p-4">
+            <article id={template.id} key={template.id} className="day-editor scroll-mt-24">
+              <header className="py-4">
                 {template.name.toLocaleLowerCase() !== dayNames[template.dayOfWeek].toLocaleLowerCase() && (
-                  <p className="mb-1 text-xs font-bold uppercase tracking-wider text-brand">
+                  <p className="eyebrow mb-2 !text-brand">
                     {dayNames[template.dayOfWeek]}
                   </p>
                 )}
-                <h2 className="text-xl font-extrabold text-ink">{template.name}</h2>
-                {template.notes && <p className="mt-1 text-sm text-secondary">{template.notes}</p>}
+                <h2>{template.name}</h2>
+                {template.notes && <p className="mt-2 text-sm text-secondary">{template.notes}</p>}
               </header>
 
-              <div className="space-y-2.5 p-3 sm:p-4">
+              <div className="space-y-3">
                 {template.exercises.map((item, index) => (
                   <RoutineExerciseEditor
                     key={item.id}
@@ -307,16 +309,16 @@ function SettingsPageContent() {
                   />
                 ))}
                 {template.exercises.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-line p-5 text-center text-sm text-secondary">
+                  <p className="border-b border-line/40 py-5 text-sm text-secondary">
                     No hay ejercicios en este día.
                   </p>
                 )}
 
-                <div className="grid gap-2 border-t border-line/70 pt-3 sm:grid-cols-[1fr_auto]">
+                <div className="grid gap-2 pt-2 sm:grid-cols-[1fr_auto]">
                   <select
                     aria-label={`Ejercicio para ${template.name}`}
                     value={daySelections[template.id] ?? ''}
-                    className="input !text-left !font-semibold"
+                    className="input input-line !text-left !font-semibold"
                     onChange={(event) => setDaySelections((current) => ({
                       ...current,
                       [template.id]: event.target.value
@@ -339,21 +341,21 @@ function SettingsPageContent() {
                     <Plus className="size-4" /> Añadir al día
                   </button>
                 </div>
-                <button type="button" onClick={() => navigate('/rutina/ejercicios?ejercicio=nuevo')} className="text-sm font-bold text-brand">
+                <button type="button" onClick={() => navigate('/rutina/ejercicios?ejercicio=nuevo')} className="min-h-11 text-left text-sm font-bold text-brand">
                   ¿No está en la lista? Crear ejercicio nuevo
                 </button>
               </div>
 
-              {template.exercises.length > 0 && !routineDirty && <div className="border-t border-line/70 p-3 sm:p-4">
-                <Link to={`/entrenamiento/${template.id}`} className="text-sm font-bold text-brand">
-                  Entrenar {template.name.toLowerCase()}
+              {template.exercises.length > 0 && !routineDirty && <div className="mt-2 border-t border-line/40 pt-2">
+                <Link to={`/entrenamiento/${template.id}`} className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-brand">
+                  Entrenar {template.name.toLowerCase()}<ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               </div>}
             </article>
           ))}
         </section>
 
-        <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 grid gap-2 rounded-xl border border-line/70 bg-surface/95 p-3 shadow-card backdrop-blur-xl sm:grid-cols-2 lg:bottom-4 lg:left-[264px] lg:right-8">
+        <div className="save-bar fixed inset-x-0 z-20 grid grid-cols-2 gap-2 border-t border-line bg-canvas/95 px-4 py-3 backdrop-blur-sm lg:bottom-4 lg:left-[264px] lg:right-8 lg:rounded-[5px] lg:border">
           <button type="button" disabled={!routineDirty} onClick={async () => {
             if (!await confirmAction('¿Descartar los cambios sin guardar de la rutina?')) return
             try { sessionStorage.removeItem(routineDraftKey); sessionStorage.removeItem(routineDraftKey + '.fields') } catch { /* Continúa en memoria. */ }
@@ -361,10 +363,10 @@ function SettingsPageContent() {
             setError(null)
             setMessage(null)
             setRoutineDirty(false)
-          }} className="btn-secondary w-full">
+          }} className="btn-secondary w-full !px-3">
             Descartar cambios
           </button>
-          <button type="button" disabled={!routineDirty} onClick={persistRoutine} className="btn-primary w-full">
+          <button type="button" disabled={!routineDirty} onClick={persistRoutine} className="btn-primary w-full !px-3">
             <Save className="size-4" /> Guardar cambios
           </button>
         </div>
@@ -380,15 +382,16 @@ function SettingsPageContent() {
           title="Gestionar ejercicios"
           description="Busca, crea, edita o archiva ejercicios de la biblioteca."
           onBack={openOverview}
+          aside={<Link to="/rutina/editar" aria-label="Volver a editar rutina" className="inline-flex min-h-11 items-center text-sm font-bold text-brand">Editar rutina</Link>}
         />
 
         {message && <p role="status" className="status-success">{message}</p>}
         {error && <p role="alert" className="status-error">{error}</p>}
 
-        <section className="card space-y-3 p-3.5 sm:p-4">
+        <section className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
             <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-secondary">
+              <span className="mb-1 block text-xs font-bold text-secondary">
                 Buscar
               </span>
               <span className="relative block">
@@ -396,7 +399,7 @@ function SettingsPageContent() {
                 <input
                   value={exerciseSearch}
                   onChange={(event) => setExerciseSearch(event.target.value)}
-                  className="input !text-left !font-semibold pl-9"
+                  className="input input-line !text-left !font-semibold pl-9"
                   placeholder="Buscar ejercicio..."
                 />
               </span>
@@ -414,7 +417,7 @@ function SettingsPageContent() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+          <div className="grid grid-cols-3">
             {([
               ['active', 'Activos'],
               ['all', 'Todos'],
@@ -424,8 +427,8 @@ function SettingsPageContent() {
                 key={value}
                 type="button"
                 onClick={() => setExerciseStatus(value)}
-                className={`min-h-10 rounded-lg px-1 text-xs font-bold transition sm:text-sm ${
-                  exerciseStatus === value ? 'bg-surface text-ink shadow-sm' : 'text-secondary'
+                className={`min-h-12 border-b-2 px-1 text-sm font-bold transition ${
+                  exerciseStatus === value ? 'border-brand text-brand' : 'border-line text-secondary hover:text-ink'
                 }`}
               >
                 {label}
@@ -434,7 +437,6 @@ function SettingsPageContent() {
           </div>
         </section>
 
-        <Link to="/rutina/editar" className="btn-secondary">Volver a editar rutina</Link>
         {exerciseParam && !showExerciseForm && <p role="alert" className="status-error">Este ejercicio ya no está en la biblioteca. Puedes crear uno nuevo.</p>}
         {showExerciseForm && (
           <ExerciseForm
@@ -455,25 +457,25 @@ function SettingsPageContent() {
           />
         )}
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-x-8 md:grid-cols-2">
           {filteredExercises.map((exercise) => (
-            <article key={exercise.id} className={`card p-3.5 ${exercise.active ? '' : 'opacity-70'}`}>
+            <article key={exercise.id} className={`border-b border-line/60 py-4 ${exercise.active ? '' : 'opacity-70'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="break-words font-extrabold text-ink">{exercise.name}</h3>
+                  <h3 className="break-words text-lg font-bold tracking-[-0.02em] text-ink">{exercise.name}</h3>
                   <p className="mt-1 text-xs font-semibold text-secondary">
                     {exercise.muscleGroup || 'Sin grupo muscular'}
                     {!exercise.active && ' · Archivado'}
                   </p>
                   {exercise.notes && <p className="mt-2 text-sm text-secondary">{exercise.notes}</p>}
                 </div>
-                <span className={`rounded-full px-2 py-1 text-xs font-bold ${
-                  exercise.active ? 'bg-success-soft text-success-text' : 'bg-muted text-secondary'
+                <span className={`shrink-0 pt-1 text-xs font-extrabold uppercase tracking-[0.12em] ${
+                  exercise.active ? 'text-secondary' : 'text-subtle'
                 }`}>
                   {exercise.active ? 'Activo' : 'Inactivo'}
                 </span>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={async () => {
@@ -510,7 +512,7 @@ function SettingsPageContent() {
           ))}
         </div>
         {filteredExercises.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-line p-5 text-center text-sm font-semibold text-secondary">
+          <p className="py-6 text-sm font-semibold text-secondary">
             No hay ejercicios que coincidan con la búsqueda.
           </p>
         )}
@@ -520,7 +522,7 @@ function SettingsPageContent() {
 
   return (
       <div className="account-page space-y-4 md:space-y-5">
-      <header className="account-intro hidden lg:block"><p className="eyebrow">Tu espacio</p><h2>Cuenta y datos</h2><p>Gestiona tu sesión y tus entrenamientos.</p></header>
+      <header className="account-intro"><p className="eyebrow">Tu espacio</p><h2>Cuenta y datos</h2><p>Gestiona tu sesión y tus entrenamientos.</p></header>
       <SettingsAccordionHeader
         id="account"
         title="Cuenta y sincronización"
@@ -564,18 +566,14 @@ function SettingsAccordionHeader({
     <button
       type="button"
       onClick={() => onOpen(id)}
-      className={`card flex min-h-16 w-full items-center justify-between gap-3 p-3.5 text-left transition ${
-        open ? '!border-brand/50' : ''
-      }`}
+      className="card flex min-h-16 w-full items-center justify-between gap-3 py-4 text-left transition"
       aria-expanded={open}
     >
       <span className="min-w-0">
-        <span className="block font-extrabold text-ink">{title}</span>
+        <span className="block text-xl font-extrabold tracking-[-0.035em] text-ink">{title}</span>
         <span className="mt-0.5 block truncate text-xs font-semibold text-secondary">{summary}</span>
       </span>
-      <span className="rounded-md bg-muted px-2 py-1 text-xs font-extrabold text-secondary">
-        {open ? 'Abierto' : 'Abrir'}
-      </span>
+      <ChevronDown className={`size-5 shrink-0 text-secondary transition-transform ${open ? 'rotate-180 text-brand' : ''}`} aria-hidden="true" />
     </button>
   )
 }
@@ -584,22 +582,27 @@ function SettingsSubpageHeader({
   eyebrow,
   title,
   description,
-  onBack
+  onBack,
+  aside
 }: {
   eyebrow?: string
   title: string
   description: string
   onBack: () => void
+  aside?: ReactNode
 }) {
   return (
-    <section className="card p-4 md:p-5">
-      <button type="button" onClick={onBack} className="btn-secondary mb-3">
-        <ArrowLeft className="size-4" /> Volver a rutina
-      </button>
-      {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
-      <h2 className="text-2xl font-extrabold tracking-tight text-ink">{title}</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{description}</p>
-    </section>
+    <header className="page-head">
+      <div className="flex items-center justify-between gap-4">
+        <button type="button" onClick={onBack} className="-ml-1 inline-flex min-h-11 items-center gap-2 px-1 text-sm font-bold text-secondary hover:text-ink">
+          <ArrowLeft className="size-4" /> Volver a rutina
+        </button>
+        {aside}
+      </div>
+      <p className="eyebrow mt-4">{eyebrow ?? 'Planificación'}</p>
+      <h2 className="page-title">{title}</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary">{description}</p>
+    </header>
   )
 }
 
@@ -627,31 +630,31 @@ function RoutineExerciseEditor({
   onFieldChange: (field: 'target' | 'rest', value: string) => void
 }) {
   return (
-    <div className="rounded-xl border border-line/70 bg-raised p-3">
-      <div className="flex items-start gap-2">
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-xs font-extrabold">
-          {item.order}
+    <div className="border-b border-line/40 pb-4 pt-1">
+      <div className="flex items-start gap-3">
+        <span className="w-7 shrink-0 pt-0.5 text-lg font-medium tabular-nums text-subtle">
+          {String(item.order).padStart(2, '0')}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-extrabold text-ink">{exercise?.name ?? 'Ejercicio no disponible'}</p>
-          <p className="text-xs text-secondary">{exercise?.muscleGroup || 'Sin grupo muscular'}</p>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="font-bold text-ink">{exercise?.name ?? 'Ejercicio no disponible'}</p>
+          <p className="mt-0.5 text-xs text-secondary">{exercise?.muscleGroup || 'Sin grupo muscular'}</p>
         </div>
-        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-11 shrink-0 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label={`Subir ${exercise?.name ?? 'ejercicio'}`}>
+        <button type="button" disabled={first} onClick={() => onMove(-1)} className="grid size-11 shrink-0 place-items-center rounded-[3px] border border-line/65 text-secondary hover:text-ink disabled:opacity-30" aria-label={`Subir ${exercise?.name ?? 'ejercicio'}`}>
           <ArrowUp className="size-4" />
         </button>
-        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-11 shrink-0 place-items-center rounded-lg border border-line disabled:opacity-30" aria-label={`Bajar ${exercise?.name ?? 'ejercicio'}`}>
+        <button type="button" disabled={last} onClick={() => onMove(1)} className="grid size-11 shrink-0 place-items-center rounded-[3px] border border-line/65 text-secondary hover:text-ink disabled:opacity-30" aria-label={`Bajar ${exercise?.name ?? 'ejercicio'}`}>
           <ArrowDown className="size-4" />
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 lg:gap-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 pl-10 lg:gap-4">
         <label className="text-xs font-bold text-secondary">
           Objetivo
           <input
             value={fields?.target ?? formatTarget(item.targetSets, item.targetReps)}
             onChange={event => onFieldChange('target',event.target.value)}
             aria-invalid={fields?.target !== undefined && !parseTarget(fields.target)}
-            className="input mt-1 !text-left"
+            className="input input-line mt-1 !text-left"
             placeholder="3×8"
             aria-label={`Objetivo de ${exercise?.name ?? 'ejercicio'}: series por repeticiones, por ejemplo 3×8`}
             onBlur={(event) => {
@@ -670,7 +673,7 @@ function RoutineExerciseEditor({
             value={fields?.rest ?? (item.restSeconds ? formatRestSeconds(item.restSeconds) : '0:00')}
             onChange={event => onFieldChange('rest',event.target.value)}
             aria-invalid={fields?.rest !== undefined && parseRest(fields.rest) === null}
-            className="input mt-1 !text-left"
+            className="input input-line mt-1 !text-left"
             placeholder="1:30"
             aria-label={`Descanso de ${exercise?.name ?? 'ejercicio'} en minutos y segundos, por ejemplo 1:30`}
             onBlur={(event) => {
@@ -684,16 +687,16 @@ function RoutineExerciseEditor({
           />
         </label>
       </div>
-      <label className="mt-2 block text-xs font-bold text-secondary">
+      <label className="ml-10 mt-3 block text-xs font-bold text-secondary">
         Nota para esta rutina
         <textarea
           value={item.notes ?? ''}
           onChange={(event) => onChange({ notes: event.target.value })}
-          className="mt-1 min-h-20 w-full rounded-xl border border-control bg-raised px-3 py-2.5 text-base font-medium text-ink outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft"
+          className="input-line mt-1 min-h-16 w-full px-3 py-2.5 text-base font-medium text-ink outline-none placeholder:text-subtle"
           placeholder="Nota específica opcional"
         />
       </label>
-      <button type="button" onClick={onRemove} className="mt-2 inline-flex min-h-11 items-center gap-2 px-2 text-sm font-bold text-danger-text">
+      <button type="button" onClick={onRemove} className="ml-10 mt-1 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-danger-text">
         <Trash2 className="size-4" /> Quitar del día
       </button>
     </div>
@@ -778,10 +781,10 @@ function ExerciseForm({
   }
 
   return (
-    <form ref={formRef} onSubmit={submit} className="card scroll-mt-24 space-y-3 p-4 sm:p-5">
+    <form ref={formRef} onSubmit={submit} className="scroll-mt-24 space-y-4 border-t-2 border-brand pt-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-extrabold">{exercise ? 'Editar ejercicio' : 'Nuevo ejercicio'}</h3>
-        <button type="button" onClick={onCancel} className="grid size-11 place-items-center rounded-xl" aria-label="Cerrar">
+        <h3 className="text-2xl font-extrabold tracking-[-0.04em]">{exercise ? 'Editar ejercicio' : 'Nuevo ejercicio'}</h3>
+        <button type="button" onClick={onCancel} className="-mr-2 grid size-11 place-items-center rounded-[3px] text-secondary hover:text-ink" aria-label="Cerrar">
           <X className="size-5" />
         </button>
       </div>
@@ -791,18 +794,18 @@ function ExerciseForm({
       </p>}
       <label className="block text-sm font-bold text-secondary">
         Nombre *
-        <input aria-required="true" aria-invalid={!!error && !name.trim()} aria-describedby={error ? 'exercise-form-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} className="input mt-1 !text-left" placeholder="Press banca" />
+        <input aria-required="true" aria-invalid={!!error && !name.trim()} aria-describedby={error ? 'exercise-form-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} className="input input-line mt-1 !text-left" placeholder="Press banca" />
       </label>
       <label className="block text-sm font-bold text-secondary">
         Grupo muscular
-        <select value={muscleGroup} onChange={(event) => setMuscleGroup(event.target.value as MuscleGroup | '')} className="input mt-1 !text-left !font-semibold">
+        <select value={muscleGroup} onChange={(event) => setMuscleGroup(event.target.value as MuscleGroup | '')} className="input input-line mt-1 !text-left !font-semibold">
           <option value="">Sin especificar</option>
           {muscleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
         </select>
       </label>
       <label className="block text-sm font-bold text-secondary">
         Nota técnica
-        <textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 min-h-24 w-full rounded-xl border border-control bg-raised px-3 py-2.5 text-base text-ink outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft" />
+        <textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="input-line mt-1 min-h-24 w-full px-3 py-2.5 text-base text-ink outline-none" />
       </label>
       <button type="submit" className="btn-primary w-full">
         <Save className="size-4" /> Guardar cambios
