@@ -256,4 +256,32 @@ describe('persistencia del entrenamiento ante fallos y respuestas tardías', () 
     expect(screen.getByText('Historial guardado')).toBeTruthy()
   })
 
+  it('en móvil empieza guiado, en escritorio completo y un borrador retomado conserva su modo', async () => {
+    const pressed = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed')
+    const viewport = (mobile: boolean) => vi.stubGlobal('matchMedia', () => ({ matches: mobile }))
+    try {
+      viewport(false)
+      let page = mount()
+      await settle()
+      expect(pressed('Vista completa')).toBe('true')
+      page.unmount()
+
+      viewport(true)
+      page = mount()
+      await settle()
+      expect(pressed('Modo guiado')).toBe('true')
+      fireEvent.click(screen.getByRole('button', { name: 'Vista completa' }))
+      fireEvent.click(screen.getByRole('button', { name: /^Marcar como hecha la serie 1 de / }))
+      expect(stored().viewMode).toBe('full')
+      const route = workoutDraftUrl(stored())
+      page.unmount()
+
+      mount(route)
+      await settle()
+      expect(pressed('Vista completa')).toBe('true')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
 })

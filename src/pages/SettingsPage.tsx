@@ -258,7 +258,6 @@ function SettingsPageContent() {
     return (
       <div className="routine-editor space-y-4 md:space-y-5 pb-[calc(12rem+env(safe-area-inset-bottom))] lg:pb-28">
         <SettingsSubpageHeader
-          eyebrow="Rutina"
           title="Editar rutina"
           description="Añade ejercicios a tus días y ajusta series, repeticiones y descansos."
           onBack={openOverview}
@@ -273,10 +272,12 @@ function SettingsPageContent() {
           {orderedDrafts.map((template) => (
             <article id={template.id} key={template.id} className="card scroll-mt-24 overflow-hidden">
               <header className="border-b border-line/70 p-3.5 sm:p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-brand">
-                  {dayNames[template.dayOfWeek]}
-                </p>
-                <h2 className="mt-1 text-xl font-extrabold text-ink">{template.name}</h2>
+                {template.name.toLocaleLowerCase() !== dayNames[template.dayOfWeek].toLocaleLowerCase() && (
+                  <p className="mb-1 text-xs font-bold uppercase tracking-wider text-brand">
+                    {dayNames[template.dayOfWeek]}
+                  </p>
+                )}
+                <h2 className="text-xl font-extrabold text-ink">{template.name}</h2>
                 {template.notes && <p className="mt-1 text-sm text-secondary">{template.notes}</p>}
               </header>
 
@@ -585,7 +586,7 @@ function SettingsSubpageHeader({
   description,
   onBack
 }: {
-  eyebrow: string
+  eyebrow?: string
   title: string
   description: string
   onBack: () => void
@@ -595,8 +596,8 @@ function SettingsSubpageHeader({
       <button type="button" onClick={onBack} className="btn-secondary mb-3">
         <ArrowLeft className="size-4" /> Volver a rutina
       </button>
-      <p className="eyebrow">{eyebrow}</p>
-      <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">{title}</h2>
+      {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
+      <h2 className="text-2xl font-extrabold tracking-tight text-ink">{title}</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{description}</p>
     </section>
   )

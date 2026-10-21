@@ -50,6 +50,11 @@ import { resolvePendingGuidedIndex } from '../utils/guidedWorkout'
 import { enqueueSyncOperation, pendingOperations } from '../services/syncOutbox'
 
 type WorkoutViewMode = 'full' | 'guided'
+
+// Un entrenamiento nuevo empieza guiado en móvil (bajo el lg de la barra lateral); un borrador conserva su modo.
+function getDefaultViewMode(): WorkoutViewMode {
+  return window.matchMedia?.('(max-width: 1023px)').matches ? 'guided' : 'full'
+}
 type DraftSyncStatus = 'local-error' | 'idle' | 'local' | 'pending' | 'syncing' | 'synced' | 'error'
 type DraftHydrationStatus = 'hydrating' | 'ready' | 'error'
 
@@ -286,7 +291,7 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
       startedAt: sameDayDraft?.startedAt ?? new Date().toISOString(),
       pendingDraft: null,
       draftActive: Boolean(canAutoRestore),
-      viewMode: sameDayDraft?.viewMode ?? 'full',
+      viewMode: sameDayDraft ? sameDayDraft.viewMode ?? 'full' : getDefaultViewMode(),
       guidedPosition: sameDayDraft?.guidedPosition ?? null
     }
   }
@@ -717,7 +722,7 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
             setLogs(freshLogs)
             setStartedAt(new Date().toISOString())
             setDraftActive(false)
-            setViewMode('full')
+            setViewMode(getDefaultViewMode())
             setGuidedPosition(null)
           }
           void deleteRemoteWorkoutDraft(template.dayOfWeek, getWorkoutRemoteDraftKey(localDate, template, startedAt), user.id).catch((error) => setDraftSyncError(getDraftSyncErrorMessage(error)))
@@ -824,7 +829,7 @@ function WorkoutPageContent({ recoveredDraft, onStarted }: { recoveredDraft: Sto
     setStartedAt(draftToRestore?.startedAt ?? new Date().toISOString())
     setPendingDraft(null)
     setDraftActive(Boolean(draftToRestore))
-    setViewMode(draftToRestore?.viewMode ?? 'full')
+    setViewMode(draftToRestore ? draftToRestore.viewMode ?? 'full' : getDefaultViewMode())
     setGuidedPosition(draftToRestore?.guidedPosition ?? null)
     setSaveError(null)
   }, [clearFullScrollPosition, draftActive, draftHydrationStatus, exercises, guidedPosition, hasDraftState, localDate, logs, sessions, startedAt, template, userChangeRevision, userKey, viewMode])

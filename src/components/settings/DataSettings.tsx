@@ -322,8 +322,7 @@ function DataSettingsContent({ fullSessions }: { fullSessions: WorkoutSession[] 
   return (
     <section className="card overflow-hidden" aria-labelledby="data-settings-title">
       <header className="border-b border-line/70 p-4 md:p-5">
-        <p className="eyebrow">Datos</p>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="data-settings-title" className="text-xl font-extrabold tracking-tight text-ink">
             Datos
           </h2>

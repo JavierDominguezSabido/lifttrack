@@ -108,8 +108,7 @@ export function AccountSettings() {
     <section className="card overflow-hidden" aria-labelledby="account-settings-title">
       <div className="flex flex-wrap items-start justify-between gap-4 p-4 md:p-5">
         <div>
-          <p className="eyebrow">Cuenta</p>
-          <h2 id="account-settings-title" className="mt-1 text-xl font-extrabold tracking-tight text-ink">
+          <h2 id="account-settings-title" className="text-xl font-extrabold tracking-tight text-ink">
             Cuenta y sincronización
           </h2>
           {user?.email && <p className="mt-1 break-all text-sm font-semibold text-secondary">{user.email}</p>}

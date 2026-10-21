@@ -32,7 +32,7 @@ export function RoutinePage() {
       </nav>
       {selected && <section className="training-plan">
         <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div><p className="eyebrow">{dayNames[selected.dayOfWeek]}</p><h3 className="mt-1 text-2xl font-semibold">{selected.name}</h3>{selected.notes && <p className="mt-2 text-sm text-secondary">{selected.notes}</p>}</div>
+          <div>{selected.name.toLocaleLowerCase() !== dayNames[selected.dayOfWeek].toLocaleLowerCase() && <p className="eyebrow mb-1">{dayNames[selected.dayOfWeek]}</p>}<h3 className="text-2xl font-semibold">{selected.name}</h3>{selected.notes && <p className="mt-2 text-sm text-secondary">{selected.notes}</p>}</div>
           <Link to={'/rutina/editar#' + encodeURIComponent(selected.id)} className="btn-secondary">Editar día</Link>
         </header>
         <div className="divide-y divide-line/40">{selected.exercises.map(item => <div key={item.id} className="py-1">

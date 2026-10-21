@@ -61,11 +61,12 @@
   --color-on-hero: 244 244 232;
   --color-hero-muted: 176 184 174;
   --color-hero-accent: 220 241 105;
-  --color-success: 119 194 162;
-  --color-success-solid: 119 194 162;
-  --color-success-solid-hover: 147 210 181;
-  --color-success-soft: 32 56 49;
-  --color-success-text: 155 220 191;
+  /* Un solo verde: «hecho» usa el lima de la marca; el icono distingue hecha de pendiente. */
+  --color-success: var(--color-brand);
+  --color-success-solid: var(--color-brand-solid);
+  --color-success-solid-hover: var(--color-brand-solid-hover);
+  --color-success-soft: var(--color-brand-soft);
+  --color-success-text: var(--color-brand);
   --color-danger: 228 137 143;
   --color-danger-soft: 65 39 45;
   --color-danger-text: 247 178 181;

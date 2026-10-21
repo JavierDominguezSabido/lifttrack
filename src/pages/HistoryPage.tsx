@@ -812,8 +812,7 @@ function ExerciseProgressSelector({
       <div className="max-h-[86vh] w-full overflow-hidden rounded-3xl border border-line bg-surface shadow-card sm:max-w-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-line bg-muted/40 p-4 sm:p-5">
           <div>
-            <p className="eyebrow">Ejercicio</p>
-            <h3 className="mt-1 text-xl font-extrabold text-ink">Seleccionar ejercicio</h3>
+            <h3 className="text-xl font-extrabold text-ink">Seleccionar ejercicio</h3>
           </div>
           <button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-raised" aria-label="Cerrar selector">
             <X className="size-5" aria-hidden="true" />

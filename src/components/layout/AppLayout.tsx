@@ -143,7 +143,8 @@ export function AppLayout() {
             <p className="hidden text-xs font-semibold text-subtle sm:block">{currentDate}</p>
             <h1 className="truncate text-lg font-extrabold tracking-tight lg:text-xl">{title}</h1>
           </div>
-          <span className="lifttrack-mark" aria-hidden="true">LT<span>/</span></span>
+          {/* En escritorio la marca ya está en la barra lateral. */}
+          <span className="lifttrack-mark lg:hidden" aria-hidden="true">LT<span>/</span></span>
         </header>
 
         <main id="main-content" tabIndex={-1} className="app-main mx-auto w-full max-w-[1600px] px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7 lg:pb-12 lg:pt-8">
