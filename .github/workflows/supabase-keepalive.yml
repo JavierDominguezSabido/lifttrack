@@ -1,0 +1,22 @@
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: "0 9 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      # RLS limita las tablas a "authenticated": con la clave anon responde 200 y [],
+      # pero la consulta llega a Postgres, que es lo que cuenta como actividad.
+      - name: Ping Supabase REST API
+        env:
+          URL: ${{ secrets.LIFTTRACK_URL }}
+          KEY: ${{ secrets.LIFTTRACK_KEY }}
+        run: |
+          curl -f -s -o /dev/null \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/workout_sessions?select=*&limit=1"
